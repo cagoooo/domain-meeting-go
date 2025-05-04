@@ -192,16 +192,23 @@ export default function Home() {
           return { id: photo.id, description: result.photoDescription };
         } catch (error) {
           console.error(`Error generating description for ${photo.file.name}:`, error);
-          return { id: photo.id, description: '無法描述此圖片。' }; // Set error message
+          // Ensure description is set even on error, possibly to the error message or a default
+          const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
+          const finalDescription = errorDescription.includes("safety") ? '無法描述此圖片（安全限制）。' : '無法描述此圖片。';
+          return { id: photo.id, description: finalDescription };
         }
       });
+
 
       const descriptions = await Promise.all(descriptionPromises);
 
       setPhotos(prev => prev.map(p => {
         const descData = descriptions.find(d => d.id === p.id);
-        return descData ? { ...p, description: descData.description, isGenerating: false } : { ...p, isGenerating: false };
+        // Fallback for potential undefined description, though the catch block should prevent this
+        const newDescription = descData?.description ?? '描述遺失。';
+        return descData ? { ...p, description: newDescription, isGenerating: false } : { ...p, isGenerating: false };
       }));
+
 
        toast({
          title: '成功',
@@ -244,14 +251,16 @@ export default function Home() {
       return;
     }
 
-    if (photos.some(p => !p.description || p.description === '無法描述此圖片。')) {
-      toast({
-        title: '請先產生照片描述',
-        description: '請確保所有照片都已成功產生描述。',
-        variant: 'destructive',
-      });
-      return;
+     // Check if any photo is still generating or failed generation
+    if (photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))) {
+        toast({
+            title: '請先成功產生所有照片描述',
+            description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。',
+            variant: 'destructive',
+        });
+        return;
     }
+
 
     setIsGeneratingSummary(true);
     try {
@@ -280,28 +289,71 @@ export default function Home() {
   }, [form, photos, toast]);
 
 
+  // Generates HTML content formatted for Word
   const generateReportContent = () => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
-    let report = `領域共學誌 會議報告\n\n`;
-    report += `教學領域： ${teachingArea}\n`;
-    report += `會議主題： ${meetingTopic}\n`;
-    report += `會議日期： ${format(meetingDate, 'yyyy年MM月dd日')}\n`;
-    report += `社群成員： ${communityMembers}\n\n`;
-    report += `--- 照片記錄 ---\n\n`;
+    // Basic CSS for formatting in Word
+    const styles = `
+      body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; }
+      h1 { color: #2E7D32; /* Dark Green */ text-align: center; border-bottom: 2px solid #C8E6C9; padding-bottom: 10px; }
+      h2 { color: #FFAB40; /* Orange */ border-bottom: 1px solid #FFF9C4; padding-bottom: 5px; margin-top: 20px; }
+      p { margin-bottom: 10px; }
+      strong { color: #555; }
+      ul { list-style-type: disc; margin-left: 20px; }
+      li { margin-bottom: 5px; }
+      .section { margin-bottom: 25px; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #f9f9f9;}
+      .photo-section li { border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
+      .summary-section { white-space: pre-wrap; /* Preserve whitespace */ }
+    `;
+
+    let reportHtml = `
+      <!DOCTYPE html>
+      <html lang="zh-TW">
+      <head>
+        <meta charset="UTF-8">
+        <title>領域共學誌 會議報告</title>
+        <style>${styles}</style>
+      </head>
+      <body>
+        <h1>領域共學誌 會議報告</h1>
+
+        <div class="section">
+          <h2>基本資訊</h2>
+          <p><strong>教學領域：</strong> ${teachingArea}</p>
+          <p><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p><strong>社群成員：</strong> ${communityMembers}</p>
+        </div>
+
+        <div class="section photo-section">
+          <h2>照片記錄</h2>
+          <ul>
+    `;
 
     photos.forEach((photo, index) => {
-      report += `照片 ${index + 1}:\n`;
-      report += `描述： ${photo.description || '未產生描述'}\n\n`;
-      // Note: Including actual images in a text file isn't feasible.
-      // Consider generating an HTML or PDF report for image inclusion.
+      reportHtml += `<li><strong>照片 ${index + 1} 描述：</strong> ${photo.description || '未產生描述'}</li>\n`;
+      // Note: Images are not embedded in this version. You could add base64 encoded images if needed, but it significantly increases file size.
+      // Example (requires readFileAsDataURL to be called again or store data URIs):
+      // reportHtml += `<p><img src="${photoDataUri}" alt="照片 ${index + 1}" width="300"></p>\n`;
     });
 
-    report += `--- 會議大綱摘要 ---\n\n`;
-    report += `${summary || '尚未產生摘要'}\n`;
+    reportHtml += `
+          </ul>
+        </div>
 
-    return report;
+        <div class="section summary-section">
+          <h2>會議大綱摘要</h2>
+          <p>${summary || '尚未產生摘要'}</p>
+        </div>
+
+      </body>
+      </html>
+    `;
+
+    return reportHtml;
   };
+
 
   const handleExportReport = useCallback(() => {
      const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
@@ -313,13 +365,24 @@ export default function Home() {
          });
          return;
      }
+      // Check for failed descriptions before exporting
+     if (photos.some(p => p.description.startsWith('無法描述'))) {
+        toast({
+            title: '無法匯出',
+            description: '報告中包含無法描述的照片，請確認所有照片描述是否成功產生。',
+            variant: 'destructive',
+        });
+        return;
+    }
 
     const reportContent = generateReportContent();
-    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+     // Use 'application/msword' for .doc compatibility and proper encoding preamble
+    const blob = new Blob([`\ufeff${reportContent}`], { type: 'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `領域共學誌_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.txt`;
+     // Change filename extension to .doc
+    const fileName = `領域共學誌_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.doc`;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
@@ -334,12 +397,16 @@ export default function Home() {
 
    // Effect to clear descriptions and summary when form fields change
    useEffect(() => {
-      const subscription = form.watch(() => {
-         setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
-         setSummary('');
+      const subscription = form.watch((value, { name, type }) => {
+         // Only reset if a form value actually changes, ignore initial load/watches
+         if (type === 'change') {
+           setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
+           setSummary('');
+         }
       });
       return () => subscription.unsubscribe();
    }, [form]);
+
 
   return (
     <>
@@ -350,7 +417,8 @@ export default function Home() {
       </header>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => {})} className="space-y-8">
+        {/* Removed onSubmit from form tag as individual buttons handle actions */}
+        <form className="space-y-8">
           <Card className="shadow-lg rounded-xl overflow-hidden">
              <CardHeader className="bg-secondary">
                 <CardTitle className="text-2xl text-secondary-foreground">第一步：輸入會議資訊</CardTitle>
@@ -520,17 +588,17 @@ export default function Home() {
                   <Button
                     type="button"
                     onClick={handleGenerateDescriptions}
-                    disabled={photos.some(p => p.isGenerating) || photos.every(p => p.description) || photos.length === 0}
+                     disabled={photos.some(p => p.isGenerating) || photos.length === 0 || photos.every(p => p.description && !p.isGenerating)} // Disable if all have description AND none are generating
                     className="w-full md:w-auto"
                     variant="secondary"
                   >
                      {photos.some(p => p.isGenerating) ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        產生中...
+                        描述產生中...
                       </>
                     ) : (
-                      '產生照片描述'
+                       photos.length > 0 && photos.every(p => p.description) ? '重新產生描述' : '產生照片描述'
                     )}
                   </Button>
                 </>
@@ -547,14 +615,18 @@ export default function Home() {
                <Button
                   type="button"
                   onClick={handleGenerateSummary}
-                  disabled={isGeneratingSummary || photos.length !== MAX_PHOTOS || photos.some(p => !p.description)}
+                  disabled={
+                      isGeneratingSummary ||
+                      photos.length !== MAX_PHOTOS ||
+                      photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))
+                  }
                   className="w-full md:w-auto"
                   variant="secondary"
                 >
                   {isGeneratingSummary ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      產生中...
+                      摘要產生中...
                     </>
                   ) : (
                     '產生會議摘要'
@@ -577,16 +649,20 @@ export default function Home() {
            <Card className="shadow-lg rounded-xl overflow-hidden">
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
-                <CardDescription className="text-primary-foreground/80">點擊下方按鈕，匯出完整的會議報告文字檔</CardDescription>
+                <CardDescription className="text-primary-foreground/80">點擊下方按鈕，匯出排版好的 Word (.doc) 檔案</CardDescription>
              </CardHeader>
              <CardContent className="p-6">
                  <Button
                     type="button"
                     onClick={handleExportReport}
-                    disabled={!summary || photos.length !== MAX_PHOTOS || photos.some(p => !p.description)}
+                    disabled={
+                        !summary || // Summary must exist
+                        photos.length !== MAX_PHOTOS || // Must have exactly MAX_PHOTOS
+                        photos.some(p => !p.description || p.description.startsWith('無法描述')) // All descriptions must exist and not be errors
+                    }
                     className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6"
                   >
-                    一鍵匯出會議報告 (.txt)
+                    匯出會議報告 (.doc)
                  </Button>
             </CardContent>
           </Card>
