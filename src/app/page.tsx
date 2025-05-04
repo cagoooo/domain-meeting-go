@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -30,7 +29,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress'; // Import Progress component
-import { generatePhotoDescriptions } from '@/ai/flows/generate-photo-descriptions';
+import { generatePhotoDescriptions, type GeneratePhotoDescriptionsOutput } from '@/ai/flows/generate-photo-descriptions';
 import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
@@ -54,6 +53,14 @@ type Photo = {
   isGenerating: boolean;
   dataUrl?: string; // Add dataUrl to store base64 representation
 };
+
+// Define a type for the result of individual description generation
+type DescriptionResult = {
+    id: string;
+    description: string;
+    success: boolean;
+};
+
 
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -81,7 +88,7 @@ export default function Home() {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
+      reader.readDataURL(file);
     });
   };
 
@@ -219,7 +226,7 @@ export default function Home() {
       return;
     }
 
-    // Reset descriptions for photos to be processed
+    // Reset descriptions for photos to be processed and set generating state
     setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, description: '', isGenerating: true } : p));
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0); // Start progress
@@ -227,23 +234,26 @@ export default function Home() {
     const totalToProcess = photosToProcess.length;
 
     try {
-        const descriptionPromises = photosToProcess.map(async (photo) => {
-           let descriptionResult: { id: string; description: string; success: boolean };
+        // Map photos to promises that resolve with DescriptionResult
+        const descriptionPromises = photosToProcess.map(async (photo): Promise<DescriptionResult> => {
+           let descriptionResult: DescriptionResult;
             try {
                 const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
                 if (!photo.dataUrl) {
-                    // Update state immutably
-                    setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
+                    // Update state immutably (but maybe do this less often?)
+                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
                 }
 
-                const result = await generatePhotoDescriptions({
+                 const result: GeneratePhotoDescriptionsOutput = await generatePhotoDescriptions({
                     teachingArea,
                     meetingTopic,
                     meetingDate: format(meetingDate, 'yyyy-MM-dd'),
                     communityMembers,
                     photoDataUri,
                 });
-                 descriptionResult = { id: photo.id, description: result.photoDescription, success: true };
+                 // Ensure description is not null/undefined and doesn't start with failure message
+                 const success = !!result.photoDescription && !result.photoDescription.startsWith('無法描述');
+                 descriptionResult = { id: photo.id, description: result.photoDescription || '描述失敗', success: success };
             } catch (error) {
                 console.error(`Error generating description for ${photo.file.name}:`, error);
                 const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
@@ -261,14 +271,16 @@ export default function Home() {
             return descriptionResult; // Return the result object
         });
 
-        // Wait for all promises to settle (either resolve or reject)
-        await Promise.allSettled(descriptionPromises);
+        // Wait for all promises to settle and get their results
+        const results = await Promise.allSettled(descriptionPromises);
 
-       // Final check after all promises are settled
-        const finalPhotos = photos; // Get the latest state after individual updates
-        const allSucceeded = finalPhotos
-            .filter(p => photosToProcess.some(ptp => ptp.id === p.id)) // Check only processed photos
-            .every(p => p.description && !p.description.startsWith('無法描述'));
+       // Check the results directly from the settled promises
+        let allSucceeded = true;
+        results.forEach(result => {
+            if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)) {
+                allSucceeded = false;
+            }
+        });
 
 
         if (allSucceeded) {
@@ -575,7 +587,7 @@ export default function Home() {
     `;
 
     // Initialize reportHtml with the starting HTML structure
-    let reportHtml = htmlStart;
+    let reportHtml = htmlStart; // Ensure reportHtml is declared here
 
     // Main title
     reportHtml += `<h1>領域共學誌 會議報告</h1>`;
@@ -605,7 +617,11 @@ export default function Home() {
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            content = `<p class="${forPrint ? 'photo-paragraph' : 'ImageParagraph'}" align=center><img class="${forPrint ? '' : 'PhotoStyle'}" src="${photo.dataUrl}" alt="${altText}"></p>`;
+             // Use ImageParagraph for Word, photo-paragraph for print/HTML
+             const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
+             // Use PhotoStyle for Word, standard img tag for print/HTML
+             const imgClass = forPrint ? '' : 'class="PhotoStyle"';
+             content = `<p class="${paragraphClass}" align=center><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
@@ -615,7 +631,9 @@ export default function Home() {
     // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${forPrint ? 'photo-description' : 'DescriptionStyle'}">${description}</p></td>`; // Removed width="50%"
+       // Use DescriptionStyle for Word, photo-description for print/HTML
+       const paragraphClass = forPrint ? 'photo-description' : 'DescriptionStyle';
+       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`; // Removed width="50%"
     }
 
     // Build the table content (2x4: two columns, four rows total)
@@ -1171,4 +1189,3 @@ export default function Home() {
     </>
   );
 }
-
