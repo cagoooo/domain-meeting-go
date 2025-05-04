@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -30,6 +29,7 @@ import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer } from 'luci
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress'; // Import Progress component
 import { generatePhotoDescriptions } from '@/ai/flows/generate-photo-descriptions';
 import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
 import { Toaster } from '@/components/ui/toaster';
@@ -61,6 +61,8 @@ export default function Home() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isExportingDoc, setIsExportingDoc] = useState(false); // Specific state for DOC export
   const [isPreparingPdf, setIsPreparingPdf] = useState(false); // Specific state for PDF preparation
+  const [descriptionProgress, setDescriptionProgress] = useState<number | null>(null); // State for progress bar
+  const [isGeneratingAllDescriptions, setIsGeneratingAllDescriptions] = useState(false); // State for overall description generation status
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printIframeRef = useRef<HTMLIFrameElement>(null); // Ref for the print iframe
   const { toast } = useToast();
@@ -160,7 +162,11 @@ export default function Home() {
           setPhotos((prevPhotos) => {
              // Ensure not to exceed MAX_PHOTOS even with concurrent uploads
              const combined = [...prevPhotos, ...validNewPhotos];
-             return combined.slice(0, MAX_PHOTOS);
+              // Clear descriptions and progress if new photos are added
+              setSummary('');
+              setDescriptionProgress(null);
+              setIsGeneratingAllDescriptions(false);
+              return combined.slice(0, MAX_PHOTOS).map(p => ({ ...p, description: '', isGenerating: false })); // Reset descriptions for all photos
           });
        }
 
@@ -178,10 +184,17 @@ export default function Home() {
       if (photoToRemove) {
         URL.revokeObjectURL(photoToRemove.previewUrl);
       }
-      return prevPhotos.filter((photo) => photo.id !== id);
+       const remainingPhotos = prevPhotos.filter((photo) => photo.id !== id);
+       // If removing a photo, reset descriptions and progress
+       if (remainingPhotos.length < prevPhotos.length) {
+         setSummary('');
+         setDescriptionProgress(null);
+         setIsGeneratingAllDescriptions(false);
+         // Reset descriptions only if generating was in progress or completed
+         return remainingPhotos.map(p => ({ ...p, description: '', isGenerating: false }));
+       }
+       return remainingPhotos;
     });
-     // Clear summary if a photo affecting it is removed
-     setSummary('');
   }, []);
 
 
@@ -195,74 +208,102 @@ export default function Home() {
        });
        return;
      }
-    if (photos.some(p => p.isGenerating)) return; // Prevent multiple calls
+    if (isGeneratingAllDescriptions) return; // Prevent multiple overall calls
 
-    const photosToProcess = photos.filter(p => !p.description);
-    if (photosToProcess.length === 0) {
+    const photosToProcess = photos.filter(p => !p.description || p.description.startsWith('重新產生')); // Process photos without description or marked for regeneration
+     if (photosToProcess.length === 0 && photos.every(p => p.description && !p.description.startsWith('重新產生'))) {
       toast({
         title: '提示',
-        description: '所有照片描述都已產生。',
+        description: '所有照片描述都已產生。如需重新產生，請先移除照片再重新上傳。', // Adjusted message
       });
       return;
     }
 
-    setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: true } : p));
+    // Reset descriptions for photos to be processed
+    setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, description: '', isGenerating: true } : p));
+    setIsGeneratingAllDescriptions(true);
+    setDescriptionProgress(0); // Start progress
+    let completedCount = 0;
+    const totalToProcess = photosToProcess.length;
 
     try {
-      const descriptionPromises = photosToProcess.map(async (photo) => {
-        try {
-          // Use stored dataUrl if available, otherwise read again (fallback)
-          const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
-           // If dataUrl wasn't stored initially, store it now
-          if (!photo.dataUrl) {
-            setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
-          }
+        const descriptionPromises = photosToProcess.map(async (photo) => {
+           let descriptionResult: { id: string; description: string; success: boolean };
+            try {
+                const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
+                if (!photo.dataUrl) {
+                    // Update state immutably
+                    setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
+                }
 
-          const result = await generatePhotoDescriptions({
-            teachingArea,
-            meetingTopic,
-            meetingDate: format(meetingDate, 'yyyy-MM-dd'),
-            communityMembers,
-            photoDataUri,
+                const result = await generatePhotoDescriptions({
+                    teachingArea,
+                    meetingTopic,
+                    meetingDate: format(meetingDate, 'yyyy-MM-dd'),
+                    communityMembers,
+                    photoDataUri,
+                });
+                 descriptionResult = { id: photo.id, description: result.photoDescription, success: true };
+            } catch (error) {
+                console.error(`Error generating description for ${photo.file.name}:`, error);
+                const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
+                const finalDescription = errorDescription.includes("safety") ? '無法描述此圖片（安全限制）。' : '無法描述此圖片。';
+                 descriptionResult = { id: photo.id, description: finalDescription, success: false };
+            } finally {
+               // Update state and progress after each description finishes
+                completedCount++;
+                const newProgress = Math.round((completedCount / totalToProcess) * 100);
+                 setDescriptionProgress(newProgress);
+
+                // Update the specific photo's state
+                 setPhotos(prev => prev.map(p => p.id === descriptionResult.id ? { ...p, description: descriptionResult.description, isGenerating: false } : p));
+            }
+            return descriptionResult; // Return the result object
+        });
+
+        // Wait for all promises to settle (either resolve or reject)
+        await Promise.allSettled(descriptionPromises);
+
+       // Final check after all promises are settled
+        const finalPhotos = photos; // Get the latest state after individual updates
+        const allSucceeded = finalPhotos
+            .filter(p => photosToProcess.some(ptp => ptp.id === p.id)) // Check only processed photos
+            .every(p => p.description && !p.description.startsWith('無法描述'));
+
+
+        if (allSucceeded) {
+          toast({
+            title: '成功',
+            description: '照片描述產生完成！',
           });
-          return { id: photo.id, description: result.photoDescription };
-        } catch (error) {
-          console.error(`Error generating description for ${photo.file.name}:`, error);
-          // Ensure description is set even on error, possibly to the error message or a default
-          const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
-          const finalDescription = errorDescription.includes("safety") ? '無法描述此圖片（安全限制）。' : '無法描述此圖片。';
-          return { id: photo.id, description: finalDescription };
+        } else {
+           toast({
+            title: '部分完成',
+            description: '部分照片描述產生失敗，請檢查後重試。',
+            variant: 'destructive',
+           });
         }
-      });
-
-
-      const descriptions = await Promise.all(descriptionPromises);
-
-      setPhotos(prev => prev.map(p => {
-        const descData = descriptions.find(d => d.id === p.id);
-        // Fallback for potential undefined description, though the catch block should prevent this
-        const newDescription = descData?.description ?? '描述遺失。';
-        return descData ? { ...p, description: newDescription, isGenerating: false } : { ...p, isGenerating: false };
-      }));
-
-
-       toast({
-         title: '成功',
-         description: '照片描述產生完成！',
-       });
        setSummary(''); // Clear summary as descriptions changed
 
-    } catch (error) {
-      console.error('Error in generating descriptions:', error);
+    } catch (error) { // Catch any unexpected overarching errors
+      console.error('Error in generating descriptions batch:', error);
        toast({
          title: '錯誤',
-         description: '產生照片描述時發生錯誤。',
+         description: '產生照片描述過程中發生錯誤。',
          variant: 'destructive',
        });
-       // Reset generating state for all processed photos on overall error
-       setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: false } : p));
+       // Reset generating state for all initially processed photos on overall error
+       setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
+    } finally {
+      // Ensure progress is 100% and generating state is false after completion/error
+      setDescriptionProgress(100);
+       // Delay hiding progress slightly to show 100%
+       setTimeout(() => {
+         setDescriptionProgress(null);
+         setIsGeneratingAllDescriptions(false);
+       }, 1000);
     }
-  }, [form, photos, toast]);
+  }, [form, photos, toast, isGeneratingAllDescriptions]);
 
 
  const handleGenerateSummary = useCallback(async () => {
@@ -593,7 +634,7 @@ export default function Home() {
 
 
   const handleExportReport = useCallback(async () => { // Make async
-     const { teachingArea, meetingTopic, meetingDate } = form.getValues(); // Removed unused members
+     const { teachingArea, meetingDate } = form.getValues(); // Removed unused members
      if (
        !form.getValues().teachingArea ||
        !form.getValues().meetingTopic ||
@@ -661,7 +702,6 @@ export default function Home() {
 
 
    const handleExportPdf = useCallback(async () => {
-        const { teachingArea, meetingTopic, meetingDate } = form.getValues(); // Removed unused members
         if (
          !form.getValues().teachingArea ||
          !form.getValues().meetingTopic ||
@@ -758,8 +798,10 @@ export default function Home() {
          // Only reset if a form value actually changes, ignore initial load/watches
          if (type === 'change' && name !== undefined) { // Ensure name is defined
            // When form changes, descriptions/summary are no longer valid for the new input
-           setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
-           setSummary('');
+            setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
+            setSummary('');
+            setDescriptionProgress(null); // Reset progress
+            setIsGeneratingAllDescriptions(false); // Reset overall generation status
          }
       });
       return () => subscription.unsubscribe();
@@ -773,6 +815,12 @@ export default function Home() {
     !summary ||
     photos.length !== MAX_PHOTOS ||
     photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl);
+
+  // Determine if the "Generate Descriptions" button should be disabled
+   const isGenerateDescriptionsDisabled =
+      isGeneratingAllDescriptions || // Disable if currently generating
+      photos.length === 0 ||          // Disable if no photos
+      (photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述')) && !isGeneratingAllDescriptions); // Disable if all photos have valid descriptions and not currently generating
 
 
   return (
@@ -966,22 +1014,31 @@ export default function Home() {
                         </div>
                     ))}
                   </div>
-                  <Button
-                    type="button"
-                    onClick={handleGenerateDescriptions}
-                     disabled={photos.some(p => p.isGenerating) || photos.length === 0 || photos.every(p => p.description && !p.isGenerating)} // Disable if all have description AND none are generating
-                    className="w-full md:w-auto"
-                    variant="secondary"
-                  >
-                     {photos.some(p => p.isGenerating) ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        描述產生中...
-                      </>
-                    ) : (
-                       photos.length > 0 && photos.every(p => p.description) ? '重新產生描述' : '產生照片描述'
+                   <Button
+                      type="button"
+                      onClick={handleGenerateDescriptions}
+                      disabled={isGenerateDescriptionsDisabled}
+                      className="w-full md:w-auto"
+                      variant="secondary"
+                    >
+                      {isGeneratingAllDescriptions ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          描述產生中... ({descriptionProgress !== null ? `${descriptionProgress}%` : ''})
+                        </>
+                      ) : (
+                        photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述')) ? '重新產生描述' : '產生照片描述'
+                      )}
+                    </Button>
+                    {/* Progress Bar */}
+                    {descriptionProgress !== null && (
+                        <div className="mt-4">
+                            <Progress value={descriptionProgress} className="w-full" />
+                            <p className="text-sm text-muted-foreground text-center mt-1">
+                                正在產生照片描述... {descriptionProgress}%
+                            </p>
+                        </div>
                     )}
-                  </Button>
                 </>
               )}
             </CardContent>
@@ -999,7 +1056,8 @@ export default function Home() {
                   disabled={
                       isGeneratingSummary ||
                       photos.length !== MAX_PHOTOS ||
-                      photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))
+                      photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述')) ||
+                      isGeneratingAllDescriptions // Disable if descriptions are being generated
                   }
                   className="w-full md:w-auto"
                   variant="secondary"
@@ -1081,8 +1139,3 @@ export default function Home() {
     </>
   );
 }
-
-
-
-    
-
