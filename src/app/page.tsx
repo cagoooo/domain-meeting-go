@@ -232,17 +232,14 @@ export default function Home() {
      }
     if (isGeneratingAllDescriptions) return; // Prevent multiple overall calls
 
-    // Check if all photos already have successful descriptions
-    const allDescriptionsExist = photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述'));
-    if (allDescriptionsExist) {
-        // If descriptions exist, allow re-generation but don't reset descriptions immediately.
-        // The generation logic below will handle resetting and processing all.
-        // No need for a toast here unless specifically required for regeneration confirmation.
-    } else {
-        // If starting fresh or with some missing/failed descriptions, process relevant photos.
-        // No need to filter photosToProcess here, as the logic below handles resetting all anyway.
-    }
+    // Check if all photos already have successful descriptions or if generation failed previously
+    const needsGeneration = photos.length > 0 && photos.some(p => !p.description || p.description.startsWith('無法描述'));
 
+    // If all descriptions exist and were successful, confirm regeneration
+    if (!needsGeneration && photos.length > 0) {
+        // Optional: Add confirmation step here if needed
+        // console.log("Descriptions already exist. Re-generating...");
+    }
 
     // Reset descriptions for ALL photos and set generating state
     setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
@@ -304,10 +301,12 @@ export default function Home() {
 
        // Check the results directly from the settled promises
         let allSucceeded = true;
+        let failedCount = 0;
         results.forEach(result => {
             // Check if the promise was rejected OR if it fulfilled but the generation was not successful
             if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)) {
                 allSucceeded = false;
+                failedCount++;
             }
         });
 
@@ -320,8 +319,8 @@ export default function Home() {
         } else {
            toast({
             title: '部分完成',
-            description: '部分照片描述產生失敗，請檢查標示為「無法描述」的圖片。',
-            variant: 'destructive', // Changed from 'warning' to 'destructive' for clarity
+            description: `${failedCount} 張照片描述產生失敗，請檢查標示為「無法描述」的圖片。`,
+            variant: 'destructive', // Keep as destructive for clarity
            });
         }
        setSummary(''); // Clear summary as descriptions changed
@@ -442,19 +441,20 @@ export default function Home() {
     // Replace newline characters with <br> tags for HTML display
     formattedSummary = formattedSummary.replace(/\n/g, '<br>');
 
-    // Base CSS for both Word and Print
+    // Base CSS for both Word and Print - Using Narrow Margins (1.27cm)
     let styles = `
-      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 1.27cm; } /* Adjusted margin */
+      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 1.27cm; } /* Narrow Margin */
       h1 { color: #000000; text-align: left; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
       em { font-style: italic; }
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      .photo-table { width: 100%; max-width: 18.46cm; /* Max width within A4 narrow margins (21 - 1.27*2) */ border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
+      /* Table Styling: Centered, max-width for A4 narrow margin */
+      .photo-table { width: 100%; max-width: 18.46cm; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height (5cm = 141.73pt approx 142pt), auto width, max-width 100% of cell, centered */
-      .photo-table img { display: block; margin: 5pt auto; height: 142pt; /* Approx 5cm */ width: auto; max-width: 100%; object-fit: contain; }
+      .photo-table img { display: block; margin: 5pt auto; height: 142pt; /* Approx 5cm FIXED HEIGHT */ width: auto; /* AUTO WIDTH */ max-width: 100%; object-fit: contain; }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
       .summary-section p { white-space: normal; font-size: 12pt; text-align: justify; }
     `;
@@ -463,7 +463,7 @@ export default function Home() {
     if (forPrint) {
         styles += `
           @media print {
-            @page { size: A4 portrait; margin: 1.27cm; } /* Adjusted margin for print */
+            @page { size: A4 portrait; margin: 1.27cm; } /* Narrow Margin for print */
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             h1, h2 { page-break-after: avoid; }
             .section, .photo-table { page-break-inside: avoid; }
@@ -474,12 +474,12 @@ export default function Home() {
         `;
     }
 
-    // MSO styles for Word compatibility (only add if not for printing)
+    // MSO styles for Word compatibility (only add if not for printing) - Using Narrow Margins (1.27cm)
     const msoStyles = !forPrint ? `
         /* General Word Styles */
         @page Section1 {
           size: 21cm 29.7cm; /* A4 size */
-          margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins */
+          margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins: 0.5 inch approx */
           mso-header-margin: .5in;
           mso-footer-margin: .5in;
           mso-paper-source: 0;
@@ -491,12 +491,12 @@ export default function Home() {
         h2 { mso-style-link: "標題 2 字元"; margin-top: 20pt; margin-right: 0cm; margin-bottom: 15pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
         p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
         /* Table Styles - Center the table within the available width */
-        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 18.46cm; /* Max width for narrow margins */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; }
+        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 18.46cm; /* Max width for narrow margins (21 - 1.27*2) */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; }
         td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; vertical-align: top; width: 50%; }
         /* Image Paragraph Style - Centers content */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
-        /* Image Style - Fixed height, auto width */
-        img.PhotoStyle { display: block; margin: auto; height: 142pt; /* Approx 5cm */ width: auto; max-width: 100%; mso-position-horizontal: center; mso-position-vertical: absolute; }
+        /* Image Style - Fixed height (142pt ≈ 5cm), auto width */
+        img.PhotoStyle { display: block; margin: auto; height: 142pt; /* FIXED HEIGHT 5cm */ width: auto; /* AUTO WIDTH */ max-width: 100%; mso-position-horizontal: center; }
         /* Description Style */
         p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3; }
         /* Summary Paragraph Style */
@@ -644,9 +644,12 @@ export default function Home() {
         let content = '';
         if (photo?.dataUrl) {
              const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
-             const imgClass = forPrint ? '' : 'class="PhotoStyle"';
-             // Ensure center alignment for the paragraph containing the image
-             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`;
+             // Apply PhotoStyle class with fixed height and auto width for Word
+             const imgStyle = !forPrint ? `class="PhotoStyle"` : '';
+             // Apply inline styles for standard HTML/Print (overridden by CSS class)
+             const inlineImgStyle = forPrint ? 'style="height: 142pt; width: auto; max-width: 100%; display: block; margin: auto;"' : '';
+
+             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgStyle} ${inlineImgStyle} src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
@@ -1216,4 +1219,3 @@ export default function Home() {
     </>
   );
 }
-
