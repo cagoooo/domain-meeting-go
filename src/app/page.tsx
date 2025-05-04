@@ -452,7 +452,7 @@ export default function Home() {
         h2 { mso-style-link: "標題 2 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
         p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
         /* Table Styles - Apply margin: auto for centering */
-        table.MsoNormalTable { margin: auto; /* Center the table */ width: 100%; /* Keep width 100% */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; }
+        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; /* Force center */ width: 100%; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; }
         td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; /* Force center alignment */ vertical-align: top; width: 50%; }
         /* Image Paragraph Style - Centers content within the cell */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
@@ -510,6 +510,20 @@ export default function Home() {
                <w:OverrideTableStyleHps/>
                <w:UseFELayout/>
            </w:Compatibility>
+            <w:TrackMoves>false</w:TrackMoves>
+            <w:TrackFormatting/>
+            <w:PunctuationKerning/>
+            <w:DrawingGridHorizontalSpacing>5.25 pt</w:DrawingGridHorizontalSpacing>
+            <w:DisplayHorizontalDrawingGridEvery>0</w:DisplayHorizontalDrawingGridEvery>
+            <w:DisplayVerticalDrawingGridEvery>2</w:DisplayVerticalDrawingGridEvery>
+            <w:ValidateAgainstSchemas/>
+            <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
+            <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
+            <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
+            <w:DoNotPromoteQF/>
+            <w:LidThemeOther>EN-US</w:LidThemeOther>
+            <w:LidThemeAsian>ZH-TW</w:LidThemeAsian>
+            <w:LidThemeComplexScript>X-NONE</w:LidThemeComplexScript>
           <m:mathPr>
            <m:mathFont m:val="Cambria Math"/>
            <m:brkBin m:val="before"/>
@@ -559,6 +573,9 @@ export default function Home() {
     <body>
     <div>
     `;
+
+    // Initialize reportHtml with the starting HTML structure
+    let reportHtml = htmlStart;
 
     // Main title
     reportHtml += `<h1>領域共學誌 會議報告</h1>`;
