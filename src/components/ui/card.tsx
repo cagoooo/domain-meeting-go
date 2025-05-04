@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "rounded-lg border bg-card text-card-foreground shadow-md transition-shadow duration-200 hover:shadow-lg", // Increased shadow and added transition
       className
     )}
     {...props}
@@ -29,14 +29,15 @@ const CardHeader = React.forwardRef<
 ))
 CardHeader.displayName = "CardHeader"
 
+// Updated CardTitle to ensure consistent styling
 const CardTitle = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  HTMLHeadingElement, // Changed element type to heading for semantics
+  React.HTMLAttributes<HTMLHeadingElement> // Changed attribute type
 >(({ className, ...props }, ref) => (
-  <div
+  <h2 // Use h2 or appropriate heading level
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      "text-2xl font-semibold leading-none tracking-tight text-card-foreground", // Ensure text color matches card foreground
       className
     )}
     {...props}
@@ -44,13 +45,14 @@ const CardTitle = React.forwardRef<
 ))
 CardTitle.displayName = "CardTitle"
 
+// Updated CardDescription to ensure consistent styling
 const CardDescription = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
+  HTMLParagraphElement, // Changed element type to paragraph for semantics
+  React.HTMLAttributes<HTMLParagraphElement> // Changed attribute type
 >(({ className, ...props }, ref) => (
-  <div
+  <p // Use p for description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sm text-muted-foreground", className)} // Use muted-foreground for description
     {...props}
   />
 ))
