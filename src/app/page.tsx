@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -326,7 +327,7 @@ export default function Home() {
   const generateReportContent = async (): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
-    // Ensure all photos have data URLs (redundant if handleFileChange works, but safe)
+    // Ensure all photos have data URLs
     const photosWithDataUrls = await Promise.all(
         photos.map(async (photo) => {
             if (!photo.dataUrl) {
@@ -337,7 +338,7 @@ export default function Home() {
                     console.error(`Failed to read dataUrl for ${photo.id} during export:`, error);
                     toast({
                         title: '圖片讀取錯誤',
-                        description: `匯出時無法讀取照片 ${photo.file.name}。報告將不包含此圖片。`,
+                        description: `匯出時無法讀取照片 ${photo.file.name}。`,
                         variant: 'destructive',
                     });
                     return { ...photo, dataUrl: '' }; // Mark as empty to skip embedding
@@ -347,8 +348,7 @@ export default function Home() {
         })
     );
 
-
-    // Basic CSS for formatting in Word
+    // Basic CSS for formatting in Word - Adjusted for 2x4 Table
     const styles = `
       @page Section1 {
         size: 8.5in 11.0in; /* Letter size */
@@ -360,23 +360,25 @@ export default function Home() {
       div.Section1 {
         page: Section1;
       }
-      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; } /* Common Traditional Chinese fonts */
-      h1 { color: #000000; /* Black */ text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 20px;}
-      h2 { color: #000000; /* Black */ font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
+      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; }
+      h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 20px;}
+      h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
       p { margin-bottom: 10px; font-size: 12pt; }
       strong { font-weight: bold; }
       .section { margin-bottom: 25px; }
-      .photo-grid { display: table; width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-      .photo-row { display: table-row; }
-      .photo-cell { display: table-cell; width: 50%; padding: 10px; text-align: center; vertical-align: top; border: 1px solid #cccccc; }
-      .photo-cell img { max-width: 90%; height: auto; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
-      .photo-description { font-size: 11pt; color: #333333; text-align: center; }
-      .summary-section p { white-space: pre-wrap; /* Preserve whitespace */ font-size: 12pt; text-align: justify; }
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+      .photo-table td { border: 1px solid #cccccc; padding: 10px; text-align: center; vertical-align: top; width: 50%; } /* 2 columns */
+      .photo-table img { max-width: 95%; /* Slightly smaller for padding */ height: auto; margin-bottom: 5px; display: block; margin-left: auto; margin-right: auto; max-height: 200px; /* Limit height */ }
+      .photo-description { font-size: 10pt; /* Smaller font for description */ color: #333333; text-align: center; line-height: 1.3; }
+      .summary-section p { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
       /* MSO specific styles for Word compatibility */
       p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
       h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
       h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-      /* Add more MSO styles if needed */
+      table.MsoNormalTable { border: 1px solid #cccccc; border-collapse: collapse; }
+      td.MsoNormal { padding: 5pt; border: 1px solid #cccccc; text-align: center; vertical-align: top; }
+      img.PhotoStyle { display: block; margin: auto; max-width: 95%; height: auto; max-height: 200pt; /* Use points for Word */}
+      p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin-top: 5pt; line-height: 1.3;}
     `;
 
      // Use Word XML structure for better compatibility
@@ -437,53 +439,72 @@ export default function Home() {
 
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100.0%;border-collapse:collapse;border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0cm 5.4pt 0cm 5.4pt;mso-border-insideh:.5pt solid windowtext;mso-border-insidev:.5pt solid windowtext;'>
-            <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:150.0pt'>
+          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100%;border-collapse:collapse;border:1pt solid #cccccc;mso-border-alt:solid windowtext .5pt;mso-padding-alt:5.0pt 5.0pt 5.0pt 5.0pt;'>
+            <tbody>
+              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:auto;'>
     `;
 
-    // Loop through photos in pairs for 2x2 grid
-    for (let i = 0; i < MAX_PHOTOS; i += 2) {
-      if (i > 0) { // Add row start for the second row
-         reportHtml += `<tr style='mso-yfti-irow:${Math.floor(i/2)};height:150.0pt${i + 2 >= MAX_PHOTOS ? ';mso-yfti-lastrow:yes' : ''}'>\n`;
-      }
-
-      // Cell for photo i
-      const photo1 = photosWithDataUrls[i];
-      reportHtml += `<td width="50%" valign=top style='width:50.0%;border:solid windowtext 1.0pt;mso-border-alt:solid windowtext .5pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;height:150.0pt'>
-          <p class=MsoNormal align=center style='text-align:center'>`;
-      if (photo1?.dataUrl) {
-        // Embed image using VML for Word compatibility
-        // You might need to adjust width/height based on actual image dimensions or desired size
-        reportHtml += `<!--[if gte vml 1]><v:shape id="Picture_${i+1}" o:spid="_x0000_i102${i+1}" type="#_x0000_t75" style='width:200pt;height:150pt;visibility:visible;mso-wrap-style:square'><v:imagedata src="${photo1.dataUrl}" o:title=""/></v:shape><![endif]--><![if !vml]><img width=267 height=200 src="${photo1.dataUrl}" v:shapes="Picture_${i+1}"><![endif]>`;
-      } else {
-        reportHtml += `[圖片 ${i + 1} 無法載入]`;
-      }
-      reportHtml += `<span style='font-size:11.0pt;font-family:"PMingLiU","serif";'><br clear=all> ${photo1?.description || '未產生描述'}</span></p>
-          </td>\n`;
-
-      // Cell for photo i+1
-      const photo2 = photosWithDataUrls[i + 1];
-      reportHtml += `<td width="50%" valign=top style='width:50.0%;border:solid windowtext 1.0pt;border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;height:150.0pt'>
-           <p class=MsoNormal align=center style='text-align:center'>`;
-      if (photo2?.dataUrl) {
-          reportHtml += `<!--[if gte vml 1]><v:shape id="Picture_${i+2}" o:spid="_x0000_i102${i+2}" type="#_x0000_t75" style='width:200pt;height:150pt;visibility:visible;mso-wrap-style:square'><v:imagedata src="${photo2.dataUrl}" o:title=""/></v:shape><![endif]--><![if !vml]><img width=267 height=200 src="${photo2.dataUrl}" v:shapes="Picture_${i+2}"><![endif]>`;
-      } else {
-        reportHtml += `[圖片 ${i + 2} 無法載入]`;
-      }
-       reportHtml += `<span style='font-size:11.0pt;font-family:"PMingLiU","serif";'><br clear=all> ${photo2?.description || '未產生描述'}</span></p>
-          </td>\n`;
-
-      reportHtml += `</tr>\n`; // End row
+    // Build the table content (2x4: two columns, four rows total - 2 photo rows, 2 description rows)
+    // Row 1: Images 1 & 2
+    const photo1 = photosWithDataUrls[0];
+    const photo2 = photosWithDataUrls[1];
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
+    if (photo1?.dataUrl) {
+        // Use fixed width/height in points for better Word rendering
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo1.dataUrl}" alt="照片 1"></p>`;
+    } else {
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 1 無法載入]</p>`;
     }
+    reportHtml += `</td>`;
 
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
+    if (photo2?.dataUrl) {
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo2.dataUrl}" alt="照片 2"></p>`;
+    } else {
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 2 無法載入]</p>`;
+    }
+    reportHtml += `</td></tr>`;
+
+    // Row 2: Descriptions 1 & 2
+    reportHtml += `<tr style='mso-yfti-irow:1;height:auto;'>`;
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo1?.description || '未產生描述'}</p></td>`;
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo2?.description || '未產生描述'}</p></td>`;
+    reportHtml += `</tr>`;
+
+    // Row 3: Images 3 & 4
+    const photo3 = photosWithDataUrls[2];
+    const photo4 = photosWithDataUrls[3];
+     reportHtml += `<tr style='mso-yfti-irow:2;height:auto;'>`;
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
+    if (photo3?.dataUrl) {
+         reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo3.dataUrl}" alt="照片 3"></p>`;
+    } else {
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 3 無法載入]</p>`;
+    }
+    reportHtml += `</td>`;
+
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
+    if (photo4?.dataUrl) {
+         reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo4.dataUrl}" alt="照片 4"></p>`;
+    } else {
+        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 4 無法載入]</p>`;
+    }
+    reportHtml += `</td></tr>`;
+
+    // Row 4: Descriptions 3 & 4
+    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:auto;'>`;
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo3?.description || '未產生描述'}</p></td>`;
+    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo4?.description || '未產生描述'}</p></td>`;
+    reportHtml += `</tr>`;
 
     reportHtml += `
+            </tbody>
           </table>
         </div>
 
         <div class="section summary-section">
           <h2>會議大綱摘要</h2>
-          <p class=MsoNormal>${summary || '尚未產生摘要'}</p>
+          <p class=MsoNormal>${summary.replace(/\n/g, '<br style="mso-data-placement:same-cell;">') || '尚未產生摘要'}</p>
         </div>
 
       </div> <!-- End Section1 -->
