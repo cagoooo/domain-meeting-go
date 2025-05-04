@@ -232,16 +232,17 @@ export default function Home() {
      }
     if (isGeneratingAllDescriptions) return; // Prevent multiple overall calls
 
-    const photosToProcess = photos.filter(p => !p.description || p.description.startsWith('重新產生')); // Process photos without description or marked for regeneration
-     if (photosToProcess.length === 0 && photos.every(p => p.description && !p.description.startsWith('無法描述'))) {
-      // Update: If all descriptions exist and none are marked for regen, change button text but allow clicking again
-      // No early return here, allow button to be clickable for regeneration
-      // toast({
-      //   title: '提示',
-      //   description: '所有照片描述都已產生。如需重新產生，請點擊「重新產生描述」。',
-      // });
-     // return; // Remove this return to allow re-generation click
+    // Check if all photos already have successful descriptions
+    const allDescriptionsExist = photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述'));
+    if (allDescriptionsExist) {
+        // If descriptions exist, allow re-generation but don't reset descriptions immediately.
+        // The generation logic below will handle resetting and processing all.
+        // No need for a toast here unless specifically required for regeneration confirmation.
+    } else {
+        // If starting fresh or with some missing/failed descriptions, process relevant photos.
+        // No need to filter photosToProcess here, as the logic below handles resetting all anyway.
     }
+
 
     // Reset descriptions for ALL photos and set generating state
     setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
@@ -258,7 +259,7 @@ export default function Home() {
             try {
                 const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
                 if (!photo.dataUrl) {
-                    // Update state immutably (but maybe do this less often?)
+                    // Update state immutably if dataUrl was missing
                      setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
                 }
 
@@ -275,7 +276,10 @@ export default function Home() {
             } catch (error) {
                 console.error(`Error generating description for ${photo.file.name}:`, error);
                 const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
-                const finalDescription = errorDescription.includes("safety") ? '無法描述此圖片（安全限制）。' : '無法描述此圖片。';
+                // Specific handling for safety issues from the API response
+                const finalDescription = (errorDescription.includes("safety") || errorDescription.includes("SAFETY"))
+                    ? '無法描述此圖片（安全限制）。'
+                    : '無法描述此圖片。';
                  descriptionResult = { id: photo.id, description: finalDescription, success: false };
             } finally {
                // Update state and progress after each description finishes
@@ -283,7 +287,7 @@ export default function Home() {
                 const newProgress = Math.round((completedCount / totalToProcess) * 100);
                  setDescriptionProgress(newProgress);
 
-                // Update the specific photo's state
+                // Update the specific photo's state - ensure descriptionResult is defined
                  setPhotos(prev => prev.map(p => p.id === descriptionResult.id ? { ...p, description: descriptionResult.description, isGenerating: false } : p));
             }
             return descriptionResult; // Return the result object
@@ -295,6 +299,7 @@ export default function Home() {
        // Check the results directly from the settled promises
         let allSucceeded = true;
         results.forEach(result => {
+            // Check if the promise was rejected OR if it fulfilled but the generation was not successful
             if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)) {
                 allSucceeded = false;
             }
@@ -309,8 +314,8 @@ export default function Home() {
         } else {
            toast({
             title: '部分完成',
-            description: '部分照片描述產生失敗，請檢查後重試。',
-            variant: 'destructive',
+            description: '部分照片描述產生失敗，請檢查標示為「無法描述」的圖片。',
+            variant: 'destructive', // Changed from 'warning' to 'destructive' for clarity
            });
         }
        setSummary(''); // Clear summary as descriptions changed
@@ -319,11 +324,11 @@ export default function Home() {
       console.error('Error in generating descriptions batch:', error);
        toast({
          title: '錯誤',
-         description: '產生照片描述過程中發生錯誤。',
+         description: '產生照片描述過程中發生嚴重錯誤。',
          variant: 'destructive',
        });
        // Reset generating state for all initially processed photos on overall error
-       setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
+       setPhotos(prev => prev.map(p => photos.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
     } finally {
       // Ensure progress is 100% and generating state is false after completion/error
       setDescriptionProgress(100);
@@ -362,7 +367,7 @@ export default function Home() {
     if (photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))) {
         toast({
             title: '請先成功產生所有照片描述',
-            description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。',
+            description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。點擊「重新產生描述」按鈕以重試。',
             variant: 'destructive',
         });
         return;
@@ -434,14 +439,15 @@ export default function Home() {
     // Base CSS for both Word and Print
     let styles = `
       body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 2cm; }
-      h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
+      /* Align h1 to left */
+      h1 { color: #000000; text-align: left; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
       em { font-style: italic; } /* Style for italics */
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      /* Table Styles - Center the table itself */
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
+      /* Table Styles - Ensure table is centered using margin auto */
+      .photo-table { width: 100%; max-width: 17cm; /* Max width within A4 margins */ border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell, centered */
       .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
@@ -470,7 +476,7 @@ export default function Home() {
         /* General Word Styles */
         @page Section1 {
           size: 21cm 29.7cm; /* A4 size */
-          margin: 1.0in 1.0in 1.0in 1.0in; /* Standard margins */
+          margin: 2cm 2cm 2cm 2cm; /* Standard margins */
           mso-header-margin: .5in;
           mso-footer-margin: .5in;
           mso-paper-source: 0;
@@ -478,11 +484,12 @@ export default function Home() {
         div.Section1 { page: Section1; }
         /* Paragraph Styles */
         p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0cm; margin-bottom: .0001pt; font-size: 12.0pt; font-family: "Times New Roman", serif; mso-fareast-font-family: "新細明體";}
-        h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; text-align: center; page-break-after: avoid; font-size: 20.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.5pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid windowtext 1.5pt; }
-        h2 { mso-style-link: "標題 2 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
+        /* Align h1 to left */
+        h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 20pt; margin-left: 0cm; text-align: left; page-break-after: avoid; font-size: 20.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 2.0pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid windowtext 2.0pt; }
+        h2 { mso-style-link: "標題 2 字元"; margin-top: 20pt; margin-right: 0cm; margin-bottom: 15pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
         p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
-        /* Table Styles - Apply margin: auto for centering */
-        table.MsoNormalTable { /* Center the table itself */ margin-left: auto !important; margin-right: auto !important; width: 100%; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; /* Remove default para margin inside table */ }
+        /* Table Styles - Ensure table is centered using margin auto */
+        table.MsoNormalTable { /* Center the table itself */ margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 17cm; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; /* Remove default para margin inside table */ }
         td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; /* Force center alignment */ vertical-align: top; width: 50%; }
         /* Image Paragraph Style - Centers content within the cell */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
@@ -607,8 +614,8 @@ export default function Home() {
     // Initialize reportHtml with the starting HTML structure
     let reportHtml = htmlStart;
 
-    // Main title
-    reportHtml += `<h1>領域共學誌 會議報告</h1>`;
+    // Main title - Apply class for potential Word styling, ensure alignment
+    reportHtml += `<h1 class="${forPrint ? '' : 'Title'}" style="text-align:left;">領域共學誌 會議報告</h1>`;
 
     // Basic Info Section
     reportHtml += `
@@ -621,13 +628,12 @@ export default function Home() {
         </div>
     `;
 
-    // Photo Record Section - Apply centering style directly for Word export
-    const tableStyle = !forPrint ? 'style="margin-left:auto; margin-right:auto;"' : '';
+    // Photo Record Section - Apply centering style directly for Word export via MSO class
     reportHtml += `
         <div class="section photo-section">
           <h2>照片記錄</h2>
-           <!-- Removed align=center from table for Word, relying on MSO styles -->
-          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0 ${tableStyle}>
+           <!-- Use MsoNormalTable for Word centering and styling -->
+          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0>
              <tbody>
     `;
 
@@ -636,15 +642,15 @@ export default function Home() {
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-             // Use ImageParagraph for Word, photo-paragraph for print/HTML
+             // Use ImageParagraph for Word centering, photo-paragraph for print/HTML
              const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
-             // Use PhotoStyle for Word, standard img tag for print/HTML
+             // Use PhotoStyle for Word size/layout, standard img tag for print/HTML
              const imgClass = forPrint ? '' : 'class="PhotoStyle"';
-             content = `<p class="${paragraphClass}" align=center><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`;
+             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`; // Ensure center alignment for the paragraph
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
-         // Removed width attribute, Word handles column widths better automatically
+         // Use MsoNormal class for Word cell styling
         return `<td class="${forPrint ? '' : 'MsoNormal'}">${content}</td>`;
     };
 
@@ -653,7 +659,7 @@ export default function Home() {
       const description = photo?.description || '未產生描述';
        // Use DescriptionStyle for Word, photo-description for print/HTML
        const paragraphClass = forPrint ? 'photo-description' : 'DescriptionStyle';
-        // Removed width attribute
+       // Use MsoNormal class for Word cell styling
        return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`;
     }
 
@@ -1211,5 +1217,3 @@ export default function Home() {
     </>
   );
 }
-
-      
