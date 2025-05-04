@@ -26,7 +26,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, UploadCloud, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer } from 'lucide-react'; // Added Printer icon
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -59,8 +59,10 @@ export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [summary, setSummary] = useState<string>('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Consider renaming or using a specific state for export loading
+  const [isExportingDoc, setIsExportingDoc] = useState(false); // Specific state for DOC export
+  const [isPreparingPdf, setIsPreparingPdf] = useState(false); // Specific state for PDF preparation
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const printIframeRef = useRef<HTMLIFrameElement>(null); // Ref for the print iframe
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -323,8 +325,8 @@ export default function Home() {
   }, [form, photos, toast]);
 
 
-  // Generates HTML content formatted for Word, including embedded images
-  const generateReportContent = async (): Promise<string> => {
+  // Generates HTML content formatted for Word or Print
+  const generateReportContent = async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
     // Ensure all photos have data URLs
@@ -348,47 +350,60 @@ export default function Home() {
         })
     );
 
-    // Basic CSS for formatting in Word - Adjusted for 2x4 Table
-    // Using points (pt) for better Word compatibility and A4 portrait assumption
-    const styles = `
-      @page Section1 {
-        size: 21cm 29.7cm; /* A4 size */
-        margin: 1.0in 1.0in 1.0in 1.0in; /* Standard margins */
-        mso-header-margin: .5in;
-        mso-footer-margin: .5in;
-        mso-paper-source: 0;
-      }
-      div.Section1 {
-        page: Section1;
-      }
-      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; font-size: 12pt; }
+    // Base CSS for both Word and Print
+    let styles = `
+      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 2cm; }
       h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
-      .section { margin-bottom: 25pt; }
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; }
-      /* Ensure cells are exactly 50% width and aligned top/center */
-      .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; mso-border-alt: solid #cccccc .75pt; }
-      /* Adjust image height and ensure centering - use pt for Word */
-      .photo-table img { max-width: 100%; width: auto; height: 150pt; /* Adjusted height for better fit */ display: block; margin: 5pt auto 5pt auto; /* Center with margin */ }
-      .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; }
+      .section { margin-bottom: 25pt; page-break-inside: avoid; }
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; }
+      .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
+      /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell */
+      .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
+      .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
       .summary-section p { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
-
-      /* MSO specific styles for Word compatibility */
-      p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
-      h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-      h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-      table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; mso-cellspacing:0cm; mso-yfti-tbllook:1184; width:100%; }
-      td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; width:50%; }
-      /* Ensure images are centered and properly sized within table cells */
-      p.ImageParagraph { text-align: center; margin: 5pt 0;} /* Centering paragraph for image */
-      img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 150pt; /* Adjusted height */ }
-      p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3;}
     `;
 
-     // Use Word XML structure for better compatibility
-    let reportHtml = `
+    // Add print-specific styles if needed
+    if (forPrint) {
+        styles += `
+          @media print {
+            @page { size: A4 portrait; margin: 2cm; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* Ensure colors print */
+            h1, h2 { page-break-after: avoid; }
+            .section, .photo-table { page-break-inside: avoid; }
+            /* Ensure table rows don't break across pages if possible */
+             .photo-table tr { page-break-inside: avoid; }
+          }
+        `;
+    }
+
+    // MSO styles for Word compatibility (only add if not for printing)
+    const msoStyles = !forPrint ? `
+        @page Section1 {
+          size: 21cm 29.7cm; /* A4 size */
+          margin: 1.0in 1.0in 1.0in 1.0in; /* Standard margins */
+          mso-header-margin: .5in;
+          mso-footer-margin: .5in;
+          mso-paper-source: 0;
+        }
+        div.Section1 {
+          page: Section1;
+        }
+        p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
+        h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
+        h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
+        table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; mso-cellspacing:0cm; mso-yfti-tbllook:1184; width:100%; }
+        td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; width:50%; }
+        p.ImageParagraph { text-align: center; margin: 5pt 0;} /* Centering paragraph for image */
+        img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 150pt; /* Fixed height */}
+        p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3;}
+    ` : '';
+
+     // Use Word XML structure for DOC, standard HTML for Print
+    const htmlStart = !forPrint ? `
       <html xmlns:v="urn:schemas-microsoft-com:vml"
       xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -408,91 +423,102 @@ export default function Home() {
           <w:View>Print</w:View>
           <w:Zoom>100</w:Zoom>
           <w:DoNotOptimizeForBrowser/>
-          <w:DrawingGridVerticalSpacing>10 pt</w:DrawingGridVerticalSpacing> <!-- Added for potential alignment -->
+          <w:DrawingGridVerticalSpacing>10 pt</w:DrawingGridVerticalSpacing>
          </w:WordDocument>
         </xml><![endif]-->
         <style>
         <!--
          /* Font Definitions */
          @font-face
-            {font-family:PMingLiU;
-            panose-1:2 2 5 0 0 0 0 0 0 0;}
+            {font-family:PMingLiU; panose-1:2 2 5 0 0 0 0 0 0 0;}
          @font-face
-            {font-family:新細明體;
-            panose-1:2 2 5 0 0 0 0 0 0 0;}
+            {font-family:新細明體; panose-1:2 2 5 0 0 0 0 0 0 0;}
          @font-face
-            {font-family:"\@PMingLiU";
-            panose-1:2 2 5 0 0 0 0 0 0 0;}
+            {font-family:"\@PMingLiU"; panose-1:2 2 5 0 0 0 0 0 0 0;}
          @font-face
-            {font-family:"\@新細明體";
-            panose-1:2 2 5 0 0 0 0 0 0 0;}
+            {font-family:"\@新細明體"; panose-1:2 2 5 0 0 0 0 0 0 0;}
          /* Style Definitions */
          ${styles}
+         ${msoStyles}
         -->
         </style>
       </head>
       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;'>
-      <div class=Section1>
+      <div class=${forPrint ? '' : 'Section1'}>
+    ` : `
+    <!DOCTYPE html>
+    <html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>領域共學誌 會議報告 (預覽)</title>
+        <style>
+          ${styles}
+        </style>
+    </head>
+    <body>
+    <div>
+    `;
 
+    let reportHtml = htmlStart + `
         <h1>領域共學誌 會議報告</h1>
 
         <div class="section">
           <h2>基本資訊</h2>
-          <p class=MsoNormal><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class=MsoNormal><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class=MsoNormal><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class=MsoNormal><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
 
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%">
+          <table class="${forPrint ? '' : 'MsoNormalTable'} photo-table" border=1 cellspacing=0 cellpadding=0 width="100%">
             <tbody>
-              <!-- Row 1: Images 1 & 2 -->
-              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes'>
     `;
 
     // Helper function to generate table cell content for images
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            // Use explicit height and center paragraph
-            content = `<p class=ImageParagraph align=center style='text-align:center'><img class=PhotoStyle src="${photo.dataUrl}" alt="${altText}" height="150"></p>`; // Height in points
+            // Use class for styling, remove inline height for CSS control
+            content = `<p class="${forPrint ? 'photo-paragraph' : 'ImageParagraph'}" align=center><img class="${forPrint ? '' : 'PhotoStyle'}" src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
-            content = `<p class=MsoNormal align=center style='text-align:center'>[${altText} 無法載入]</p>`;
+            content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
-        return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt; mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'>${content}</td>`;
+        return `<td class="${forPrint ? '' : 'MsoNormal'}" width="50%">${content}</td>`;
     };
 
     // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-      return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt;mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'><p class=DescriptionStyle>${description}</p></td>`;
+      return `<td class="${forPrint ? '' : 'MsoNormal'}" width="50%"><p class="${forPrint ? 'photo-description' : 'DescriptionStyle'}">${description}</p></td>`;
     }
 
     // Build the table content (2x4: two columns, four rows total)
+     // Row 1: Images 1 & 2
+    reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:0;mso-yfti-firstrow:yes"' : ''}>`;
     reportHtml += generateImageCell(photosWithDataUrls[0], '照片 1');
     reportHtml += generateImageCell(photosWithDataUrls[1], '照片 2');
     reportHtml += `</tr>`;
 
     // Row 2: Descriptions 1 & 2
-    reportHtml += `<tr style='mso-yfti-irow:1'>`;
+    reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:1"' : ''}>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtml += `</tr>`;
 
     // Row 3: Images 3 & 4
-    reportHtml += `<tr style='mso-yfti-irow:2'>`;
+    reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:2"' : ''}>`;
     reportHtml += generateImageCell(photosWithDataUrls[2], '照片 3');
     reportHtml += generateImageCell(photosWithDataUrls[3], '照片 4');
     reportHtml += `</tr>`;
 
     // Row 4: Descriptions 3 & 4
-    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes'>`;
+    reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:3;mso-yfti-lastrow:yes"' : ''}>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtml += `</tr>`;
-
 
     reportHtml += `
             </tbody>
@@ -501,10 +527,10 @@ export default function Home() {
 
         <div class="section summary-section">
           <h2>會議大綱摘要</h2>
-          <p class=MsoNormal>${summary.replace(/\n/g, '<br style="mso-data-placement:same-cell;">') || '尚未產生摘要'}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}>${summary.replace(/\n/g, '<br>') || '尚未產生摘要'}</p>
         </div>
 
-      </div> <!-- End Section1 -->
+      </div> <!-- End Section / Section1 -->
       </body>
       </html>
     `;
@@ -514,8 +540,15 @@ export default function Home() {
 
 
   const handleExportReport = useCallback(async () => { // Make async
-     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-     if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length !== MAX_PHOTOS || !summary) {
+     const { teachingArea, meetingTopic, meetingDate } = form.getValues(); // Removed unused members
+     if (
+       !form.getValues().teachingArea ||
+       !form.getValues().meetingTopic ||
+       !form.getValues().meetingDate ||
+       !form.getValues().communityMembers ||
+       photos.length !== MAX_PHOTOS ||
+       !summary
+      ) {
          toast({
             title: '無法匯出',
             description: '請先完成所有步驟（填寫資訊、上傳照片、產生描述、產生摘要）再匯出報告。',
@@ -539,13 +572,12 @@ export default function Home() {
             description: '部分圖片資料尚未完全載入，請稍候再試。',
             variant: 'destructive',
         });
-        // Optional: attempt to load missing dataUrls here if needed
         return;
     }
 
-    setIsSubmitting(true); // Indicate loading state for export
+    setIsExportingDoc(true); // Indicate loading state for DOC export
     try {
-        const reportContent = await generateReportContent(); // Await the async generation
+        const reportContent = await generateReportContent(false); // Generate content for Word
         // Use 'application/msword' for .doc compatibility and proper encoding preamble
         const blob = new Blob([`\ufeff${reportContent}`], { type: 'application/msword;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -563,16 +595,108 @@ export default function Home() {
             description: `報告 ${fileName} 已匯出。`,
         });
     } catch (error) {
-         console.error('Error exporting report:', error);
+         console.error('Error exporting DOC report:', error);
          toast({
             title: '匯出錯誤',
-            description: '匯出報告時發生錯誤。',
+            description: '匯出 DOC 報告時發生錯誤。',
             variant: 'destructive',
          });
     } finally {
-        setIsSubmitting(false); // End loading state
+        setIsExportingDoc(false); // End loading state for DOC export
     }
-  }, [form, photos, summary, toast, generateReportContent]); // Added generateReportContent to dependencies
+  }, [form, photos, summary, toast, generateReportContent]); // Added generateReportContent
+
+
+   const handleExportPdf = useCallback(async () => {
+        const { teachingArea, meetingTopic, meetingDate } = form.getValues(); // Removed unused members
+        if (
+         !form.getValues().teachingArea ||
+         !form.getValues().meetingTopic ||
+         !form.getValues().meetingDate ||
+         !form.getValues().communityMembers ||
+         photos.length !== MAX_PHOTOS ||
+         !summary
+        ) {
+            toast({
+                title: '無法匯出 PDF',
+                description: '請先完成所有步驟（填寫資訊、上傳照片、產生描述、產生摘要）再匯出 PDF。',
+                variant: 'destructive',
+            });
+            return;
+        }
+        // Check for failed descriptions before exporting
+        if (photos.some(p => !p.description || p.description.startsWith('無法描述'))) {
+            toast({
+                title: '無法匯出 PDF',
+                description: '報告中包含無法描述或產生失敗的照片描述，請確認所有照片描述是否成功產生。',
+                variant: 'destructive',
+            });
+            return;
+        }
+        // Check if all photos have dataUrls for embedding
+        if (photos.some(p => !p.dataUrl)) {
+            toast({
+                title: '無法匯出 PDF',
+                description: '部分圖片資料尚未完全載入，請稍候再試。',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsPreparingPdf(true); // Indicate loading state for PDF preparation
+        try {
+            const reportContent = await generateReportContent(true); // Generate content optimized for printing
+
+            if (printIframeRef.current) {
+                const iframe = printIframeRef.current;
+                iframe.srcdoc = reportContent;
+
+                // Wait for the iframe content to load before printing
+                iframe.onload = () => {
+                  // Slight delay to ensure rendering completes in the iframe
+                  setTimeout(() => {
+                    try {
+                        iframe.contentWindow?.print();
+                         toast({
+                            title: '準備列印',
+                            description: '瀏覽器列印對話框已開啟，請選擇「另存為 PDF」。',
+                         });
+                    } catch (printError) {
+                        console.error('Error triggering print:', printError);
+                         toast({
+                            title: '列印錯誤',
+                            description: '無法自動開啟列印對話框，請嘗試手動列印。',
+                            variant: 'destructive',
+                        });
+                    } finally {
+                       setIsPreparingPdf(false); // End loading state after print attempt
+                       iframe.onload = null; // Clean up onload handler
+                    }
+                  }, 500); // Adjust delay if needed
+                };
+                 iframe.onerror = (error) => {
+                    console.error('Error loading iframe content:', error);
+                    toast({
+                        title: '載入錯誤',
+                        description: '無法載入預覽內容以供列印。',
+                        variant: 'destructive',
+                    });
+                     setIsPreparingPdf(false);
+                 };
+            } else {
+                throw new Error("Print iframe ref not found.");
+            }
+        } catch (error) {
+            console.error('Error preparing PDF report:', error);
+            toast({
+                title: '匯出錯誤',
+                description: '準備 PDF 報告時發生錯誤。',
+                variant: 'destructive',
+            });
+            setIsPreparingPdf(false); // End loading state on error
+        }
+    }, [form, photos, summary, toast, generateReportContent]); // Added generateReportContent
+
 
 
    // Effect to clear descriptions and summary when form fields change
@@ -589,8 +713,30 @@ export default function Home() {
    }, [form]);
 
 
+  // Common check for export button disabling logic
+  const isExportDisabled =
+    isExportingDoc ||
+    isPreparingPdf ||
+    !summary ||
+    photos.length !== MAX_PHOTOS ||
+    photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl);
+
+
   return (
     <>
+    {/* Hidden iframe for printing */}
+    <iframe
+        ref={printIframeRef}
+        style={{
+            position: 'absolute',
+            width: '0',
+            height: '0',
+            border: '0',
+            visibility: 'hidden', // Keep it out of sight and flow
+        }}
+        title="Print Content Frame"
+    ></iframe>
+
     <div className="container mx-auto p-4 md:p-8 bg-background min-h-screen">
       <header className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-primary-foreground bg-primary py-4 rounded-lg shadow-md">領域共學誌</h1>
@@ -832,28 +978,43 @@ export default function Home() {
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
                  <CardDescription className="text-primary-foreground/80">
-                    點擊按鈕匯出包含所有資訊、照片及描述的 Word (.doc) 報告檔案。
+                    點擊下方按鈕匯出 Word (.doc) 或 PDF 格式的報告檔案。
                  </CardDescription>
              </CardHeader>
-             <CardContent className="p-6">
+             <CardContent className="p-6 flex flex-col sm:flex-row gap-4">
                  <Button
                     type="button"
                     onClick={handleExportReport}
-                    disabled={
-                        isSubmitting || // Disable while exporting
-                        !summary || // Summary must exist
-                        photos.length !== MAX_PHOTOS || // Must have exactly MAX_PHOTOS
-                        photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl) // All descriptions must exist, not be errors, and have dataUrl
-                    }
-                    className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6"
+                    disabled={isExportDisabled}
+                    className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6"
                   >
-                    {isSubmitting ? (
+                    {isExportingDoc ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          匯出中...
+                          匯出 DOC 中...
                         </>
                       ) : (
-                       '匯出會議報告 (.doc)' // Change text back or adjust as needed
+                       '匯出會議報告 (.doc)'
+                      )
+                    }
+                 </Button>
+                  <Button
+                    type="button"
+                    onClick={handleExportPdf}
+                    disabled={isExportDisabled}
+                    className="w-full sm:w-auto bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6"
+                    variant="outline"
+                  >
+                    {isPreparingPdf ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          準備 PDF 中...
+                        </>
+                      ) : (
+                       <>
+                        <Printer className="mr-2 h-5 w-5" />
+                        匯出會議報告 (PDF)
+                       </>
                       )
                     }
                  </Button>
@@ -868,3 +1029,5 @@ export default function Home() {
   );
 }
 
+
+    

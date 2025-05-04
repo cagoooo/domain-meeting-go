@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>會議報告範本 v3 (保持比例)</title>
+    <style>
+        body {
+            font-family: "Times New Roman", serif; /* Default Word font */
+            /* max-width: 210mm; */
+            margin: 2cm; /* Approximate Word default margins */
+        }
+        h1, h2 {
+            font-family: Arial, sans-serif; /* Common Word heading font */
+            font-weight: bold;
+            color: black;
+            border-bottom: 1px solid black;
+            padding-bottom: 4pt;
+            margin-top: 12pt;
+            margin-bottom: 3pt;
+        }
+        h1 {
+            font-size: 20pt;
+            text-align: center;
+            border-bottom-width: 1.5pt;
+             padding-bottom: 8pt;
+        }
+        h2 {
+            font-size: 16pt;
+             border-bottom-width: 0.75pt;
+        }
+        p {
+            font-family: "標楷體", serif; /* Example CJK font */
+            font-size: 12pt;
+            margin-bottom: 7.5pt;
+            line-height: 1.5;
+             white-space: pre-wrap; /* Preserve line breaks in summary */
+        }
+        .info-section p {
+             white-space: normal; /* Normal wrapping for info section */
+             line-height: 1.2;
+             margin-bottom: 3pt;
+        }
+        strong {
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #ccc;
+            margin-top: 10pt;
+            margin-bottom: 10pt;
+        }
+        td {
+            border: 1px solid #ccc;
+            padding: 5pt;
+            vertical-align: top; /* Align content to the top */
+            text-align: center; /* Center align inline/text content */
+            width: 50%; /* Two equal columns */
+        }
+        /* Image Styling - Fixed Height, Auto Width */
+        td img {
+            display: block; /* Needed for margin auto centering */
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 5pt; /* Add some space below image */
+            height: 142pt; /* Approx 5cm - FIXED HEIGHT */
+            width: auto;   /* AUTO WIDTH - Maintains aspect ratio */
+            /* Optional: Add a max-width to prevent very wide images from overflowing */
+            max-width: 100%; 
+        }
+
+        /* Description Styling */
+        .description {
+            font-size: 10pt;
+            color: #333;
+            text-align: center;
+            margin-top: 0; /* Remove default margin if any */
+        }
+        .section {
+             margin-bottom: 18.75pt;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>[請在此處輸入會議主標題]</h1>
+
+    <div class="section info-section">
+        <h2>會議基本資訊</h2>
+        <p><strong>會議主題：</strong> [請輸入會議主題]</p>
+        <p><strong>會議地點：</strong> [請輸入會議地點]</p>
+        <p><strong>會議日期：</strong> [請輸入會議日期，例如：2025年05月06日]</p>
+        <p><strong>與會人員：</strong> [請輸入與會人員姓名，用逗號分隔]</p>
+    </div>
+
+    <div class="section">
+        <h2>圖片記錄</h2>
+        <table>
+            <tr>
+                <td>
+                    <!-- 圖片高度固定為 5cm，寬度自動 -->
+                    <img src="placeholder1.jpg" alt="圖片 1">
+                    <p class="description">[請在此處輸入圖片 1 的說明文字]</p>
+                </td>
+                <td>
+                    <img src="placeholder2.jpg" alt="圖片 2">
+                    <p class="description">[請在此處輸入圖片 2 的說明文字]</p>
+                </td>
+            </tr>
+             <tr>
+                <td>
+                    <img src="placeholder3.jpg" alt="圖片 3">
+                    <p class="description">[請在此處輸入圖片 3 的說明文字]</p>
+                </td>
+                <td>
+                    <img src="placeholder4.jpg" alt="圖片 4">
+                    <p class="description">[請在此處輸入圖片 4 的說明文字]</p>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="section">
+        <h2>會議總結與待辦事項</h2>
+        <p>[請在此處輸入詳細的會議總結、討論內容、決策事項以及後續的待辦事項。 您可以自由換行。]</p>
+    </div>
+
+</body>
+</html>
