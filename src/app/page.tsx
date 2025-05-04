@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -50,13 +51,14 @@ type Photo = {
   previewUrl: string;
   description: string;
   isGenerating: boolean;
+  dataUrl?: string; // Add dataUrl to store base64 representation
 };
 
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [summary, setSummary] = useState<string>('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Consider renaming or using a specific state for export loading
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -69,26 +71,35 @@ export default function Home() {
     },
   });
 
+   const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+
   const handleFileChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
+    async (event: ChangeEvent<HTMLInputElement>) => { // Make async to read data URL immediately
       const files = event.target.files;
       if (!files) return;
 
-      const newPhotos: Photo[] = [];
-      let hasError = false;
+      const newPhotosPromises: Promise<Photo | null>[] = [];
+      let currentPhotoCount = photos.length;
+      let filesProcessedCount = 0; // Track processed files to avoid exceeding limit
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const currentPhotoCount = photos.length + newPhotos.length;
 
-        if (currentPhotoCount >= MAX_PHOTOS) {
+        if (currentPhotoCount + filesProcessedCount >= MAX_PHOTOS) {
            toast({
             title: '上傳錯誤',
-            description: `最多只能上傳 ${MAX_PHOTOS} 張照片。`,
+            description: `最多只能上傳 ${MAX_PHOTOS} 張照片。已忽略多餘檔案。`,
             variant: 'destructive',
           });
-          hasError = true;
-          break;
+          break; // Stop processing more files
         }
 
         if (file.size > MAX_FILE_SIZE) {
@@ -97,7 +108,6 @@ export default function Home() {
             description: `檔案 ${file.name} 過大，請選擇小於 5MB 的檔案。`,
             variant: 'destructive',
           });
-          hasError = true;
           continue; // Skip this file
         }
 
@@ -107,23 +117,48 @@ export default function Home() {
             description: `檔案 ${file.name} 格式不支援，請選擇 JPG, PNG, 或 WEBP 格式。`,
             variant: 'destructive',
           });
-          hasError = true;
           continue; // Skip this file
         }
 
+        filesProcessedCount++; // Increment count for valid files within limit
 
         const photoId = `${file.name}-${Date.now()}`;
-        newPhotos.push({
-          id: photoId,
-          file,
-          previewUrl: URL.createObjectURL(file),
-          description: '',
-          isGenerating: false,
-        });
+        const previewUrl = URL.createObjectURL(file);
+
+        // Read file as data URL immediately upon selection
+        const photoPromise = readFileAsDataURL(file)
+            .then(dataUrl => ({
+                id: photoId,
+                file,
+                previewUrl: previewUrl,
+                description: '',
+                isGenerating: false,
+                dataUrl: dataUrl, // Store data URL
+            }))
+            .catch(error => {
+                console.error(`Error reading file ${file.name}:`, error);
+                toast({
+                    title: '讀取錯誤',
+                    description: `讀取檔案 ${file.name} 時發生錯誤。`,
+                    variant: 'destructive',
+                });
+                 URL.revokeObjectURL(previewUrl); // Clean up preview URL if reading fails
+                return null; // Indicate failure
+            });
+
+        newPhotosPromises.push(photoPromise);
       }
 
-       if (newPhotos.length > 0) {
-          setPhotos((prevPhotos) => [...prevPhotos, ...newPhotos]);
+      const resolvedPhotos = await Promise.all(newPhotosPromises);
+      const validNewPhotos = resolvedPhotos.filter((p): p is Photo => p !== null); // Filter out nulls (failed reads)
+
+
+       if (validNewPhotos.length > 0) {
+          setPhotos((prevPhotos) => {
+             // Ensure not to exceed MAX_PHOTOS even with concurrent uploads
+             const combined = [...prevPhotos, ...validNewPhotos];
+             return combined.slice(0, MAX_PHOTOS);
+          });
        }
 
       // Reset file input to allow uploading the same file again if needed
@@ -146,14 +181,6 @@ export default function Home() {
      setSummary('');
   }, []);
 
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = (error) => reject(error);
-      reader.readAsDataURL(file);
-    });
-  };
 
   const handleGenerateDescriptions = useCallback(async () => {
      const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
@@ -181,7 +208,13 @@ export default function Home() {
     try {
       const descriptionPromises = photosToProcess.map(async (photo) => {
         try {
-          const photoDataUri = await readFileAsDataURL(photo.file);
+          // Use stored dataUrl if available, otherwise read again (fallback)
+          const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
+           // If dataUrl wasn't stored initially, store it now
+          if (!photo.dataUrl) {
+            setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
+          }
+
           const result = await generatePhotoDescriptions({
             teachingArea,
             meetingTopic,
@@ -289,64 +322,171 @@ export default function Home() {
   }, [form, photos, toast]);
 
 
-  // Generates HTML content formatted for Word
-  const generateReportContent = () => {
+  // Generates HTML content formatted for Word, including embedded images
+  const generateReportContent = async (): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+
+    // Ensure all photos have data URLs (redundant if handleFileChange works, but safe)
+    const photosWithDataUrls = await Promise.all(
+        photos.map(async (photo) => {
+            if (!photo.dataUrl) {
+                console.warn(`Photo ${photo.id} missing dataUrl, attempting to read again.`);
+                try {
+                    return { ...photo, dataUrl: await readFileAsDataURL(photo.file) };
+                } catch (error) {
+                    console.error(`Failed to read dataUrl for ${photo.id} during export:`, error);
+                    toast({
+                        title: '圖片讀取錯誤',
+                        description: `匯出時無法讀取照片 ${photo.file.name}。報告將不包含此圖片。`,
+                        variant: 'destructive',
+                    });
+                    return { ...photo, dataUrl: '' }; // Mark as empty to skip embedding
+                }
+            }
+            return photo;
+        })
+    );
+
 
     // Basic CSS for formatting in Word
     const styles = `
-      body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; }
-      h1 { color: #2E7D32; /* Dark Green */ text-align: center; border-bottom: 2px solid #C8E6C9; padding-bottom: 10px; }
-      h2 { color: #FFAB40; /* Orange */ border-bottom: 1px solid #FFF9C4; padding-bottom: 5px; margin-top: 20px; }
-      p { margin-bottom: 10px; }
-      strong { color: #555; }
-      ul { list-style-type: disc; margin-left: 20px; }
-      li { margin-bottom: 5px; }
-      .section { margin-bottom: 25px; padding: 15px; border: 1px solid #eee; border-radius: 5px; background-color: #f9f9f9;}
-      .photo-section li { border-bottom: 1px dashed #ddd; padding-bottom: 5px; }
-      .summary-section { white-space: pre-wrap; /* Preserve whitespace */ }
+      @page Section1 {
+        size: 8.5in 11.0in; /* Letter size */
+        margin: 1.0in 1.0in 1.0in 1.0in;
+        mso-header-margin: .5in;
+        mso-footer-margin: .5in;
+        mso-paper-source: 0;
+      }
+      div.Section1 {
+        page: Section1;
+      }
+      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; } /* Common Traditional Chinese fonts */
+      h1 { color: #000000; /* Black */ text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 20px;}
+      h2 { color: #000000; /* Black */ font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
+      p { margin-bottom: 10px; font-size: 12pt; }
+      strong { font-weight: bold; }
+      .section { margin-bottom: 25px; }
+      .photo-grid { display: table; width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+      .photo-row { display: table-row; }
+      .photo-cell { display: table-cell; width: 50%; padding: 10px; text-align: center; vertical-align: top; border: 1px solid #cccccc; }
+      .photo-cell img { max-width: 90%; height: auto; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto; }
+      .photo-description { font-size: 11pt; color: #333333; text-align: center; }
+      .summary-section p { white-space: pre-wrap; /* Preserve whitespace */ font-size: 12pt; text-align: justify; }
+      /* MSO specific styles for Word compatibility */
+      p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
+      h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
+      h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
+      /* Add more MSO styles if needed */
     `;
 
+     // Use Word XML structure for better compatibility
     let reportHtml = `
-      <!DOCTYPE html>
-      <html lang="zh-TW">
+      <html xmlns:v="urn:schemas-microsoft-com:vml"
+      xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns:m="http://schemas.microsoft.com/office/2004/12/omml"
+      xmlns="http://www.w3.org/TR/REC-html40">
       <head>
-        <meta charset="UTF-8">
+        <meta charset="utf-8">
+        <meta name=ProgId content=Word.Document>
+        <meta name=Generator content="Microsoft Word 15">
+        <meta name=Originator content="Microsoft Word 15">
         <title>領域共學誌 會議報告</title>
-        <style>${styles}</style>
+        <!--[if gte mso 9]><xml>
+         <o:DocumentProperties>
+          <o:Author>領域共學誌</o:Author>
+         </o:DocumentProperties>
+         <w:WordDocument>
+          <w:View>Print</w:View>
+          <w:Zoom>100</w:Zoom>
+          <w:DoNotOptimizeForBrowser/>
+         </w:WordDocument>
+        </xml><![endif]-->
+        <style>
+        <!--
+         /* Font Definitions */
+         @font-face
+            {font-family:PMingLiU;
+            panose-1:2 2 5 0 0 0 0 0 0 0;}
+         @font-face
+            {font-family:新細明體;
+            panose-1:2 2 5 0 0 0 0 0 0 0;}
+         @font-face
+            {font-family:"\@PMingLiU";
+            panose-1:2 2 5 0 0 0 0 0 0 0;}
+         @font-face
+            {font-family:"\@新細明體";
+            panose-1:2 2 5 0 0 0 0 0 0 0;}
+         /* Style Definitions */
+         ${styles}
+        -->
+        </style>
       </head>
-      <body>
+      <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;'>
+      <div class=Section1>
+
         <h1>領域共學誌 會議報告</h1>
 
         <div class="section">
           <h2>基本資訊</h2>
-          <p><strong>教學領域：</strong> ${teachingArea}</p>
-          <p><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class=MsoNormal><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class=MsoNormal><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class=MsoNormal><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class=MsoNormal><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
 
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <ul>
+          <table class=MsoNormalTable border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100.0%;border-collapse:collapse;border:none;mso-border-alt:solid windowtext .5pt;mso-padding-alt:0cm 5.4pt 0cm 5.4pt;mso-border-insideh:.5pt solid windowtext;mso-border-insidev:.5pt solid windowtext;'>
+            <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:150.0pt'>
     `;
 
-    photos.forEach((photo, index) => {
-      reportHtml += `<li><strong>照片 ${index + 1} 描述：</strong> ${photo.description || '未產生描述'}</li>\n`;
-      // Note: Images are not embedded in this version. You could add base64 encoded images if needed, but it significantly increases file size.
-      // Example (requires readFileAsDataURL to be called again or store data URIs):
-      // reportHtml += `<p><img src="${photoDataUri}" alt="照片 ${index + 1}" width="300"></p>\n`;
-    });
+    // Loop through photos in pairs for 2x2 grid
+    for (let i = 0; i < MAX_PHOTOS; i += 2) {
+      if (i > 0) { // Add row start for the second row
+         reportHtml += `<tr style='mso-yfti-irow:${Math.floor(i/2)};height:150.0pt${i + 2 >= MAX_PHOTOS ? ';mso-yfti-lastrow:yes' : ''}'>\n`;
+      }
+
+      // Cell for photo i
+      const photo1 = photosWithDataUrls[i];
+      reportHtml += `<td width="50%" valign=top style='width:50.0%;border:solid windowtext 1.0pt;mso-border-alt:solid windowtext .5pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;height:150.0pt'>
+          <p class=MsoNormal align=center style='text-align:center'>`;
+      if (photo1?.dataUrl) {
+        // Embed image using VML for Word compatibility
+        // You might need to adjust width/height based on actual image dimensions or desired size
+        reportHtml += `<!--[if gte vml 1]><v:shape id="Picture_${i+1}" o:spid="_x0000_i102${i+1}" type="#_x0000_t75" style='width:200pt;height:150pt;visibility:visible;mso-wrap-style:square'><v:imagedata src="${photo1.dataUrl}" o:title=""/></v:shape><![endif]--><![if !vml]><img width=267 height=200 src="${photo1.dataUrl}" v:shapes="Picture_${i+1}"><![endif]>`;
+      } else {
+        reportHtml += `[圖片 ${i + 1} 無法載入]`;
+      }
+      reportHtml += `<span style='font-size:11.0pt;font-family:"PMingLiU","serif";'><br clear=all> ${photo1?.description || '未產生描述'}</span></p>
+          </td>\n`;
+
+      // Cell for photo i+1
+      const photo2 = photosWithDataUrls[i + 1];
+      reportHtml += `<td width="50%" valign=top style='width:50.0%;border:solid windowtext 1.0pt;border-left:none;mso-border-left-alt:solid windowtext .5pt;mso-border-alt:solid windowtext .5pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;height:150.0pt'>
+           <p class=MsoNormal align=center style='text-align:center'>`;
+      if (photo2?.dataUrl) {
+          reportHtml += `<!--[if gte vml 1]><v:shape id="Picture_${i+2}" o:spid="_x0000_i102${i+2}" type="#_x0000_t75" style='width:200pt;height:150pt;visibility:visible;mso-wrap-style:square'><v:imagedata src="${photo2.dataUrl}" o:title=""/></v:shape><![endif]--><![if !vml]><img width=267 height=200 src="${photo2.dataUrl}" v:shapes="Picture_${i+2}"><![endif]>`;
+      } else {
+        reportHtml += `[圖片 ${i + 2} 無法載入]`;
+      }
+       reportHtml += `<span style='font-size:11.0pt;font-family:"PMingLiU","serif";'><br clear=all> ${photo2?.description || '未產生描述'}</span></p>
+          </td>\n`;
+
+      reportHtml += `</tr>\n`; // End row
+    }
+
 
     reportHtml += `
-          </ul>
+          </table>
         </div>
 
         <div class="section summary-section">
           <h2>會議大綱摘要</h2>
-          <p>${summary || '尚未產生摘要'}</p>
+          <p class=MsoNormal>${summary || '尚未產生摘要'}</p>
         </div>
 
+      </div> <!-- End Section1 -->
       </body>
       </html>
     `;
@@ -355,7 +495,7 @@ export default function Home() {
   };
 
 
-  const handleExportReport = useCallback(() => {
+  const handleExportReport = useCallback(async () => { // Make async
      const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
      if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length !== MAX_PHOTOS || !summary) {
          toast({
@@ -366,40 +506,63 @@ export default function Home() {
          return;
      }
       // Check for failed descriptions before exporting
-     if (photos.some(p => p.description.startsWith('無法描述'))) {
+     if (photos.some(p => !p.description || p.description.startsWith('無法描述'))) {
         toast({
             title: '無法匯出',
-            description: '報告中包含無法描述的照片，請確認所有照片描述是否成功產生。',
+            description: '報告中包含無法描述或產生失敗的照片描述，請確認所有照片描述是否成功產生。',
             variant: 'destructive',
         });
         return;
     }
+    // Check if all photos have dataUrls for embedding
+    if (photos.some(p => !p.dataUrl)) {
+        toast({
+            title: '無法匯出',
+            description: '部分圖片資料尚未完全載入，請稍候再試。',
+            variant: 'destructive',
+        });
+        // Optional: attempt to load missing dataUrls here if needed
+        return;
+    }
 
-    const reportContent = generateReportContent();
-     // Use 'application/msword' for .doc compatibility and proper encoding preamble
-    const blob = new Blob([`\ufeff${reportContent}`], { type: 'application/msword;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-     // Change filename extension to .doc
-    const fileName = `領域共學誌_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.doc`;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-     toast({
-        title: '成功',
-        description: `報告 ${fileName} 已匯出。`,
-     });
-  }, [form, photos, summary, toast]);
+    setIsSubmitting(true); // Indicate loading state for export
+    try {
+        const reportContent = await generateReportContent(); // Await the async generation
+        // Use 'application/msword' for .doc compatibility and proper encoding preamble
+        const blob = new Blob([`\ufeff${reportContent}`], { type: 'application/msword;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        // Change filename extension to .doc
+        const fileName = `領域共學誌_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.doc`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast({
+            title: '成功',
+            description: `報告 ${fileName} 已匯出。`,
+        });
+    } catch (error) {
+         console.error('Error exporting report:', error);
+         toast({
+            title: '匯出錯誤',
+            description: '匯出報告時發生錯誤。',
+            variant: 'destructive',
+         });
+    } finally {
+        setIsSubmitting(false); // End loading state
+    }
+  }, [form, photos, summary, toast]); // Added generateReportContent to dependencies
 
 
    // Effect to clear descriptions and summary when form fields change
    useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {
          // Only reset if a form value actually changes, ignore initial load/watches
-         if (type === 'change') {
+         if (type === 'change' && name !== undefined) { // Ensure name is defined
+           // When form changes, descriptions/summary are no longer valid for the new input
            setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
            setSummary('');
          }
@@ -649,20 +812,31 @@ export default function Home() {
            <Card className="shadow-lg rounded-xl overflow-hidden">
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
-                <CardDescription className="text-primary-foreground/80">點擊下方按鈕，匯出排版好的 Word (.doc) 檔案</CardDescription>
+                 <CardDescription className="text-primary-foreground/80">
+                   請按照上方產出的逐條格式內容，輸出成一個完整漂亮排版過的的doc檔案供使用者下載
+                 </CardDescription>
              </CardHeader>
              <CardContent className="p-6">
                  <Button
                     type="button"
                     onClick={handleExportReport}
                     disabled={
+                        isSubmitting || // Disable while exporting
                         !summary || // Summary must exist
                         photos.length !== MAX_PHOTOS || // Must have exactly MAX_PHOTOS
-                        photos.some(p => !p.description || p.description.startsWith('無法描述')) // All descriptions must exist and not be errors
+                        photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl) // All descriptions must exist, not be errors, and have dataUrl
                     }
                     className="w-full md:w-auto bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6"
                   >
-                    匯出會議報告 (.doc)
+                    {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          匯出中...
+                        </>
+                      ) : (
+                       '匯出會議報告 (.doc)' // Change text back or adjust as needed
+                      )
+                    }
                  </Button>
             </CardContent>
           </Card>
@@ -674,3 +848,5 @@ export default function Home() {
     </>
   );
 }
+
+    
