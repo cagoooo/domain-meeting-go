@@ -16,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-TW"> {/* Set language to Traditional Chinese */}
+    <html lang="zh-TW">
       <body className={`${inter.variable} antialiased bg-background text-foreground`}>
         {children}
         <Toaster /> {/* Add Toaster here */}
