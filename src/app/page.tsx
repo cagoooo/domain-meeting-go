@@ -311,12 +311,12 @@ export default function Home() {
         });
 
 
-        if (allSucceeded) {
+        if (allSucceeded && failedCount === 0 && photos.length > 0) { // Only show success if all succeeded AND there were photos
           toast({
             title: '成功',
             description: '照片描述產生完成！',
           });
-        } else {
+        } else if (failedCount > 0) { // Show partial if any failed
            toast({
             title: '部分完成',
             description: `${failedCount} 張照片描述產生失敗，請檢查標示為「無法描述」的圖片。`,
@@ -454,7 +454,7 @@ export default function Home() {
       .photo-table { width: 100%; max-width: 18.46cm; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height (5cm = 141.73pt approx 142pt), auto width, max-width 100% of cell, centered */
-      .photo-table img { display: block; margin: 5pt auto; height: 142pt; /* Approx 5cm FIXED HEIGHT */ width: auto; /* AUTO WIDTH */ max-width: 100%; object-fit: contain; }
+      .photo-table img { display: block; margin: 5pt auto; height: 141.73pt; /* 5cm FIXED HEIGHT */ width: auto; /* AUTO WIDTH */ max-width: 100%; object-fit: contain; }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
       .summary-section p { white-space: normal; font-size: 12pt; text-align: justify; }
     `;
@@ -495,8 +495,8 @@ export default function Home() {
         td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; vertical-align: top; width: 50%; }
         /* Image Paragraph Style - Centers content */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
-        /* Image Style - Fixed height (142pt ≈ 5cm), auto width */
-        img.PhotoStyle { display: block; margin: auto; height: 142pt; /* FIXED HEIGHT 5cm */ width: auto; /* AUTO WIDTH */ max-width: 100%; mso-position-horizontal: center; }
+        /* Image Style - Fixed height (141.73pt ≈ 5cm), auto width */
+        img.PhotoStyle { display: block; margin: auto; height: 141.73pt; /* FIXED HEIGHT 5cm */ width: auto; /* AUTO WIDTH */ max-width: 100%; mso-position-horizontal: center; }
         /* Description Style */
         p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3; }
         /* Summary Paragraph Style */
@@ -517,10 +517,10 @@ export default function Home() {
         <meta name=ProgId content=Word.Document>
         <meta name=Generator content="Microsoft Word 15">
         <meta name=Originator content="Microsoft Word 15">
-        <title>領域共學誌 會議報告</title>
+        <title>領域共備GO 會議報告</title>
         <!--[if gte mso 9]><xml>
          <o:DocumentProperties>
-          <o:Author>領域共學誌</o:Author>
+          <o:Author>領域共備GO</o:Author>
          </o:DocumentProperties>
          <w:WordDocument>
           <w:View>Print</w:View>
@@ -603,7 +603,7 @@ export default function Home() {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>領域共學誌 會議報告 (預覽)</title>
+        <title>領域共備GO 會議報告 (預覽)</title>
         <style>
           ${styles}
         </style>
@@ -616,7 +616,7 @@ export default function Home() {
     let reportHtml = htmlStart;
 
     // Main title - Apply class for potential Word styling, ensure left alignment
-    reportHtml += `<h1 class="${forPrint ? '' : 'Title'}" style="text-align:left;">領域共學誌 會議報告</h1>`;
+    reportHtml += `<h1 class="${forPrint ? '' : 'Title'}" style="text-align:left;">領域共備GO 會議報告</h1>`;
 
     // Basic Info Section
     reportHtml += `
@@ -646,8 +646,8 @@ export default function Home() {
              const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
              // Apply PhotoStyle class with fixed height and auto width for Word
              const imgStyle = !forPrint ? `class="PhotoStyle"` : '';
-             // Apply inline styles for standard HTML/Print (overridden by CSS class)
-             const inlineImgStyle = forPrint ? 'style="height: 142pt; width: auto; max-width: 100%; display: block; margin: auto;"' : '';
+             // Apply inline styles for standard HTML/Print (fixed height, auto width)
+             const inlineImgStyle = forPrint ? 'style="height: 141.73pt; width: auto; max-width: 100%; display: block; margin: auto;"' : '';
 
              content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgStyle} ${inlineImgStyle} src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
@@ -757,7 +757,7 @@ export default function Home() {
         const link = document.createElement('a');
         link.href = url;
         // Change filename extension to .doc
-        const fileName = `領域共學誌_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.doc`;
+        const fileName = `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.doc`;
         link.download = fileName;
         document.body.appendChild(link);
         link.click();
@@ -898,7 +898,8 @@ export default function Home() {
   // Determine if the "Generate Descriptions" button should be disabled
   const isGenerateDescriptionsDisabled =
       isGeneratingAllDescriptions || // Disable if currently generating
-      photos.length === 0; // Disable if no photos
+      photos.length === 0 || // Disable if no photos
+      photos.some(p => p.isGenerating); // Disable if any photo is currently generating (individual or all)
       // Allow clicking even if descriptions exist, to regenerate
 
 
@@ -919,7 +920,7 @@ export default function Home() {
 
     <div className="container mx-auto p-4 md:p-8 bg-background min-h-screen">
       <header className="mb-8 text-center">
-        <h1 className="text-4xl font-bold text-primary-foreground bg-primary py-4 rounded-lg shadow-md">領域共學誌</h1>
+        <h1 className="text-4xl font-bold text-primary-foreground bg-primary py-4 rounded-lg shadow-md">領域共備GO</h1>
         <p className="text-muted-foreground mt-2">國小教師社群領域會議報告協作產出平台</p>
       </header>
 

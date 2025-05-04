@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' }); // Define Inter font
 
 export const metadata: Metadata = {
-  title: '生成摘要領域會議紀錄', // Updated title
+  title: '領域共備GO', // Updated title
   description: '自動生成國小教師社群領域會議記錄摘要，提升協作效率', // Updated description reflecting the new focus
 };
 
