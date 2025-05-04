@@ -349,6 +349,7 @@ export default function Home() {
     );
 
     // Basic CSS for formatting in Word - Adjusted for 2x4 Table
+    // Using points (pt) for better Word compatibility
     const styles = `
       @page Section1 {
         size: 8.5in 11.0in; /* Letter size */
@@ -361,23 +362,25 @@ export default function Home() {
         page: Section1;
       }
       body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; }
-      h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10px; margin-bottom: 20px;}
-      h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
-      p { margin-bottom: 10px; font-size: 12pt; }
+      h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
+      h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
+      p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
-      .section { margin-bottom: 25px; }
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-      .photo-table td { border: 1px solid #cccccc; padding: 10px; text-align: center; vertical-align: top; width: 50%; } /* 2 columns */
-      .photo-table img { max-width: 95%; /* Slightly smaller for padding */ height: auto; margin-bottom: 5px; display: block; margin-left: auto; margin-right: auto; max-height: 200px; /* Limit height */ }
-      .photo-description { font-size: 10pt; /* Smaller font for description */ color: #333333; text-align: center; line-height: 1.3; }
+      .section { margin-bottom: 25pt; }
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; }
+      .photo-table td { border: 1px solid #cccccc; padding: 10pt; text-align: center; vertical-align: top; width: 50%; height: 1%; /* Fix for inconsistent cell height */}
+      .photo-table img { max-width: 100%; width: auto; height: 180pt; /* Fixed height in points */ display: block; margin-left: auto; margin-right: auto; margin-bottom: 5pt; }
+      .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; }
       .summary-section p { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
       /* MSO specific styles for Word compatibility */
       p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
       h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
       h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-      table.MsoNormalTable { border: 1px solid #cccccc; border-collapse: collapse; }
-      td.MsoNormal { padding: 5pt; border: 1px solid #cccccc; text-align: center; vertical-align: top; }
-      img.PhotoStyle { display: block; margin: auto; max-width: 95%; height: auto; max-height: 200pt; /* Use points for Word */}
+      table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; }
+      td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; }
+      /* Ensure images are centered and properly sized within table cells */
+      p.ImageParagraph { text-align: center; margin-bottom: 5pt;}
+      img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 180pt; /* Explicit height in points */ }
       p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin-top: 5pt; line-height: 1.3;}
     `;
 
@@ -439,63 +442,52 @@ export default function Home() {
 
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100%;border-collapse:collapse;border:1pt solid #cccccc;mso-border-alt:solid windowtext .5pt;mso-padding-alt:5.0pt 5.0pt 5.0pt 5.0pt;'>
+          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100%;border-collapse:collapse;border:1pt solid #cccccc;mso-border-alt:solid #cccccc .75pt;mso-padding-alt:5.0pt 5.0pt 5.0pt 5.0pt;mso-cellspacing:0cm;mso-yfti-tbllook:1184;'>
             <tbody>
-              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:auto;'>
+              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:1%;'>
     `;
 
-    // Build the table content (2x4: two columns, four rows total - 2 photo rows, 2 description rows)
-    // Row 1: Images 1 & 2
-    const photo1 = photosWithDataUrls[0];
-    const photo2 = photosWithDataUrls[1];
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
-    if (photo1?.dataUrl) {
-        // Use fixed width/height in points for better Word rendering
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo1.dataUrl}" alt="照片 1"></p>`;
-    } else {
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 1 無法載入]</p>`;
-    }
-    reportHtml += `</td>`;
+    // Helper function to generate table cell content
+    const generateTableCell = (photo: Photo | undefined, altText: string): string => {
+        let content = '';
+        if (photo?.dataUrl) {
+            // Use explicit width/height in points and wrap in a paragraph for centering
+            content = `<p class=ImageParagraph align=center style='text-align:center'><img class=PhotoStyle src="${photo.dataUrl}" alt="${altText}" width="250" height="180"></p>`;
+        } else {
+            content = `<p class=MsoNormal align=center style='text-align:center'>[${altText} 無法載入]</p>`;
+        }
+        return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt; mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'>${content}</td>`;
+    };
 
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
-    if (photo2?.dataUrl) {
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo2.dataUrl}" alt="照片 2"></p>`;
-    } else {
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 2 無法載入]</p>`;
+    const generateDescriptionCell = (photo: Photo | undefined): string => {
+      const description = photo?.description || '未產生描述';
+      return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt;mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'><p class=DescriptionStyle>${description}</p></td>`;
     }
-    reportHtml += `</td></tr>`;
+
+    // Build the table content (2x4: two columns, four rows total)
+    // Row 1: Images 1 & 2
+    reportHtml += generateTableCell(photosWithDataUrls[0], '照片 1');
+    reportHtml += generateTableCell(photosWithDataUrls[1], '照片 2');
+    reportHtml += `</tr>`;
 
     // Row 2: Descriptions 1 & 2
-    reportHtml += `<tr style='mso-yfti-irow:1;height:auto;'>`;
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo1?.description || '未產生描述'}</p></td>`;
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo2?.description || '未產生描述'}</p></td>`;
+    reportHtml += `<tr style='mso-yfti-irow:1;height:1%;'>`;
+    reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
+    reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtml += `</tr>`;
 
     // Row 3: Images 3 & 4
-    const photo3 = photosWithDataUrls[2];
-    const photo4 = photosWithDataUrls[3];
-     reportHtml += `<tr style='mso-yfti-irow:2;height:auto;'>`;
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
-    if (photo3?.dataUrl) {
-         reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo3.dataUrl}" alt="照片 3"></p>`;
-    } else {
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 3 無法載入]</p>`;
-    }
-    reportHtml += `</td>`;
-
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'>`;
-    if (photo4?.dataUrl) {
-         reportHtml += `<p class=MsoNormal align=center style='text-align:center'><img class=PhotoStyle width=250 height=188 src="${photo4.dataUrl}" alt="照片 4"></p>`;
-    } else {
-        reportHtml += `<p class=MsoNormal align=center style='text-align:center'>[圖片 4 無法載入]</p>`;
-    }
-    reportHtml += `</td></tr>`;
+    reportHtml += `<tr style='mso-yfti-irow:2;height:1%;'>`;
+    reportHtml += generateTableCell(photosWithDataUrls[2], '照片 3');
+    reportHtml += generateTableCell(photosWithDataUrls[3], '照片 4');
+    reportHtml += `</tr>`;
 
     // Row 4: Descriptions 3 & 4
-    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:auto;'>`;
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo3?.description || '未產生描述'}</p></td>`;
-    reportHtml += `<td class=MsoNormal width="50%" style='width:50.0%;'><p class=DescriptionStyle>${photo4?.description || '未產生描述'}</p></td>`;
+    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:1%;'>`;
+    reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
+    reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtml += `</tr>`;
+
 
     reportHtml += `
             </tbody>
@@ -741,8 +733,9 @@ export default function Home() {
                          <Image
                             src={photo.previewUrl}
                             alt={`照片 ${photo.file.name}`}
-                            layout="fill"
-                            objectFit="contain" // Changed to contain to show whole image
+                            fill // Use fill to cover the container
+                            style={{ objectFit: 'contain' }} // Use contain to show the whole image within aspect ratio
+                            priority // Prioritize loading visible images
                           />
                         <button
                           type="button"
@@ -870,4 +863,3 @@ export default function Home() {
   );
 }
 
-    
