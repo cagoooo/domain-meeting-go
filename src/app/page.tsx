@@ -85,10 +85,25 @@ export default function Home() {
 
    const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+       if (!(file instanceof File)) {
+           return reject(new Error("Input is not a File object"));
+       }
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = () => {
+          if (typeof reader.result === 'string') {
+             resolve(reader.result);
+          } else {
+             reject(new Error('FileReader result is not a string'));
+          }
+      };
       reader.onerror = (error) => reject(error);
-      reader.readDataURL(file);
+      // Use the correct method name: readAsDataURL
+       if (typeof reader.readAsDataURL === 'function') {
+          reader.readAsDataURL(file);
+       } else {
+           console.error("readAsDataURL method not found on FileReader instance:", reader);
+           reject(new Error('FileReader.readAsDataURL method not found'));
+       }
     });
   };
 
@@ -151,7 +166,7 @@ export default function Home() {
                 console.error(`Error reading file ${file.name}:`, error);
                 toast({
                     title: '讀取錯誤',
-                    description: `讀取檔案 ${file.name} 時發生錯誤。`,
+                    description: `讀取檔案 ${file.name} 時發生錯誤: ${error instanceof Error ? error.message : 'Unknown error'}`,
                     variant: 'destructive',
                 });
                  URL.revokeObjectURL(previewUrl); // Clean up preview URL if reading fails
@@ -218,24 +233,27 @@ export default function Home() {
     if (isGeneratingAllDescriptions) return; // Prevent multiple overall calls
 
     const photosToProcess = photos.filter(p => !p.description || p.description.startsWith('重新產生')); // Process photos without description or marked for regeneration
-     if (photosToProcess.length === 0 && photos.every(p => p.description && !p.description.startsWith('重新產生'))) {
-      toast({
-        title: '提示',
-        description: '所有照片描述都已產生。如需重新產生，請先移除照片再重新上傳。', // Adjusted message
-      });
-      return;
+     if (photosToProcess.length === 0 && photos.every(p => p.description && !p.description.startsWith('無法描述'))) {
+      // Update: If all descriptions exist and none are marked for regen, change button text but allow clicking again
+      // No early return here, allow button to be clickable for regeneration
+      // toast({
+      //   title: '提示',
+      //   description: '所有照片描述都已產生。如需重新產生，請點擊「重新產生描述」。',
+      // });
+     // return; // Remove this return to allow re-generation click
     }
 
-    // Reset descriptions for photos to be processed and set generating state
-    setPhotos(prev => prev.map(p => photosToProcess.some(ptp => ptp.id === p.id) ? { ...p, description: '', isGenerating: true } : p));
+    // Reset descriptions for ALL photos and set generating state
+    setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0); // Start progress
     let completedCount = 0;
-    const totalToProcess = photosToProcess.length;
+    // Use photos.length for total count as we are resetting all
+    const totalToProcess = photos.length;
 
     try {
-        // Map photos to promises that resolve with DescriptionResult
-        const descriptionPromises = photosToProcess.map(async (photo): Promise<DescriptionResult> => {
+        // Map ALL photos to promises that resolve with DescriptionResult
+        const descriptionPromises = photos.map(async (photo): Promise<DescriptionResult> => {
            let descriptionResult: DescriptionResult;
             try {
                 const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
@@ -422,8 +440,8 @@ export default function Home() {
       strong { font-weight: bold; }
       em { font-style: italic; } /* Style for italics */
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      /* Table Styles */
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; } /* Added auto margins */
+      /* Table Styles - Center the table itself */
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell, centered */
       .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
@@ -464,7 +482,7 @@ export default function Home() {
         h2 { mso-style-link: "標題 2 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
         p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
         /* Table Styles - Apply margin: auto for centering */
-        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; /* Force center */ width: 100%; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; }
+        table.MsoNormalTable { /* Center the table itself */ margin-left: auto !important; margin-right: auto !important; width: 100%; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; /* Remove default para margin inside table */ }
         td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; /* Force center alignment */ vertical-align: top; width: 50%; }
         /* Image Paragraph Style - Centers content within the cell */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
@@ -587,7 +605,7 @@ export default function Home() {
     `;
 
     // Initialize reportHtml with the starting HTML structure
-    let reportHtml = htmlStart; // Ensure reportHtml is declared here
+    let reportHtml = htmlStart;
 
     // Main title
     reportHtml += `<h1>領域共學誌 會議報告</h1>`;
@@ -608,6 +626,7 @@ export default function Home() {
     reportHtml += `
         <div class="section photo-section">
           <h2>照片記錄</h2>
+           <!-- Removed align=center from table for Word, relying on MSO styles -->
           <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0 ${tableStyle}>
              <tbody>
     `;
@@ -625,7 +644,8 @@ export default function Home() {
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
-        return `<td class="${forPrint ? '' : 'MsoNormal'}">${content}</td>`; // Removed width="50%" for better auto-layout in Word
+         // Removed width attribute, Word handles column widths better automatically
+        return `<td class="${forPrint ? '' : 'MsoNormal'}">${content}</td>`;
     };
 
     // Helper function to generate table cell content for descriptions
@@ -633,7 +653,8 @@ export default function Home() {
       const description = photo?.description || '未產生描述';
        // Use DescriptionStyle for Word, photo-description for print/HTML
        const paragraphClass = forPrint ? 'photo-description' : 'DescriptionStyle';
-       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`; // Removed width="50%"
+        // Removed width attribute
+       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`;
     }
 
     // Build the table content (2x4: two columns, four rows total)
@@ -867,10 +888,10 @@ export default function Home() {
     photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl);
 
   // Determine if the "Generate Descriptions" button should be disabled
-   const isGenerateDescriptionsDisabled =
+  const isGenerateDescriptionsDisabled =
       isGeneratingAllDescriptions || // Disable if currently generating
-      photos.length === 0 ||          // Disable if no photos
-      (photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述')) && !isGeneratingAllDescriptions); // Disable if all photos have valid descriptions and not currently generating
+      photos.length === 0; // Disable if no photos
+      // Allow clicking even if descriptions exist, to regenerate
 
 
   return (
@@ -1077,7 +1098,8 @@ export default function Home() {
                           描述產生中... ({descriptionProgress !== null ? `${descriptionProgress}%` : ''})
                         </>
                       ) : (
-                        photos.length > 0 && photos.every(p => p.description && !p.description.startsWith('無法描述')) ? '重新產生描述' : '產生照片描述'
+                         // Change text based on whether descriptions exist
+                         photos.length > 0 && photos.some(p => p.description && !p.description.startsWith('無法描述')) ? '重新產生描述' : '產生照片描述'
                       )}
                     </Button>
                     {/* Progress Bar */}
@@ -1085,7 +1107,7 @@ export default function Home() {
                         <div className="mt-4">
                             <Progress value={descriptionProgress} className="w-full" />
                             <p className="text-sm text-muted-foreground text-center mt-1">
-                                正在產生照片描述... {descriptionProgress}%
+                                {descriptionProgress < 100 ? `正在產生照片描述... ${descriptionProgress}%` : '描述產生完成！'}
                             </p>
                         </div>
                     )}
@@ -1189,3 +1211,5 @@ export default function Home() {
     </>
   );
 }
+
+      
