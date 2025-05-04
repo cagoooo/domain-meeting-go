@@ -58,16 +58,15 @@
             text-align: center; /* Center align inline/text content */
             width: 50%; /* Two equal columns */
         }
-        /* Image Styling - Fixed Height, Auto Width */
+        /* Image Styling - Now overridden by inline styles, but keep for fallback/clarity */
         td img {
             display: block; /* Needed for margin auto centering */
             margin-left: auto;
             margin-right: auto;
             margin-bottom: 5pt; /* Add some space below image */
-            height: 142pt; /* Approx 5cm - FIXED HEIGHT */
-            width: auto;   /* AUTO WIDTH - Maintains aspect ratio */
-            /* Optional: Add a max-width to prevent very wide images from overflowing */
-            max-width: 100%; 
+            /* height: 142pt; /* Approx 5cm - Now set inline */
+            /* width: auto;   /* Now set inline */
+            max-width: 100%; /* Keep this to prevent overflow */
         }
 
         /* Description Styling */
@@ -100,21 +99,21 @@
             <tr>
                 <td>
                     <!-- 圖片高度固定為 5cm，寬度自動 -->
-                    <img src="placeholder1.jpg" alt="圖片 1">
+                    <img src="placeholder1.jpg" alt="圖片 1" style="height: 5cm; width: auto;">
                     <p class="description">[請在此處輸入圖片 1 的說明文字]</p>
                 </td>
                 <td>
-                    <img src="placeholder2.jpg" alt="圖片 2">
+                    <img src="placeholder2.jpg" alt="圖片 2" style="height: 5cm; width: auto;">
                     <p class="description">[請在此處輸入圖片 2 的說明文字]</p>
                 </td>
             </tr>
              <tr>
                 <td>
-                    <img src="placeholder3.jpg" alt="圖片 3">
+                    <img src="placeholder3.jpg" alt="圖片 3" style="height: 5cm; width: auto;">
                     <p class="description">[請在此處輸入圖片 3 的說明文字]</p>
                 </td>
                 <td>
-                    <img src="placeholder4.jpg" alt="圖片 4">
+                    <img src="placeholder4.jpg" alt="圖片 4" style="height: 5cm; width: auto;">
                     <p class="description">[請在此處輸入圖片 4 的說明文字]</p>
                 </td>
             </tr>
