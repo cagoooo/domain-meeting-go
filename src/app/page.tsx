@@ -326,7 +326,7 @@ export default function Home() {
 
 
   // Generates HTML content formatted for Word or Print
-  const generateReportContent = async (forPrint = false): Promise<string> => {
+  const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
     // Ensure all photos have data URLs
@@ -350,6 +350,14 @@ export default function Home() {
         })
     );
 
+    // Format summary: Handle Markdown and newlines
+    let formattedSummary = summary || '尚未產生摘要';
+    // Basic Markdown to HTML conversion
+    formattedSummary = formattedSummary
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italics (using em)
+      .replace(/\n/g, '<br>'); // Newlines to <br>
+
     // Base CSS for both Word and Print
     let styles = `
       body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 2cm; }
@@ -357,13 +365,16 @@ export default function Home() {
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
+      em { font-style: italic; } /* Style for italics */
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
       .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell */
       .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
-      .summary-section p { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
+      .summary-section p { white-space: normal; /* Allow normal wrapping after converting \n to <br> */ font-size: 12pt; text-align: justify; }
+      /* Specific styling for MsoNormal paragraphs in summary to handle <br> */
+      p.MsoNormal { white-space: normal !important; /* Ensure Word respects line breaks */ }
     `;
 
     // Add print-specific styles if needed
@@ -376,6 +387,8 @@ export default function Home() {
             .section, .photo-table { page-break-inside: avoid; }
             /* Ensure table rows don't break across pages if possible */
              .photo-table tr { page-break-inside: avoid; }
+             strong { font-weight: bold; } /* Ensure bold prints */
+             em { font-style: italic; } /* Ensure italics prints */
           }
         `;
     }
@@ -392,7 +405,9 @@ export default function Home() {
         div.Section1 {
           page: Section1;
         }
+        /* General paragraph style */
         p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
+        /* Specific styles for headings, table, etc. */
         h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
         h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
         table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; mso-cellspacing:0cm; mso-yfti-tbllook:1184; width:100%; }
@@ -400,6 +415,9 @@ export default function Home() {
         p.ImageParagraph { text-align: center; margin: 5pt 0;} /* Centering paragraph for image */
         img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 150pt; /* Fixed height */}
         p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3;}
+        /* Add MSO specific styles for bold and italic if needed, often handled by HTML tags */
+        strong { mso-bidi-font-weight:normal; font-weight: bold; }
+        em { mso-bidi-font-style:normal; font-style: italic; }
     ` : '';
 
      // Use Word XML structure for DOC, standard HTML for Print
@@ -424,7 +442,40 @@ export default function Home() {
           <w:Zoom>100</w:Zoom>
           <w:DoNotOptimizeForBrowser/>
           <w:DrawingGridVerticalSpacing>10 pt</w:DrawingGridVerticalSpacing>
-         </w:WordDocument>
+          <w:PunctuationKerning/>
+          <w:ValidateAgainstSchemas/>
+          <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
+          <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
+          <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
+          <w:DoNotPromoteQF/>
+          <w:LidThemeOther>EN-US</w:LidThemeOther>
+          <w:LidThemeAsian>ZH-TW</w:LidThemeAsian>
+          <w:LidThemeComplexScript>X-NONE</w:LidThemeComplexScript>
+          <w:Compatibility>
+           <w:BreakWrappedTables/>
+           <w:SnapToGridInCell/>
+           <w:WrapTextWithPunct/>
+           <w:UseAsianBreakRules/>
+           <w:DontGrowAutofit/>
+           <w:SplitPgBreakAndParaMark/>
+           <w:EnableOpenTypeKerning/>
+           <w:DontFlipMirrorIndents/>
+           <w:OverrideTableStyleHps/>
+           <w:UseFELayout/>
+          </w:Compatibility>
+          <m:mathPr>
+           <m:mathFont m:val="Cambria Math"/>
+           <m:brkBin m:val="before"/>
+           <m:brkBinSub m:val="&#45;-"/>
+           <m:smallFrac m:val="off"/>
+           <m:dispDef/>
+           <m:lMargin m:val="0"/>
+           <m:rMargin m:val="0"/>
+           <m:defJc m:val="centerGroup"/>
+           <m:wrapIndent m:val="1440"/>
+           <m:intLim m:val="subSup"/>
+           <m:naryLim m:val="undOvr"/>
+          </m:mathPr></w:WordDocument>
         </xml><![endif]-->
         <style>
         <!--
@@ -433,6 +484,8 @@ export default function Home() {
             {font-family:PMingLiU; panose-1:2 2 5 0 0 0 0 0 0 0;}
          @font-face
             {font-family:新細明體; panose-1:2 2 5 0 0 0 0 0 0 0;}
+         @font-face
+            {font-family:"Cambria Math"; panose-1:2 4 5 3 5 4 6 3 2 4;}
          @font-face
             {font-family:"\@PMingLiU"; panose-1:2 2 5 0 0 0 0 0 0 0;}
          @font-face
@@ -527,7 +580,7 @@ export default function Home() {
 
         <div class="section summary-section">
           <h2>會議大綱摘要</h2>
-          <p class=${forPrint ? '' : 'MsoNormal'}>${summary.replace(/\n/g, '<br>') || '尚未產生摘要'}</p>
+          <p class=${forPrint ? '' : 'MsoNormal'}>${formattedSummary}</p> {/* Use the formatted summary */}
         </div>
 
       </div> <!-- End Section / Section1 -->
@@ -536,7 +589,7 @@ export default function Home() {
     `;
 
     return reportHtml;
-  };
+  }, [photos, summary, form, toast]); // Add dependencies
 
 
   const handleExportReport = useCallback(async () => { // Make async
@@ -1030,4 +1083,6 @@ export default function Home() {
 }
 
 
+
     
+
