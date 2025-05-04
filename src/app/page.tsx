@@ -832,7 +832,7 @@ export default function Home() {
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
                  <CardDescription className="text-primary-foreground/80">
-                    匯出會議報告的doc檔案中照片紀錄的排版請繼續優化改良，目前的產出doc檔中的照片會太大張跑版很難看，要改成自適應在A4直式排版呈現，讓四張圖片的大小剛剛好自適應調整在A4直式紙張的排版框架裡面(2X4表格置中排版)
+                    點擊按鈕匯出包含所有資訊、照片及描述的 Word (.doc) 報告檔案。
                  </CardDescription>
              </CardHeader>
              <CardContent className="p-6">
