@@ -391,13 +391,15 @@ export default function Home() {
         })
     );
 
-    // Format summary: Handle Markdown and newlines
+    // Format summary: Handle Markdown-like syntax and newlines
     let formattedSummary = summary || '尚未產生摘要';
-    // Basic Markdown to HTML conversion
+    // Convert **text** to <strong>text</strong> and *text* to <em>text</em>
     formattedSummary = formattedSummary
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italics (using em)
-      .replace(/\n/g, '<br>'); // Newlines to <br>
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // Replace newline characters with <br> tags for HTML display
+    formattedSummary = formattedSummary.replace(/\n/g, '<br>');
 
     // Base CSS for both Word and Print
     let styles = `
@@ -408,14 +410,14 @@ export default function Home() {
       strong { font-weight: bold; }
       em { font-style: italic; } /* Style for italics */
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; }
+      /* Table Styles */
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
-      /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell */
+      /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell, centered */
       .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
+      /* Summary Styles */
       .summary-section p { white-space: normal; /* Allow normal wrapping after converting \n to <br> */ font-size: 12pt; text-align: justify; }
-      /* Specific styling for MsoNormal paragraphs in summary to handle <br> */
-      p.MsoNormal { white-space: normal !important; /* Ensure Word respects line breaks */ }
     `;
 
     // Add print-specific styles if needed
@@ -426,16 +428,16 @@ export default function Home() {
             body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* Ensure colors print */
             h1, h2 { page-break-after: avoid; }
             .section, .photo-table { page-break-inside: avoid; }
-            /* Ensure table rows don't break across pages if possible */
-             .photo-table tr { page-break-inside: avoid; }
-             strong { font-weight: bold; } /* Ensure bold prints */
-             em { font-style: italic; } /* Ensure italics prints */
+            .photo-table tr { page-break-inside: avoid; } /* Try to keep rows together */
+            strong { font-weight: bold !important; } /* Ensure bold prints */
+            em { font-style: italic !important; } /* Ensure italics prints */
           }
         `;
     }
 
     // MSO styles for Word compatibility (only add if not for printing)
     const msoStyles = !forPrint ? `
+        /* General Word Styles */
         @page Section1 {
           size: 21cm 29.7cm; /* A4 size */
           margin: 1.0in 1.0in 1.0in 1.0in; /* Standard margins */
@@ -443,22 +445,26 @@ export default function Home() {
           mso-footer-margin: .5in;
           mso-paper-source: 0;
         }
-        div.Section1 {
-          page: Section1;
-        }
-        /* General paragraph style */
-        p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
-        /* Specific styles for headings, table, etc. */
-        h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-        h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-        table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; mso-cellspacing:0cm; mso-yfti-tbllook:1184; width:100%; }
-        td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; width:50%; }
-        p.ImageParagraph { text-align: center; margin: 5pt 0;} /* Centering paragraph for image */
-        img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 150pt; /* Fixed height */}
-        p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3;}
-        /* Add MSO specific styles for bold and italic if needed, often handled by HTML tags */
-        strong { mso-bidi-font-weight:normal; font-weight: bold; }
-        em { mso-bidi-font-style:normal; font-style: italic; }
+        div.Section1 { page: Section1; }
+        /* Paragraph Styles */
+        p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0cm; margin-bottom: .0001pt; font-size: 12.0pt; font-family: "Times New Roman", serif; mso-fareast-font-family: "新細明體";}
+        h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; text-align: center; page-break-after: avoid; font-size: 20.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.5pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid windowtext 1.5pt; }
+        h2 { mso-style-link: "標題 2 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 3.0pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
+        p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
+        /* Table Styles - Apply margin: auto for centering */
+        table.MsoNormalTable { margin: auto; /* Center the table */ width: 100%; /* Keep width 100% */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; }
+        td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; /* Force center alignment */ vertical-align: top; width: 50%; }
+        /* Image Paragraph Style - Centers content within the cell */
+        p.ImageParagraph { text-align: center; margin: 5pt 0; }
+        /* Image Style - Use MSO properties for better Word rendering */
+        img.PhotoStyle { display: block; margin: auto; height: 150pt; width: auto; max-width: 100%; mso-position-horizontal: center; mso-position-vertical: absolute; }
+        /* Description Style */
+        p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3; }
+        /* Summary Paragraph Style - ensure justification and handling of <br> */
+        p.SummaryParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; text-align: justify; mso-line-break-override: none; /* Helps with <br> in Word */ }
+        /* Explicit styles for strong/em if needed */
+        strong { mso-bidi-font-weight: normal; font-weight: bold; }
+        em { mso-bidi-font-style: normal; font-style: italic; }
     ` : '';
 
      // Use Word XML structure for DOC, standard HTML for Print
@@ -492,18 +498,18 @@ export default function Home() {
           <w:LidThemeOther>EN-US</w:LidThemeOther>
           <w:LidThemeAsian>ZH-TW</w:LidThemeAsian>
           <w:LidThemeComplexScript>X-NONE</w:LidThemeComplexScript>
-          <w:Compatibility>
-           <w:BreakWrappedTables/>
-           <w:SnapToGridInCell/>
-           <w:WrapTextWithPunct/>
-           <w:UseAsianBreakRules/>
-           <w:DontGrowAutofit/>
-           <w:SplitPgBreakAndParaMark/>
-           <w:EnableOpenTypeKerning/>
-           <w:DontFlipMirrorIndents/>
-           <w:OverrideTableStyleHps/>
-           <w:UseFELayout/>
-          </w:Compatibility>
+           <w:Compatibility>
+               <w:BreakWrappedTables/>
+               <w:SnapToGridInCell/>
+               <w:WrapTextWithPunct/>
+               <w:UseAsianBreakRules/>
+               <w:DontGrowAutofit/>
+               <w:SplitPgBreakAndParaMark/>
+               <w:EnableOpenTypeKerning/>
+               <w:DontFlipMirrorIndents/>
+               <w:OverrideTableStyleHps/>
+               <w:UseFELayout/>
+           </w:Compatibility>
           <m:mathPr>
            <m:mathFont m:val="Cambria Math"/>
            <m:brkBin m:val="before"/>
@@ -554,39 +560,45 @@ export default function Home() {
     <div>
     `;
 
-    let reportHtml = htmlStart + `
-        <h1>領域共學誌 會議報告</h1>
+    // Main title
+    reportHtml += `<h1>領域共學誌 會議報告</h1>`;
 
+    // Basic Info Section
+    reportHtml += `
         <div class="section">
           <h2>基本資訊</h2>
-          <p class=${forPrint ? '' : 'MsoNormal'}><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class=${forPrint ? '' : 'MsoNormal'}><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class=${forPrint ? '' : 'MsoNormal'}><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class=${forPrint ? '' : 'MsoNormal'}><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
+    `;
 
+    // Photo Record Section - Apply centering style directly for Word export
+    const tableStyle = !forPrint ? 'style="margin-left:auto; margin-right:auto;"' : '';
+    reportHtml += `
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <table class="${forPrint ? '' : 'MsoNormalTable'} photo-table" border=1 cellspacing=0 cellpadding=0 width="100%">
-            <tbody>
+          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0 ${tableStyle}>
+             <tbody>
     `;
+
 
     // Helper function to generate table cell content for images
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            // Use class for styling, remove inline height for CSS control
             content = `<p class="${forPrint ? 'photo-paragraph' : 'ImageParagraph'}" align=center><img class="${forPrint ? '' : 'PhotoStyle'}" src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
-            content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
+             content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
-        return `<td class="${forPrint ? '' : 'MsoNormal'}" width="50%">${content}</td>`;
+        return `<td class="${forPrint ? '' : 'MsoNormal'}">${content}</td>`; // Removed width="50%" for better auto-layout in Word
     };
 
     // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-      return `<td class="${forPrint ? '' : 'MsoNormal'}" width="50%"><p class="${forPrint ? 'photo-description' : 'DescriptionStyle'}">${description}</p></td>`;
+       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${forPrint ? 'photo-description' : 'DescriptionStyle'}">${description}</p></td>`; // Removed width="50%"
     }
 
     // Build the table content (2x4: two columns, four rows total)
@@ -618,10 +630,13 @@ export default function Home() {
             </tbody>
           </table>
         </div>
+    `;
 
+    // Summary Section - Use SummaryParagraph for Word formatting
+    reportHtml += `
         <div class="section summary-section">
           <h2>會議大綱摘要</h2>
-          <p class=${forPrint ? '' : 'MsoNormal'}>${formattedSummary}</p> {/* Use the formatted summary */}
+           <p class="${forPrint ? '' : 'SummaryParagraph'}">${formattedSummary}</p>
         </div>
 
       </div> <!-- End Section / Section1 -->
