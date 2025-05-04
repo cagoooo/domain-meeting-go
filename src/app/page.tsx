@@ -349,11 +349,11 @@ export default function Home() {
     );
 
     // Basic CSS for formatting in Word - Adjusted for 2x4 Table
-    // Using points (pt) for better Word compatibility
+    // Using points (pt) for better Word compatibility and A4 portrait assumption
     const styles = `
       @page Section1 {
-        size: 8.5in 11.0in; /* Letter size */
-        margin: 1.0in 1.0in 1.0in 1.0in;
+        size: 21cm 29.7cm; /* A4 size */
+        margin: 1.0in 1.0in 1.0in 1.0in; /* Standard margins */
         mso-header-margin: .5in;
         mso-footer-margin: .5in;
         mso-paper-source: 0;
@@ -361,27 +361,30 @@ export default function Home() {
       div.Section1 {
         page: Section1;
       }
-      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; }
+      body { font-family: 'PMingLiU', '新細明體', serif; line-height: 1.6; color: #000000; font-size: 12pt; }
       h1 { color: #000000; text-align: center; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
       .section { margin-bottom: 25pt; }
       .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; }
-      .photo-table td { border: 1px solid #cccccc; padding: 10pt; text-align: center; vertical-align: top; width: 50%; height: 1%; /* Fix for inconsistent cell height */}
-      .photo-table img { max-width: 100%; width: auto; height: 180pt; /* Fixed height in points */ display: block; margin-left: auto; margin-right: auto; margin-bottom: 5pt; }
+      /* Ensure cells are exactly 50% width and aligned top/center */
+      .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; mso-border-alt: solid #cccccc .75pt; }
+      /* Adjust image height and ensure centering - use pt for Word */
+      .photo-table img { max-width: 100%; width: auto; height: 150pt; /* Adjusted height for better fit */ display: block; margin: 5pt auto 5pt auto; /* Center with margin */ }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; }
       .summary-section p { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
+
       /* MSO specific styles for Word compatibility */
       p.MsoNormal, li.MsoNormal, div.MsoNormal {margin:0cm; margin-bottom:.0001pt; font-size:12.0pt; font-family:"Times New Roman","serif";}
       h1 {mso-style-link:"標題 1 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; text-align:center; page-break-after:avoid; font-size:20.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
       h2 {mso-style-link:"標題 2 字元"; margin-top:12.0pt; margin-right:0cm; margin-bottom:3.0pt; margin-left:0cm; page-break-after:avoid; font-size:16.0pt; font-family:"Arial","sans-serif"; color:black; font-weight:bold;}
-      table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; }
-      td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; }
+      table.MsoNormalTable { border: 1pt solid #cccccc; border-collapse: collapse; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5pt 5pt 5pt 5pt; mso-cellspacing:0cm; mso-yfti-tbllook:1184; width:100%; }
+      td.MsoNormal { padding: 5pt; border: 1pt solid #cccccc; text-align: center; vertical-align: top; mso-border-alt: solid #cccccc .75pt; width:50%; }
       /* Ensure images are centered and properly sized within table cells */
-      p.ImageParagraph { text-align: center; margin-bottom: 5pt;}
-      img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 180pt; /* Explicit height in points */ }
-      p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin-top: 5pt; line-height: 1.3;}
+      p.ImageParagraph { text-align: center; margin: 5pt 0;} /* Centering paragraph for image */
+      img.PhotoStyle { display: block; margin: auto; max-width: 100%; width: auto; height: 150pt; /* Adjusted height */ }
+      p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3;}
     `;
 
      // Use Word XML structure for better compatibility
@@ -405,6 +408,7 @@ export default function Home() {
           <w:View>Print</w:View>
           <w:Zoom>100</w:Zoom>
           <w:DoNotOptimizeForBrowser/>
+          <w:DrawingGridVerticalSpacing>10 pt</w:DrawingGridVerticalSpacing> <!-- Added for potential alignment -->
          </w:WordDocument>
         </xml><![endif]-->
         <style>
@@ -442,48 +446,49 @@ export default function Home() {
 
         <div class="section photo-section">
           <h2>照片記錄</h2>
-          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%" style='width:100%;border-collapse:collapse;border:1pt solid #cccccc;mso-border-alt:solid #cccccc .75pt;mso-padding-alt:5.0pt 5.0pt 5.0pt 5.0pt;mso-cellspacing:0cm;mso-yfti-tbllook:1184;'>
+          <table class="MsoNormalTable photo-table" border=1 cellspacing=0 cellpadding=0 width="100%">
             <tbody>
-              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes;height:1%;'>
+              <!-- Row 1: Images 1 & 2 -->
+              <tr style='mso-yfti-irow:0;mso-yfti-firstrow:yes'>
     `;
 
-    // Helper function to generate table cell content
-    const generateTableCell = (photo: Photo | undefined, altText: string): string => {
+    // Helper function to generate table cell content for images
+    const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            // Use explicit width/height in points and wrap in a paragraph for centering
-            content = `<p class=ImageParagraph align=center style='text-align:center'><img class=PhotoStyle src="${photo.dataUrl}" alt="${altText}" width="250" height="180"></p>`;
+            // Use explicit height and center paragraph
+            content = `<p class=ImageParagraph align=center style='text-align:center'><img class=PhotoStyle src="${photo.dataUrl}" alt="${altText}" height="150"></p>`; // Height in points
         } else {
             content = `<p class=MsoNormal align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
         return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt; mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'>${content}</td>`;
     };
 
+    // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
       return `<td class=MsoNormal width="50%" style='width:50.0%;border:solid #cccccc 1.0pt;mso-border-alt:solid #cccccc .75pt;padding:5.0pt 5.0pt 5.0pt 5.0pt;vertical-align:top;'><p class=DescriptionStyle>${description}</p></td>`;
     }
 
     // Build the table content (2x4: two columns, four rows total)
-    // Row 1: Images 1 & 2
-    reportHtml += generateTableCell(photosWithDataUrls[0], '照片 1');
-    reportHtml += generateTableCell(photosWithDataUrls[1], '照片 2');
+    reportHtml += generateImageCell(photosWithDataUrls[0], '照片 1');
+    reportHtml += generateImageCell(photosWithDataUrls[1], '照片 2');
     reportHtml += `</tr>`;
 
     // Row 2: Descriptions 1 & 2
-    reportHtml += `<tr style='mso-yfti-irow:1;height:1%;'>`;
+    reportHtml += `<tr style='mso-yfti-irow:1'>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtml += `</tr>`;
 
     // Row 3: Images 3 & 4
-    reportHtml += `<tr style='mso-yfti-irow:2;height:1%;'>`;
-    reportHtml += generateTableCell(photosWithDataUrls[2], '照片 3');
-    reportHtml += generateTableCell(photosWithDataUrls[3], '照片 4');
+    reportHtml += `<tr style='mso-yfti-irow:2'>`;
+    reportHtml += generateImageCell(photosWithDataUrls[2], '照片 3');
+    reportHtml += generateImageCell(photosWithDataUrls[3], '照片 4');
     reportHtml += `</tr>`;
 
     // Row 4: Descriptions 3 & 4
-    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes;height:1%;'>`;
+    reportHtml += `<tr style='mso-yfti-irow:3;mso-yfti-lastrow:yes'>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtml += `</tr>`;
@@ -567,7 +572,7 @@ export default function Home() {
     } finally {
         setIsSubmitting(false); // End loading state
     }
-  }, [form, photos, summary, toast]); // Added generateReportContent to dependencies
+  }, [form, photos, summary, toast, generateReportContent]); // Added generateReportContent to dependencies
 
 
    // Effect to clear descriptions and summary when form fields change
@@ -827,7 +832,7 @@ export default function Home() {
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
                  <CardDescription className="text-primary-foreground/80">
-                   請按照上方產出的逐條格式內容，輸出成一個完整漂亮排版過的的doc檔案供使用者下載
+                    匯出會議報告的doc檔案中照片紀錄的排版請繼續優化改良，目前的產出doc檔中的照片會太大張跑版很難看，要改成自適應在A4直式排版呈現，讓四張圖片的大小剛剛好自適應調整在A4直式紙張的排版框架裡面(2X4表格置中排版)
                  </CardDescription>
              </CardHeader>
              <CardContent className="p-6">
