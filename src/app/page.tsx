@@ -411,7 +411,7 @@ export default function Home() {
       em { font-style: italic; } /* Style for italics */
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
       /* Table Styles */
-      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; }
+      .photo-table { width: 100%; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; } /* Added auto margins */
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
       /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell, centered */
       .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
@@ -1171,3 +1171,4 @@ export default function Home() {
     </>
   );
 }
+
