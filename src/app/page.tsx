@@ -255,7 +255,7 @@ export default function Home() {
     try {
         // Map ALL photos to promises that resolve with DescriptionResult
         const descriptionPromises = photos.map(async (photo): Promise<DescriptionResult> => {
-           let descriptionResult: DescriptionResult;
+           let descriptionResult: DescriptionResult | undefined = undefined; // Initialize to undefined
             try {
                 const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
                 if (!photo.dataUrl) {
@@ -287,10 +287,16 @@ export default function Home() {
                 const newProgress = Math.round((completedCount / totalToProcess) * 100);
                  setDescriptionProgress(newProgress);
 
-                // Update the specific photo's state - ensure descriptionResult is defined
-                 setPhotos(prev => prev.map(p => p.id === descriptionResult.id ? { ...p, description: descriptionResult.description, isGenerating: false } : p));
+                 // Update the specific photo's state - ensure descriptionResult is defined before accessing it
+                 if (descriptionResult) {
+                     setPhotos(prev => prev.map(p => p.id === descriptionResult!.id ? { ...p, description: descriptionResult!.description, isGenerating: false } : p));
+                 } else {
+                     // Handle the case where descriptionResult might still be undefined (though unlikely with the try/catch/finally structure)
+                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: '更新錯誤', isGenerating: false } : p));
+                 }
             }
-            return descriptionResult; // Return the result object
+            // Ensure a valid DescriptionResult is always returned
+            return descriptionResult || { id: photo.id, description: '未處理', success: false };
         });
 
         // Wait for all promises to settle and get their results
@@ -438,35 +444,32 @@ export default function Home() {
 
     // Base CSS for both Word and Print
     let styles = `
-      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 2cm; }
-      /* Align h1 to left */
+      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 1.27cm; } /* Adjusted margin */
       h1 { color: #000000; text-align: left; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
       h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
       p { margin-bottom: 10pt; font-size: 12pt; }
       strong { font-weight: bold; }
-      em { font-style: italic; } /* Style for italics */
+      em { font-style: italic; }
       .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      /* Table Styles - Ensure table is centered using margin auto */
-      .photo-table { width: 100%; max-width: 17cm; /* Max width within A4 margins */ border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
+      .photo-table { width: 100%; max-width: 18.46cm; /* Max width within A4 narrow margins (21 - 1.27*2) */ border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
       .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
-      /* Image style: Fixed height, auto width to maintain aspect ratio, max-width 100% of cell, centered */
-      .photo-table img { display: block; margin: 5pt auto; height: 150pt; /* Fixed height in points */ width: auto; max-width: 100%; object-fit: contain; }
+      /* Image style: Fixed height (5cm = 141.73pt approx 142pt), auto width, max-width 100% of cell, centered */
+      .photo-table img { display: block; margin: 5pt auto; height: 142pt; /* Approx 5cm */ width: auto; max-width: 100%; object-fit: contain; }
       .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
-      /* Summary Styles */
-      .summary-section p { white-space: normal; /* Allow normal wrapping after converting \n to <br> */ font-size: 12pt; text-align: justify; }
+      .summary-section p { white-space: normal; font-size: 12pt; text-align: justify; }
     `;
 
     // Add print-specific styles if needed
     if (forPrint) {
         styles += `
           @media print {
-            @page { size: A4 portrait; margin: 2cm; }
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } /* Ensure colors print */
+            @page { size: A4 portrait; margin: 1.27cm; } /* Adjusted margin for print */
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             h1, h2 { page-break-after: avoid; }
             .section, .photo-table { page-break-inside: avoid; }
-            .photo-table tr { page-break-inside: avoid; } /* Try to keep rows together */
-            strong { font-weight: bold !important; } /* Ensure bold prints */
-            em { font-style: italic !important; } /* Ensure italics prints */
+            .photo-table tr { page-break-inside: avoid; }
+            strong { font-weight: bold !important; }
+            em { font-style: italic !important; }
           }
         `;
     }
@@ -476,7 +479,7 @@ export default function Home() {
         /* General Word Styles */
         @page Section1 {
           size: 21cm 29.7cm; /* A4 size */
-          margin: 2cm 2cm 2cm 2cm; /* Standard margins */
+          margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins */
           mso-header-margin: .5in;
           mso-footer-margin: .5in;
           mso-paper-source: 0;
@@ -484,22 +487,20 @@ export default function Home() {
         div.Section1 { page: Section1; }
         /* Paragraph Styles */
         p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0cm; margin-bottom: .0001pt; font-size: 12.0pt; font-family: "Times New Roman", serif; mso-fareast-font-family: "新細明體";}
-        /* Align h1 to left */
         h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 20pt; margin-left: 0cm; text-align: left; page-break-after: avoid; font-size: 20.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 2.0pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid windowtext 2.0pt; }
         h2 { mso-style-link: "標題 2 字元"; margin-top: 20pt; margin-right: 0cm; margin-bottom: 15pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
         p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
-        /* Table Styles - Ensure table is centered using margin auto */
-        table.MsoNormalTable { /* Center the table itself */ margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 17cm; border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; /* Remove default para margin inside table */ }
-        td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; /* Force center alignment */ vertical-align: top; width: 50%; }
-        /* Image Paragraph Style - Centers content within the cell */
+        /* Table Styles - Center the table within the available width */
+        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 18.46cm; /* Max width for narrow margins */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; }
+        td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; vertical-align: top; width: 50%; }
+        /* Image Paragraph Style - Centers content */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
-        /* Image Style - Use MSO properties for better Word rendering */
-        img.PhotoStyle { display: block; margin: auto; height: 150pt; width: auto; max-width: 100%; mso-position-horizontal: center; mso-position-vertical: absolute; }
+        /* Image Style - Fixed height, auto width */
+        img.PhotoStyle { display: block; margin: auto; height: 142pt; /* Approx 5cm */ width: auto; max-width: 100%; mso-position-horizontal: center; mso-position-vertical: absolute; }
         /* Description Style */
         p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3; }
-        /* Summary Paragraph Style - ensure justification and handling of <br> */
-        p.SummaryParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; text-align: justify; mso-line-break-override: none; /* Helps with <br> in Word */ }
-        /* Explicit styles for strong/em if needed */
+        /* Summary Paragraph Style */
+        p.SummaryParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; text-align: justify; mso-line-break-override: none; }
         strong { mso-bidi-font-weight: normal; font-weight: bold; }
         em { mso-bidi-font-style: normal; font-style: italic; }
     ` : '';
@@ -614,7 +615,7 @@ export default function Home() {
     // Initialize reportHtml with the starting HTML structure
     let reportHtml = htmlStart;
 
-    // Main title - Apply class for potential Word styling, ensure alignment
+    // Main title - Apply class for potential Word styling, ensure left alignment
     reportHtml += `<h1 class="${forPrint ? '' : 'Title'}" style="text-align:left;">領域共學誌 會議報告</h1>`;
 
     // Basic Info Section
@@ -628,12 +629,12 @@ export default function Home() {
         </div>
     `;
 
-    // Photo Record Section - Apply centering style directly for Word export via MSO class
+    // Photo Record Section - Center the table
     reportHtml += `
         <div class="section photo-section">
           <h2>照片記錄</h2>
-           <!-- Use MsoNormalTable for Word centering and styling -->
-          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0>
+           <!-- Use MsoNormalTable for Word styling, ensure centering -->
+          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0 align=center style="margin-left:auto; margin-right:auto;">
              <tbody>
     `;
 
@@ -642,11 +643,10 @@ export default function Home() {
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-             // Use ImageParagraph for Word centering, photo-paragraph for print/HTML
              const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
-             // Use PhotoStyle for Word size/layout, standard img tag for print/HTML
              const imgClass = forPrint ? '' : 'class="PhotoStyle"';
-             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`; // Ensure center alignment for the paragraph
+             // Ensure center alignment for the paragraph containing the image
+             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgClass} src="${photo.dataUrl}" alt="${altText}"></p>`;
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
@@ -657,7 +657,6 @@ export default function Home() {
     // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-       // Use DescriptionStyle for Word, photo-description for print/HTML
        const paragraphClass = forPrint ? 'photo-description' : 'DescriptionStyle';
        // Use MsoNormal class for Word cell styling
        return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`;
@@ -1217,3 +1216,4 @@ export default function Home() {
     </>
   );
 }
+
