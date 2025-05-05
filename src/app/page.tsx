@@ -342,7 +342,8 @@ export default function Home() {
         });
 
 
-        if (allSucceeded && failedCount === 0 && photos.length > 0) { // Only show success if all succeeded AND there were photos
+        // Only show success if all succeeded AND there were photos AND none failed
+        if (allSucceeded && failedCount === 0 && photos.length > 0) {
           toast({
             title: '成功',
             description: '照片描述產生完成！',
@@ -402,9 +403,9 @@ export default function Home() {
      // Check if any photo is still generating or failed generation
      // AND ensure all descriptions actually exist and are successful
     const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述'));
-    if (photos.some(p => p.isGenerating) || !allDescriptionsGeneratedSuccessfully) {
+    if (isGeneratingAllDescriptions || photos.some(p => p.isGenerating) || !allDescriptionsGeneratedSuccessfully) {
         // Only show toast if generation wasn't started or failed, not if descriptions just exist
-        if (!allDescriptionsGeneratedSuccessfully) {
+        if (!allDescriptionsGeneratedSuccessfully && !isGeneratingAllDescriptions && !photos.some(p=>p.isGenerating)) {
             toast({
                 title: '請先成功產生所有照片描述',
                 description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。點擊「重新產生描述」按鈕以重試。',
@@ -439,7 +440,7 @@ export default function Home() {
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [form, photos, toast]);
+  }, [form, photos, toast, isGeneratingAllDescriptions]);
 
 
   // Generates HTML content formatted for Word or Print
@@ -520,7 +521,7 @@ export default function Home() {
       p {
         margin-bottom: 10pt;
         font-size: 12pt;
-        text-align: justify;
+        text-align: left; /* Changed from justify to left */
       }
       strong { font-weight: bold; color: #343a40; }
       em { font-style: italic; color: #555555; }
@@ -528,6 +529,7 @@ export default function Home() {
       .info-section p {
         margin-bottom: 5pt;
         line-height: 1.4;
+        text-align: left; /* Ensure left align for info */
       }
       .info-section strong {
          display: inline-block;
@@ -579,7 +581,7 @@ export default function Home() {
       .summary-section p {
         white-space: pre-wrap; /* Preserve line breaks from AI */
         font-size: 12pt;
-        text-align: justify;
+        text-align: left; /* Changed from justify to left */
         line-height: 1.7;
         font-family: '標楷體', 'BiauKai', serif; /* Specific font for summary */
       }
@@ -613,6 +615,7 @@ export default function Home() {
         .photo-table tr { page-break-inside: avoid; }
         strong { font-weight: bold !important; color: #000000 !important; } /* Ensure black for print */
         em { font-style: italic !important; color: #000000 !important; }
+        p { text-align: left !important; } /* Ensure left align for print */
         .photo-table, .photo-table td { border-color: #cccccc !important; } /* Standard gray borders for print */
         .photo-description { color: #333333 !important; }
         .info-section strong { color: #000000 !important; }
@@ -761,7 +764,7 @@ export default function Home() {
             margin-right:0cm;
             margin-bottom:25pt;
             margin-left:0cm;
-            text-align:left;
+            text-align:left; /* Ensure H1 is left-aligned */
             line-height:normal;
             page-break-after:avoid;
             mso-pagination:widow-orphan lines-together;
@@ -784,7 +787,7 @@ export default function Home() {
             margin-right:0cm;
             margin-bottom:15pt;
             margin-left:0cm;
-            text-align:left;
+            text-align:left; /* Ensure H2 is left-aligned */
             line-height:normal;
             page-break-after:avoid;
             mso-pagination:widow-orphan lines-together;
@@ -801,8 +804,8 @@ export default function Home() {
         p.MsoNormal, li.MsoNormal, div.MsoNormal {
             margin-bottom:10.0pt;
             mso-para-margin-bottom:10.0pt;
-            text-align:justify;
-            text-justify:inter-ideograph; /* Justify for CJK */
+            text-align:left; /* Changed from justify to left */
+            mso-text-align-alt:left;
             line-height:160%; /* Line height 1.6 */
             mso-line-height-rule:exactly;
             font-size:12.0pt;
@@ -820,8 +823,8 @@ export default function Home() {
              margin-right:0cm;
              margin-bottom:10.0pt;
              margin-left:0cm;
-             text-align:justify;
-             text-justify:inter-ideograph;
+             text-align:left; /* Changed from justify to left */
+             mso-text-align-alt:left;
              line-height:170%; /* Line height 1.7 */
              mso-line-height-rule:exactly;
              mso-pagination:widow-orphan;
@@ -877,7 +880,7 @@ export default function Home() {
           ${styles}
         </style>
       </head>
-       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;text-justify-trim:punctuation;'>
+       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;'>
       <div class='Section1'> <!-- Use Section1 for Word page settings -->
     `;
 
@@ -891,10 +894,10 @@ export default function Home() {
     reportHtml += `
         <div class="section info-section" style="margin-bottom: 30pt; page-break-inside: avoid;">
           <p class="MsoHeading2">基本資訊</p>
-          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%; text-align:left;"><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%; text-align:left;"><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%; text-align:left;"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%; text-align:left;"><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
@@ -915,8 +918,6 @@ export default function Home() {
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-             // Word needs specific VML for precise image sizing and positioning if complex layout needed
-             // For simple inline, img with style might suffice, but VML offers more control.
              // Use inline style `height:5cm; width:auto;` for both HTML and hope Word respects it.
               content = `<p class="PhotoCellStyle" align="center" style="text-align:center; margin: 5pt 0;"><img class="photo-image" src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin: auto;"></p>`;
         } else {
@@ -969,7 +970,7 @@ export default function Home() {
     reportHtml += `
         <div class="section summary-section" style="margin-bottom: 30pt; page-break-inside: avoid;">
            <p class="MsoHeading2">會議大綱摘要</p>
-           <p class="SummaryStyle">${formattedSummary}</p>
+           <p class="SummaryStyle" style="text-align:left;">${formattedSummary}</p>
         </div>
 
       </div> <!-- End Section1 -->
@@ -1489,4 +1490,3 @@ export default function Home() {
     </>
   );
 }
-
