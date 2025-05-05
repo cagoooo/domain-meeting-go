@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import { Inter } from 'next/font/google'; // Using Inter as a fallback/alternative to Geist
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
+import { cn } from '@/lib/utils'; // Import cn utility
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' }); // Define Inter font
 
@@ -16,8 +17,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-TW">
-      <body className={`${inter.variable} antialiased bg-background text-foreground`}>
+    // Apply dark theme and font variable globally
+    <html lang="zh-TW" className={cn('dark', inter.variable)}>
+      {/* Add gradient background */}
+      <body className={cn(
+          "antialiased text-foreground",
+          "bg-gradient-to-br from-slate-900 via-slate-800 to-sky-900" // Vibrant gradient background
+        )}>
         {children}
         <Toaster /> {/* Add Toaster here */}
       </body>

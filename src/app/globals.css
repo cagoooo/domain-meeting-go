@@ -44,6 +44,15 @@ body {
     --chart-5: 0 70% 65%;
 
     --radius: 0.75rem; /* Slightly larger radius */
+
+    --sidebar-background: 215 25% 20%; /* Darker Blue-Gray */
+    --sidebar-foreground: 210 20% 95%; /* Off-white */
+    --sidebar-primary: 210 90% 60%; /* Vivid Blue */
+    --sidebar-primary-foreground: 215 20% 15%; /* Dark Text on Primary */
+    --sidebar-accent: 220 15% 25%; /* Medium Dark Blue-Gray */
+    --sidebar-accent-foreground: 210 15% 85%; /* Light Grayish Blue */
+    --sidebar-border: 220 15% 28%; /* Dark Border */
+    --sidebar-ring: 210 90% 65%; /* Vivid Blue Ring */
   }
 
   .dark {
@@ -51,7 +60,7 @@ body {
     --background: 220 18% 12%; /* Dark Blue-Gray */
     --foreground: 210 20% 95%; /* Off-white */
 
-    --card: 220 15% 18%; /* Slightly Lighter Dark Blue-Gray */
+    --card: 220 15% 15%; /* Darker Card background */
     --card-foreground: 210 20% 95%; /* Off-white */
 
     --popover: 220 15% 15%; /* Darker Popover */
@@ -83,6 +92,15 @@ body {
     --chart-5: 0 60% 60%;
 
     --radius: 0.75rem; /* Consistent radius */
+
+    --sidebar-background: 220 18% 12%; /* Dark Blue-Gray */
+    --sidebar-foreground: 210 20% 95%; /* Off-white */
+    --sidebar-primary: 210 90% 60%; /* Vivid Blue */
+    --sidebar-primary-foreground: 215 20% 15%; /* Dark Text on Primary */
+    --sidebar-accent: 220 15% 25%; /* Medium Dark Blue-Gray */
+    --sidebar-accent-foreground: 210 15% 85%; /* Light Grayish Blue */
+    --sidebar-border: 220 15% 28%; /* Dark Border */
+    --sidebar-ring: 210 90% 65%; /* Vivid Blue Ring */
   }
 }
 
@@ -98,4 +116,27 @@ body {
 /* Add smooth scroll behavior */
 html {
   scroll-behavior: smooth;
+}
+
+/* Apply transition to cards for hover effects */
+@layer components {
+  .card-step-1 { @apply border-l-4 border-blue-500 hover:border-blue-400; }
+  .card-step-2 { @apply border-l-4 border-green-500 hover:border-green-400; }
+  .card-step-3 { @apply border-l-4 border-purple-500 hover:border-purple-400; }
+  .card-step-4 { @apply border-l-4 border-orange-500 hover:border-orange-400; }
+
+  .card-header-step-1 { @apply bg-blue-900/30; }
+  .card-header-step-2 { @apply bg-green-900/30; }
+  .card-header-step-3 { @apply bg-purple-900/30; }
+  .card-header-step-4 { @apply bg-orange-900/30; }
+
+  .card-icon-step-1 { @apply text-blue-400; }
+  .card-icon-step-2 { @apply text-green-400; }
+  .card-icon-step-3 { @apply text-purple-400; }
+  .card-icon-step-4 { @apply text-orange-400; }
+}
+
+/* Basic text shadow for improved readability on complex backgrounds */
+.text-shadow {
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }

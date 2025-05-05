@@ -24,7 +24,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon } from 'lucide-react'; // Added Info icon
+import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download } from 'lucide-react'; // Added Info, FileText, Download icons
 import { cn } from '@/lib/utils';
 import NextImage from 'next/image'; // Renamed to avoid conflict with ImageIcon
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -305,25 +305,35 @@ export default function Home() {
 
         let allSucceeded = true;
         let failedCount = 0;
+        let hasSuccess = false; // Track if at least one description succeeded
+
         results.forEach(result => {
-            if (result.status === 'rejected' || (result.status === 'fulfilled' && !result.value.success)) {
+            if (result.status === 'fulfilled' && result.value.success) {
+                hasSuccess = true;
+            } else {
                 allSucceeded = false;
                 failedCount++;
             }
         });
 
 
-        if (allSucceeded && failedCount === 0 && photos.length > 0) {
+        if (hasSuccess && failedCount === 0 && photos.length > 0) {
           toast({
             title: '成功',
             description: '照片描述產生完成！',
           });
-        } else if (failedCount > 0) {
+        } else if (hasSuccess && failedCount > 0) {
            toast({
             title: '部分完成',
             description: `${failedCount} 張照片描述產生失敗，請檢查標示為「無法描述」的圖片。`,
             variant: 'destructive',
            });
+        } else if (!hasSuccess && failedCount > 0) {
+             toast({
+                title: '產生失敗',
+                description: `所有照片描述產生失敗，請檢查錯誤訊息或稍後重試。`,
+                variant: 'destructive',
+             });
         }
        setSummary('');
 
@@ -368,15 +378,24 @@ export default function Home() {
     }
 
     const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述'));
-    if (isGeneratingAllDescriptions || photos.some(p => p.isGenerating) || !allDescriptionsGeneratedSuccessfully) {
-        if (!allDescriptionsGeneratedSuccessfully && !isGeneratingAllDescriptions && !photos.some(p=>p.isGenerating)) {
-            toast({
-                title: '請先成功產生所有照片描述',
-                description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。點擊「重新產生描述」按鈕以重試。',
-                variant: 'destructive',
-            });
-        }
-        return;
+     const descriptionsPending = photos.some(p => p.isGenerating);
+
+     if (descriptionsPending) {
+         toast({
+            title: '請稍候',
+            description: '照片描述仍在產生中，請完成後再產生摘要。',
+            variant: 'default',
+         });
+         return;
+     }
+
+    if (!allDescriptionsGeneratedSuccessfully) {
+         toast({
+             title: '請先成功產生所有照片描述',
+             description: '報告中包含無法描述或產生失敗的照片描述，請點擊「重新產生描述」按鈕以重試，或移除問題照片。',
+             variant: 'destructive',
+         });
+         return;
     }
 
 
@@ -404,7 +423,7 @@ export default function Home() {
     } finally {
       setIsGeneratingSummary(false);
     }
-  }, [form, photos, toast, isGeneratingAllDescriptions]);
+  }, [form, photos, toast]);
 
 
   const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
@@ -447,26 +466,26 @@ export default function Home() {
         background-color: #ffffff;
       }
       .report-container {
-        max-width: 18.46cm;
+        max-width: 18.46cm; /* Approx width within narrow margins */
         margin: 0 auto;
         background-color: #ffffff;
         padding: ${forPrint ? '0' : '1.5cm'};
-        border-radius: ${forPrint ? '0' : '8px'}; /* Slightly larger radius */
-        box-shadow: ${forPrint ? 'none' : '0 4px 12px rgba(0,0,0,0.1)'}; /* Softer shadow */
+        border-radius: ${forPrint ? '0' : '8px'};
+        box-shadow: ${forPrint ? 'none' : '0 4px 12px rgba(0,0,0,0.1)'};
       }
       h1 {
-        color: #0056b3; /* Professional blue */
-        text-align: left;
+        color: #003f5c; /* Deeper Professional blue */
+        text-align: left; /* Default Left alignment */
         font-size: 22pt;
         font-weight: bold;
         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
-        border-bottom: 2px solid #0056b3;
+        border-bottom: 2px solid #003f5c;
         padding-bottom: 10pt;
         margin-bottom: 25pt;
         page-break-after: avoid;
       }
       h2 {
-        color: #0056b3;
+        color: #0056b3; /* Slightly lighter blue for section heads */
         font-size: 16pt;
         font-weight: bold;
         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
@@ -499,10 +518,10 @@ export default function Home() {
       /* Photo Table Styling */
       .photo-table {
         width: 100%;
-        max-width: 18.46cm;
+        max-width: 18.46cm; /* Ensure it stays within content area */
         border-collapse: collapse;
         border-spacing: 0;
-        margin: 20pt auto;
+        margin: 20pt auto; /* Center table */
         page-break-inside: avoid;
         border: 1px solid #e0e0e0; /* Lighter border */
         border-radius: 6px; /* Rounded corners for the table */
@@ -527,10 +546,9 @@ export default function Home() {
       .photo-table img {
         display: block;
         margin: 0 auto 8pt auto; /* Increased bottom margin */
-        height: 5cm !important;
-        width: auto !important;
-        max-width: 100% !important;
-        object-fit: contain;
+        /* Height and width set via inline styles now */
+        max-width: 100% !important; /* Prevent overflow */
+        object-fit: contain; /* Maintain aspect ratio within bounds */
         border-radius: 4px; /* Rounded corners for images */
         box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle shadow for images */
       }
@@ -556,11 +574,11 @@ export default function Home() {
       }
       .summary-section strong {
          font-weight: bold;
-         color: #000000;
+         color: #000000; /* Black for summary bold */
       }
        .summary-section em {
          font-style: italic;
-         color: #333333;
+         color: #333333; /* Dark gray for summary italic */
       }
       .page-break { page-break-before: always; }
 
@@ -598,60 +616,187 @@ export default function Home() {
          <w:WordDocument>
           <w:View>Print</w:View>
           <w:Zoom>100</w:Zoom>
+          <w:Compatibility>
+            <w:BreakWrappedTables/>
+            <w:SnapToGridInCell/>
+            <w:WrapTextWithPunct/>
+            <w:UseAsianBreakRules/>
+            <w:DontGrowAutofit/>
+          </w:Compatibility>
           <w:DoNotOptimizeForBrowser/>
-          {/* Other Word settings */}
+          <w:TrackMoves>false</w:TrackMoves>
+          <w:TrackFormatting/>
+          <w:DrawingGridHorizontalSpacing>5.25 pt</w:DrawingGridHorizontalSpacing>
+          <w:DrawingGridVerticalSpacing>7.5 pt</w:DrawingGridVerticalSpacing>
+          <w:DisplayHorizontalDrawingGridEvery>0</w:DisplayHorizontalDrawingGridEvery>
+          <w:DisplayVerticalDrawingGridEvery>2</w:DisplayVerticalDrawingGridEvery>
          </w:WordDocument>
          <o:DocumentProperties>
            <o:Author>領域共備GO</o:Author>
            <o:Company>領域共備GO</o:Company>
            <o:Version>1.0</o:Version>
          </o:DocumentProperties>
-         {/* Latent Styles */}
+         <w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99" LatentStyleCount="371">
+           {/* Add other Latent styles if needed */}
+         </w:LatentStyles>
         </xml><![endif]-->
          <!--[if gte mso 10]>
         <style>
          /* Style Definitions */
-         table.MsoNormalTable { /* ... */ }
+         table.MsoNormalTable {mso-style-name:"Table Normal"; mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-noshow:yes; mso-style-priority:99; mso-style-parent:""; mso-padding-alt:0cm 5.4pt 0cm 5.4pt; mso-para-margin:0cm; mso-para-margin-bottom:.0001pt; mso-pagination:widow-orphan; font-size:12.0pt; font-family:"Calibri",sans-serif; mso-ascii-font-family:Calibri; mso-ascii-theme-font:minor-latin; mso-hansi-font-family:Calibri; mso-hansi-theme-font:minor-latin; mso-bidi-font-family:"Times New Roman"; mso-bidi-theme-font:minor-bidi; mso-fareast-language:EN-US;}
          table.PhotoTableStyle {
              mso-style-name:"Photo Table";
-             /* ... other styles ... */
-             border:none; /* Remove MSO border, rely on cell borders */
+             mso-tstyle-rowband-size:0;
+             mso-tstyle-colband-size:0;
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             mso-table-anchor-vertical:paragraph;
+             mso-table-anchor-horizontal:margin;
+             mso-table-left:center; /* Center align table */
+             mso-table-right:center;
+             mso-table-bspace:0cm;
+             mso-table-vspace:0cm;
+             mso-table-top:20pt;
+             mso-table-bottom:auto;
+             mso-table-lspace:0cm;
+             mso-table-rspace:0cm;
+             mso-table-layout-alt:fixed; /* Helps with cell sizing */
              mso-border-alt:solid #e0e0e0 .5pt;
+             mso-padding-alt:0cm 0cm 0cm 0cm;
              mso-border-insideh:.5pt solid #e0e0e0;
              mso-border-insidev:.5pt solid #e0e0e0;
-             background:#F8F9FA; /* Match cell background */
-             /* Ensure table alignment */
-             margin-left:auto;
-             margin-right:auto;
+             mso-para-margin:0cm;
+             mso-para-margin-bottom:.0001pt;
+             mso-pagination:widow-orphan;
+             font-size:12.0pt;
+             font-family:"標楷體",serif;
+             mso-fareast-font-family:"標楷體";
+             mso-bidi-font-family:"Times New Roman";
+             background:#F8F9FA;
+             mso-shading:white;
+             mso-pattern:auto none;
          }
          td.PhotoCellStyle {
              mso-style-name:"Photo Cell";
-             border:.5pt solid #e0e0e0;
-             padding:10pt 10pt 10pt 10pt; /* Match CSS padding */
-             text-align:center;
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             mso-style-parent:"Photo Table";
+             mso-cell-special:placeholder; /* Ensure it's treated as a cell */
+             width: 9.23cm; /* Half of 18.46cm approx */
+             mso-border-alt:solid #e0e0e0 .5pt;
+             padding:10.0pt 10.0pt 10.0pt 10.0pt;
              vertical-align:top;
-             background:#F8F9FA; /* Explicit background */
+             background:#F8F9FA;
          }
          p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
             mso-style-name:"Photo Description";
-            /* ... other styles ... */
+            mso-style-priority:99;
+            mso-style-unhide:no;
+            mso-style-parent:"";
+            margin-top:5.0pt;
+            margin-right:0cm;
+            margin-bottom:0cm;
+            margin-left:0cm;
+            mso-para-margin-top:.5gd;
+            mso-para-margin-right:0cm;
+            mso-para-margin-bottom:0cm;
+            mso-para-margin-left:0cm;
+            text-align:center;
+            line-height:140%;
+            mso-pagination:widow-orphan;
             font-size:10.0pt;
             font-family:"Microsoft JhengHei",sans-serif;
-            color:#495057; /* Match CSS color */
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#495057;
          }
-         p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 { /* ... H1 styles ... */ text-align:left; }
-         p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 { /* ... H2 styles ... */ text-align:left; }
-         p.MsoNormal, li.MsoNormal, div.MsoNormal { /* ... Normal paragraph styles ... */ text-align:left; }
+         p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 {
+            mso-style-priority:9;
+            mso-style-unhide:no;
+            mso-style-qformat:yes;
+            mso-style-link:"Heading 1 Char";
+            mso-margin-top-alt:auto;
+            margin-right:0cm;
+            mso-margin-bottom-alt:auto;
+            margin-left:0cm;
+            line-height:normal;
+            mso-pagination:widow-orphan lines-together;
+            page-break-after:avoid;
+            mso-outline-level:1;
+            font-size:22.0pt;
+            font-family:"Microsoft JhengHei",sans-serif;
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#003F5C;
+            font-weight:bold;
+            border:none;
+            mso-border-bottom-alt:solid #003F5C 1.5pt;
+            padding:0cm;
+            mso-padding-alt:0cm 0cm 10.0pt 0cm;
+            text-align:left; /* Ensure left align */
+         }
+         p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 {
+            mso-style-priority:9;
+            mso-style-unhide:no;
+            mso-style-qformat:yes;
+            mso-style-link:"Heading 2 Char";
+            mso-margin-top-alt:25pt;
+            margin-right:0cm;
+            mso-margin-bottom-alt:15pt;
+            margin-left:0cm;
+            line-height:normal;
+            mso-pagination:widow-orphan lines-together;
+            page-break-after:avoid;
+            mso-outline-level:2;
+            font-size:16.0pt;
+            font-family:"Microsoft JhengHei",sans-serif;
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#0056B3;
+            font-weight:bold;
+            border:none;
+            mso-border-bottom-alt:solid #DEE2E6 .75pt;
+            padding:0cm;
+            mso-padding-alt:0cm 0cm 6.0pt 0cm;
+            text-align:left; /* Ensure left align */
+         }
+         p.MsoNormal, li.MsoNormal, div.MsoNormal {
+            mso-style-unhide:no;
+            mso-style-qformat:yes;
+            mso-style-parent:"";
+            margin-top:0cm;
+            margin-right:0cm;
+            margin-bottom:10.0pt;
+            margin-left:0cm;
+            line-height:160%;
+            mso-pagination:widow-orphan;
+            font-size:12.0pt;
+            font-family:"標楷體",serif;
+            mso-fareast-font-family:"標楷體";
+            mso-bidi-font-family:"Times New Roman";
+            color:#333333;
+            text-align:left; /* Ensure left align */
+         }
          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
              mso-style-name:"Summary Text";
-             /* ... other summary styles ... */
-             text-align:left;
-             mso-padding-alt: 15pt 15pt 15pt 15pt; /* Add padding */
-             mso-border-alt: solid #e0e0e0 .5pt; /* Add border */
-             background:#F8F9FA; /* Add background */
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             margin:0cm;
+             margin-bottom:.0001pt;
+             text-align:left; /* Ensure left align */
+             line-height:170%;
+             mso-pagination:widow-orphan;
+             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt;
+             mso-border-alt:solid #E0E0E0 .75pt;
+             font-size:12.0pt;
+             font-family:"標楷體",serif;
+             mso-fareast-font-family:"標楷體";
+             mso-bidi-font-family:"Times New Roman";
+             background:#F8F9FA;
          }
+         span.Heading1Char {mso-style-name:"Heading 1 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 1"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#003F5C; font-weight:bold;}
+         span.Heading2Char {mso-style-name:"Heading 2 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 2"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#0056B3; font-weight:bold;}
          strong {mso-style-name:""; font-weight:bold; color: #212529;} /* Match CSS */
          em {mso-style-name:""; font-style:italic; color: #495057;} /* Match CSS */
+         .SummaryStyle strong {mso-style-name:""; font-weight:bold; color: #000000;} /* Match CSS summary */
+         .SummaryStyle em {mso-style-name:""; font-style:italic; color: #333333;} /* Match CSS summary */
         </style>
         <![endif]-->
     `;
@@ -673,6 +818,18 @@ export default function Home() {
           }
           div.Section1 { page: Section1; }
           ${styles} /* Embed refined CSS */
+          /* Additional MSO Specific styles */
+          <!--[if gte mso 9]>
+          p.MsoNormal, li.MsoNormal, div.MsoNormal {
+            text-align: left !important; /* Force left align for MSO */
+            mso-line-height-alt: 160%;
+          }
+          p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 { text-align: left !important; }
+          p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 { text-align: left !important; }
+          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle { text-align: left !important; mso-line-height-alt: 170%; }
+          p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle { text-align: center !important; } /* Center description */
+          td.PhotoCellStyle p { text-align:center !important; } /* Center image paragraph */
+          <![endif]-->
         </style>
       </head>
       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;background-color:#ffffff;'>
@@ -680,28 +837,28 @@ export default function Home() {
         <div class='report-container'> <!-- Add container for non-print styling -->
     `;
 
-    let reportHtml = htmlStart;
+    let reportHtmlContent = htmlStart;
 
-    // Main title
-    reportHtml += `<p class="MsoHeading1" style="text-align:left;">領域共備GO 會議報告</p>`; // Ensure left align via inline style too
+    // Main title - Using MsoHeading1 but ensuring left alignment
+    reportHtmlContent += `<p class="MsoHeading1" align="left" style="text-align:left;">領域共備GO 會議報告</p>`;
 
-    // Basic Info Section
-    reportHtml += `
+    // Basic Info Section - Using MsoNormal but ensuring left alignment
+    reportHtmlContent += `
         <div class="section info-section">
-          <p class="MsoHeading2" style="text-align:left;">基本資訊</p>
-          <p class="MsoNormal" style="text-align:left;"><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class="MsoNormal" style="text-align:left;"><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class="MsoNormal" style="text-align:left;"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class="MsoNormal" style="text-align:left;"><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class="MsoHeading2" align="left" style="text-align:left;">基本資訊</p>
+          <p class="MsoNormal" align="left" style="text-align:left;"><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class="MsoNormal" align="left" style="text-align:left;"><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class="MsoNormal" align="left" style="text-align:left;"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class="MsoNormal" align="left" style="text-align:left;"><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
     // Photo Record Section
-    reportHtml += `
+    reportHtmlContent += `
         <div class="section photo-section">
-           <p class="MsoHeading2" style="text-align:left;">照片記錄</p>
+           <p class="MsoHeading2" align="left" style="text-align:left;">照片記錄</p>
            <!--[if gte mso 9]>
-            <table class="PhotoTableStyle" border="1" cellspacing="0" cellpadding="0" align="center" width="699" style='width:18.46cm; border-collapse:collapse; mso-table-lspace:9.0pt; mso-table-rspace:9.0pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-top:.05pt; mso-padding-alt:0cm 0cm 0cm 0cm'>
+            <table class="PhotoTableStyle" border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .5pt; mso-border-alt:solid #e0e0e0 .5pt; mso-table-lspace:0cm; mso-table-rspace:0cm; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'>
            <![endif]-->
            <!--[if !mso]>
             <table class="photo-table" align="center">
@@ -713,47 +870,50 @@ export default function Home() {
         let content = '';
         if (photo?.dataUrl) {
               // Explicitly set height:5cm; width:auto; via inline style for Word
-              content = `<p class="PhotoCellStyle" align="center" style="text-align:center; margin:0;"><img src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin:0 auto 8pt auto; border-radius: 4px;"></p>`; // Added border-radius
+              // Wrap image in a paragraph aligned center for MSO
+              content = `<p class="PhotoCellStyle MsoNormal" align="center" style="text-align:center; margin:0; line-height:normal;"><img src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin:0 auto 8pt auto; border-radius: 4px;"></p>`; // Added border-radius
         } else {
-             content = `<p class="PhotoCellStyle" align="center">[${altText} 無法載入]</p>`;
+             content = `<p class="PhotoCellStyle MsoNormal" align="center" style="text-align:center;">[${altText} 無法載入]</p>`;
         }
-        return `<td width="50%" valign="top" class="PhotoCellStyle" style='width:50.0%; border:.5pt solid #e0e0e0; padding:10pt 10pt 10pt 10pt; background:#F8F9FA;'>${content}</td>`; // Match CSS
+        // Apply PhotoCellStyle class to TD for MSO
+        return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .5pt; mso-border-alt:solid #e0e0e0 .5pt; padding:10.0pt 10.0pt 10.0pt 10.0pt; background:#F8F9FA;'>${content}</td>`;
     };
 
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-       return `<td width="50%" valign="top" class="PhotoCellStyle" style='width:50.0%; border:.5pt solid #e0e0e0; padding:10pt 10pt 10pt 10pt; background:#F8F9FA;'><p class="PhotoDescriptionStyle">${description}</p></td>`; // Match CSS
+       // Apply PhotoCellStyle and PhotoDescriptionStyle classes for MSO
+       return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .5pt; mso-border-alt:solid #e0e0e0 .5pt; padding:10.0pt 10.0pt 10.0pt 10.0pt; background:#F8F9FA;'><p class="PhotoDescriptionStyle" align="center">${description}</p></td>`;
     }
 
     // Build the table content (2x4 structure)
-    reportHtml += `<tr style='mso-yfti-irow:0;'>`;
-    reportHtml += generateImageCell(photosWithDataUrls[0], '照片 1');
-    reportHtml += generateImageCell(photosWithDataUrls[1], '照片 2');
-    reportHtml += `</tr>`;
-    reportHtml += `<tr style='mso-yfti-irow:1;'>`;
-    reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
-    reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
-    reportHtml += `</tr>`;
-    reportHtml += `<tr style='mso-yfti-irow:2;'>`;
-    reportHtml += generateImageCell(photosWithDataUrls[2], '照片 3');
-    reportHtml += generateImageCell(photosWithDataUrls[3], '照片 4');
-    reportHtml += `</tr>`;
-    reportHtml += `<tr style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'>`;
-    reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
-    reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
-    reportHtml += `</tr>`;
+    reportHtmlContent += `<tr style='mso-yfti-irow:0;'>`;
+    reportHtmlContent += generateImageCell(photosWithDataUrls[0], '照片 1');
+    reportHtmlContent += generateImageCell(photosWithDataUrls[1], '照片 2');
+    reportHtmlContent += `</tr>`;
+    reportHtmlContent += `<tr style='mso-yfti-irow:1;'>`;
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[0]);
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[1]);
+    reportHtmlContent += `</tr>`;
+    reportHtmlContent += `<tr style='mso-yfti-irow:2;'>`;
+    reportHtmlContent += generateImageCell(photosWithDataUrls[2], '照片 3');
+    reportHtmlContent += generateImageCell(photosWithDataUrls[3], '照片 4');
+    reportHtmlContent += `</tr>`;
+    reportHtmlContent += `<tr style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'>`;
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[2]);
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[3]);
+    reportHtmlContent += `</tr>`;
 
-    reportHtml += `
+    reportHtmlContent += `
             </tbody>
           </table>
         </div>
     `;
 
-    // Summary Section
-    reportHtml += `
+    // Summary Section - Apply SummaryStyle class and ensure left alignment
+    reportHtmlContent += `
         <div class="section summary-section">
-           <p class="MsoHeading2" style="text-align:left;">會議大綱摘要</p>
-           <p class="SummaryStyle" style="text-align:left; background:#F8F9FA; border:solid #e0e0e0 .5pt; padding:15pt;">${formattedSummary}</p> {/* Match CSS */}
+           <p class="MsoHeading2" align="left" style="text-align:left;">會議大綱摘要</p>
+           <p class="SummaryStyle" align="left" style="text-align:left; background:#F8F9FA; border:solid #e0e0e0 .75pt; padding:15.0pt;">${formattedSummary}</p>
         </div>
 
         </div> <!-- End report-container -->
@@ -762,7 +922,7 @@ export default function Home() {
       </html>
     `;
 
-    return reportHtml;
+    return reportHtmlContent;
   }, [photos, summary, form, toast]);
 
 
@@ -957,21 +1117,21 @@ export default function Home() {
           title="Print Content Frame"
       ></iframe>
 
-      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-background min-h-screen">
+      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen"> {/* Make container bg transparent */}
         <header className="mb-10 md:mb-12 text-center relative group">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary via-blue-500 to-teal-400 py-4 rounded-lg transition-all duration-300 group-hover:scale-105">
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-purple-400 py-4 rounded-lg transition-all duration-300 group-hover:scale-105 drop-shadow-lg">
             領域共備GO
           </h1>
-          <p className="text-muted-foreground text-base sm:text-lg mt-2 transition-opacity duration-300 opacity-80 group-hover:opacity-100">國小教師社群領域會議報告協作產出平台</p>
+          <p className="text-slate-300 text-base sm:text-lg mt-2 transition-opacity duration-300 opacity-90 group-hover:opacity-100 text-shadow">國小教師社群領域會議報告協作產出平台</p>
         </header>
 
         <Form {...form}>
           <form className="space-y-10"> {/* Increased spacing */}
             {/* Step 1: Meeting Info */}
-            <Card className="shadow-lg rounded-xl overflow-hidden border-l-4 border-primary transition-all duration-300 hover:shadow-xl hover:border-primary/80">
-               <CardHeader className="bg-secondary/30 p-6"> {/* Lighter header bg */}
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                     <Info className="w-6 h-6 text-primary" />
+            <Card className="card-step-1 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+               <CardHeader className="card-header-step-1 p-6"> {/* Use step-specific class */}
+                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                     <Info className="w-7 h-7 card-icon-step-1" /> {/* Use step-specific icon class */}
                      第一步：輸入會議資訊
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">請填寫本次社群會議的基本資料</CardDescription>
@@ -983,9 +1143,9 @@ export default function Home() {
                     name="teachingArea"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium">教學領域</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-300">教學領域</FormLabel>
                         <FormControl>
-                          <Input placeholder="例如：國語文、數學..." {...field} className="text-base py-2.5" />
+                          <Input placeholder="例如：國語文、數學..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -996,9 +1156,9 @@ export default function Home() {
                     name="meetingTopic"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium">會議主題</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-300">會議主題</FormLabel>
                         <FormControl>
-                          <Input placeholder="例如：新課綱教學策略..." {...field} className="text-base py-2.5" />
+                          <Input placeholder="例如：新課綱教學策略..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1009,7 +1169,7 @@ export default function Home() {
                     name="meetingDate"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel className="text-lg font-medium mb-1">會議日期</FormLabel>
+                        <FormLabel className="text-lg font-medium mb-1 text-slate-300">會議日期</FormLabel>
                          <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -1017,7 +1177,8 @@ export default function Home() {
                                   variant={"outline"}
                                   className={cn(
                                   "w-full pl-3 text-left font-normal justify-start text-base py-2.5", // Adjusted padding
-                                  !field.value && "text-muted-foreground"
+                                  !field.value && "text-muted-foreground",
+                                  "bg-slate-700/50 border-slate-600 hover:bg-slate-700/80"
                                   )}
                                 >
                                 {field.value ? (
@@ -1050,11 +1211,11 @@ export default function Home() {
                     name="communityMembers"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium">社群成員</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-300">社群成員</FormLabel>
                         <FormControl>
-                          <Input placeholder="王老師, 李老師..." {...field} className="text-base py-2.5" />
+                          <Input placeholder="王老師, 李老師..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
                         </FormControl>
-                        <FormDescription className="text-sm">
+                        <FormDescription className="text-sm text-slate-400">
                           請用逗號分隔姓名。
                         </FormDescription>
                         <FormMessage />
@@ -1066,10 +1227,10 @@ export default function Home() {
             </Card>
 
             {/* Step 2: Upload Photos */}
-            <Card className="shadow-lg rounded-xl overflow-hidden border-l-4 border-green-500 transition-all duration-300 hover:shadow-xl hover:border-green-500/80">
-               <CardHeader className="bg-green-100/30 dark:bg-green-900/20 p-6"> {/* Distinct header color */}
-                <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                    <ImageIcon className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <Card className="card-step-2 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+               <CardHeader className="card-header-step-2 p-6"> {/* Use step-specific class */}
+                <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                    <ImageIcon className="w-7 h-7 card-icon-step-2" /> {/* Use step-specific icon class */}
                     第二步：上傳會議照片
                 </CardTitle>
                  <CardDescription className="text-muted-foreground">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 5MB)</CardDescription>
@@ -1079,18 +1240,18 @@ export default function Home() {
                   <label
                     htmlFor="photo-upload"
                     className={cn(
-                      "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-colors duration-200 ease-in-out",
+                      "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out",
                       photos.length >= MAX_PHOTOS
-                        ? "border-muted-foreground/30 bg-muted/20 cursor-not-allowed opacity-60"
-                        : "border-accent hover:border-primary hover:bg-accent/50 dark:hover:bg-accent/10"
+                        ? "border-slate-600 bg-slate-800/30 cursor-not-allowed opacity-60"
+                        : "border-accent hover:border-primary hover:bg-accent/20"
                     )}
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <UploadCloud className={cn("w-10 h-10 mb-3", photos.length >= MAX_PHOTOS ? "text-muted-foreground/50" : "text-primary")} />
-                      <p className={cn("mb-2 text-sm font-medium", photos.length >= MAX_PHOTOS ? "text-muted-foreground/60" : "text-foreground")}>
+                      <UploadCloud className={cn("w-10 h-10 mb-3", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-primary")} />
+                      <p className={cn("mb-2 text-sm font-medium", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-foreground")}>
                         點擊此處或拖曳照片
                       </p>
-                      <p className={cn("text-xs", photos.length >= MAX_PHOTOS ? "text-muted-foreground/50" : "text-muted-foreground")}>
+                      <p className={cn("text-xs", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-muted-foreground")}>
                         還可上傳 {Math.max(0, MAX_PHOTOS - photos.length)} 張
                       </p>
                     </div>
@@ -1109,40 +1270,43 @@ export default function Home() {
 
                 {photos.length > 0 && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6"> {/* Increased gap */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8"> {/* Increased gap */}
                       {photos.map((photo) => (
-                        <div key={photo.id} className="relative group border rounded-lg overflow-hidden shadow-md aspect-video flex items-center justify-center bg-muted/50 transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
-                           <NextImage
-                              src={photo.previewUrl}
-                              alt={`照片 ${photo.file.name}`}
-                              fill
-                              style={{ objectFit: 'contain' }}
-                              priority
-                              className="transition-transform duration-300 group-hover:scale-105"
-                            />
-                          <button
-                            type="button"
-                            onClick={() => handlePhotoRemove(photo.id)}
-                            className="absolute top-2 right-2 bg-destructive/80 text-destructive-foreground rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 z-10 hover:bg-destructive"
-                            aria-label="移除照片"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                           {photo.isGenerating && (
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-20 backdrop-blur-sm">
-                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                              </div>
-                            )}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent p-3 text-primary-foreground text-xs z-10 transition-opacity duration-300 opacity-0 group-hover:opacity-100">
-                             {/* Added text shadow for readability */}
-                              <p className="truncate font-medium text-shadow" style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.7)' }}>
+                        <div key={photo.id} className="relative group border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
+                          {/* Image Container */}
+                          <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden">
+                             <NextImage
+                                src={photo.previewUrl}
+                                alt={`照片 ${photo.file.name}`}
+                                fill
+                                style={{ objectFit: 'contain' }}
+                                priority
+                                className="transition-transform duration-300 group-hover:scale-105"
+                              />
+                            <button
+                              type="button"
+                              onClick={() => handlePhotoRemove(photo.id)}
+                              className="absolute top-2 right-2 bg-destructive/80 text-destructive-foreground rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 z-10 hover:bg-destructive"
+                              aria-label="移除照片"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                             {photo.isGenerating && (
+                                <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 backdrop-blur-sm rounded-t-lg">
+                                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                              )}
+                          </div>
+                           {/* Description Section - Always Visible */}
+                           <div className="p-3 bg-slate-700/80 border-t border-slate-600">
+                             <p className="text-xs text-slate-300 text-center text-shadow break-words min-h-[2.5em] flex items-center justify-center">
                                 {photo.description || '尚未產生描述'}
-                              </p>
+                             </p>
                           </div>
                         </div>
                       ))}
                        {Array.from({ length: Math.max(0, MAX_PHOTOS - photos.length) }).map((_, index) => (
-                          <div key={`placeholder-${index}`} className="relative group border border-dashed border-muted-foreground/30 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-muted/20 text-muted-foreground text-sm">
+                          <div key={`placeholder-${index}`} className="relative group border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
                              照片 {photos.length + index + 1}
                           </div>
                       ))}
@@ -1152,7 +1316,7 @@ export default function Home() {
                             type="button"
                             onClick={handleGenerateDescriptions}
                             disabled={isGenerateDescriptionsDisabled}
-                            className="w-full md:w-auto min-w-[180px]" // Set min-width
+                            className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105" // Added hover effect
                             variant="secondary"
                             size="lg"
                         >
@@ -1168,7 +1332,7 @@ export default function Home() {
                         {/* Progress Bar */}
                         {descriptionProgress !== null && (
                             <div className="w-full max-w-md"> {/* Limit width */}
-                                <Progress value={descriptionProgress} className="w-full h-2.5" /> {/* Adjusted height */}
+                                <Progress value={descriptionProgress} className="w-full h-2.5 bg-slate-700" /> {/* Adjusted height and bg */}
                                 <p className="text-sm text-muted-foreground text-center mt-2">
                                     {descriptionProgress < 100 ? `正在產生照片描述... ${descriptionProgress}%` : '描述產生完成！'}
                                 </p>
@@ -1181,10 +1345,10 @@ export default function Home() {
             </Card>
 
             {/* Step 3: Generate Summary */}
-            <Card className="shadow-lg rounded-xl overflow-hidden border-l-4 border-purple-500 transition-all duration-300 hover:shadow-xl hover:border-purple-500/80">
-               <CardHeader className="bg-purple-100/30 dark:bg-purple-900/20 p-6">
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text text-purple-600 dark:text-purple-400"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+            <Card className="card-step-3 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+               <CardHeader className="card-header-step-3 p-6"> {/* Use step-specific class */}
+                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                    <FileText className="w-7 h-7 card-icon-step-3" /> {/* Use step-specific icon class */}
                     第三步：產生會議摘要
                   </CardTitle>
                   <CardDescription className="text-muted-foreground">整合會議資訊與照片描述，自動產生摘要</CardDescription>
@@ -1196,10 +1360,9 @@ export default function Home() {
                     disabled={
                         isGeneratingSummary ||
                         photos.length !== MAX_PHOTOS ||
-                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述')) ||
-                        isGeneratingAllDescriptions
+                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))
                     }
-                    className="w-full md:w-auto min-w-[180px]" // Set min-width
+                    className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105" // Added hover effect
                     variant="secondary"
                     size="lg"
                   >
@@ -1213,12 +1376,12 @@ export default function Home() {
                     )}
                   </Button>
                  {summary && (
-                  <div className="mt-4 p-4 md:p-6 border rounded-lg bg-muted/30 shadow-inner">
-                    <h3 className="text-xl font-semibold mb-3 text-foreground">會議摘要：</h3>
+                  <div className="mt-4 p-4 md:p-6 border border-slate-600 rounded-lg bg-slate-800/30 shadow-inner">
+                    <h3 className="text-xl font-semibold mb-3 text-slate-200">會議摘要：</h3>
                     <Textarea
                        value={summary}
                        readOnly
-                       className="w-full h-56 bg-background/80 text-base resize-y border-muted-foreground/30 focus:border-primary transition-colors" // Allow vertical resize
+                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" // Allow vertical resize
                        aria-label="會議摘要內容"
                     />
                   </div>
@@ -1227,10 +1390,10 @@ export default function Home() {
             </Card>
 
              {/* Step 4: Export Report */}
-             <Card className="shadow-lg rounded-xl overflow-hidden border-l-4 border-orange-500 transition-all duration-300 hover:shadow-xl hover:border-orange-500/80">
-               <CardHeader className="bg-orange-100/30 dark:bg-orange-900/20 p-6">
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-download text-orange-600 dark:text-orange-400"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+             <Card className="card-step-4 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+               <CardHeader className="card-header-step-4 p-6"> {/* Use step-specific class */}
+                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                     <Download className="w-7 h-7 card-icon-step-4" /> {/* Use step-specific icon class */}
                     第四步：匯出報告
                   </CardTitle>
                    <CardDescription className="text-muted-foreground">
