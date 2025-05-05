@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -451,6 +452,52 @@ export default function Home() {
   }, [form, photos, toast]);
 
 
+  // Helper function to generate a table cell for an image for DOC export (MSO styles)
+    const generateImageCellMSO = (photo: Photo | undefined, altText: string): string => {
+        let content = '';
+        if (photo?.dataUrl) {
+            // MSO requires wrapping the image in a paragraph for alignment and spacing.
+            // Set fixed height (5cm) and auto width via inline style.
+            content = `<p class="MsoNormal" align="center" style='text-align:center; margin-bottom:8pt;'>
+                        <img src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin:0 auto; border-radius: 4px;">
+                       </p>`;
+        } else {
+            content = `<p class="MsoNormal" align="center">[${altText} 無法載入]</p>`;
+        }
+        // Apply PhotoCellStyle class to TD for MSO styling and dimensions.
+        return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#f8f9fa;'>${content}</td>`;
+    };
+
+    // Helper function to generate a table cell for a description for DOC export (MSO styles)
+    const generateDescriptionCellMSO = (photo: Photo | undefined): string => {
+        const description = photo?.description || '未產生描述';
+        // Apply PhotoCellStyle and PhotoDescriptionStyle classes for MSO styling.
+        return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#f8f9fa;'>
+                   <p class="PhotoDescriptionStyle" align="center">${description}</p>
+                 </td>`;
+    };
+
+    // Helper function to generate a table cell for an image for PDF/Print export (standard HTML/CSS)
+    const generateImageCellPrint = (photo: Photo | undefined, altText: string): string => {
+        let content = '';
+        if (photo?.dataUrl) {
+            // Use standard HTML/CSS with inline styles for fixed height and auto width.
+            content = `<img src="${photo.dataUrl}" alt="${altText}" style="display: block; margin: 0 auto 8pt auto; height: 5cm; width: auto; max-width: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">`;
+        } else {
+            content = `<p style="text-align: center;">[${altText} 無法載入]</p>`;
+        }
+        // Use standard td with class for CSS styling.
+        return `<td class="photo-table-cell">${content}</td>`;
+    };
+
+     // Helper function to generate a table cell for a description for PDF/Print export (standard HTML/CSS)
+     const generateDescriptionCellPrint = (photo: Photo | undefined): string => {
+        const description = photo?.description || '未產生描述';
+        // Use standard p with class for CSS styling.
+        return `<td class="photo-table-cell"><p class="photo-description">${description}</p></td>`;
+    };
+
+
   const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
@@ -549,7 +596,7 @@ export default function Home() {
          font-weight: bold;
          margin-right: 8px;
       }
-      /* Photo Table Styling - Corrected for 2x4 layout (2 columns, 4 rows total) */
+      /* Photo Table Styling */
       .photo-table {
         width: 100%;
         max-width: 18.46cm;
@@ -560,20 +607,24 @@ export default function Home() {
         border: 1px solid #e0e0e0;
         border-radius: 6px;
         overflow: hidden;
+        background-color: #f8f9fa; /* Apply background to table itself */
       }
-      .photo-table td {
+      .photo-table td, .photo-table-cell /* Add class for print */ {
         border: 1px solid #e0e0e0;
         padding: 10pt;
         text-align: center; /* Center cell content (image and text) */
         vertical-align: top;
         width: 50%; /* Ensure two equal columns */
-        background-color: #f8f9fa;
+        /* Background moved to .photo-table */
       }
+      /* Style only first/last rows/cells for border radius (if not printing) */
+      ${!forPrint ? `
       .photo-table tr:first-child td:first-child { border-top-left-radius: 6px; }
       .photo-table tr:first-child td:last-child { border-top-right-radius: 6px; }
       /* Apply bottom radius to cells in the *last* row (description row of last image pair) */
       .photo-table tr:nth-child(4) td:first-child { border-bottom-left-radius: 6px; }
       .photo-table tr:nth-child(4) td:last-child { border-bottom-right-radius: 6px; }
+      ` : ''}
 
       /* Image style: Fixed height (5cm), auto width, centered */
       .photo-table img {
@@ -639,7 +690,7 @@ export default function Home() {
         .photo-table tr { page-break-inside: avoid; }
         strong, em { color: #000000 !important; } /* Ensure black text for print */
         p { text-align: left !important; }
-        .photo-table, .photo-table td { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
+        .photo-table, .photo-table td, .photo-table-cell { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
         .photo-table img { box-shadow: none !important; border-radius: 0 !important;}
         .photo-description { color: #333333 !important; text-align: center !important; }
         .info-section strong { color: #000000 !important; }
@@ -816,15 +867,17 @@ export default function Home() {
       <head>
         <meta charset="utf-8">
         <title>領域共備GO 會議報告</title>
+        ${!forPrint ? `
         <meta name=ProgId content=Word.Document>
         <meta name=Generator content="Microsoft Word 15">
         <meta name=Originator content="Microsoft Word 15">
-        ${msoPageSetupAndFonts}
+        ${msoPageSetupAndFonts}` : ''}
         <style>
           /* Embed base CSS */
           ${styles}
 
-          /* Page Setup for Word */
+          /* Page Setup for Word (only if not for print) */
+          ${!forPrint ? `
           @page Section1 {
             size: 21cm 29.7cm; /* A4 Portrait */
             margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins: 0.5 inch */
@@ -857,33 +910,38 @@ export default function Home() {
               margin-bottom: 8pt !important; /* Match CSS margin below image */
            }
           <![endif]-->
+          ` : ''}
         </style>
       </head>
       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;background-color:#ffffff;'>
-      <div class='Section1'> <!-- Use Section1 for Word page settings -->
+      <div class='${!forPrint ? 'Section1' : ''}'> <!-- Use Section1 for Word page settings only for DOC export -->
         <div class='report-container'> <!-- Container for structure -->
     `;
 
     let reportHtmlContent = htmlStart;
 
-    // Main title - Use MsoHeading1, alignment forced by MSO styles
-    reportHtmlContent += `<p class="MsoHeading1">領域共備GO 會議報告</p>`;
+    // Main title - Use H1 for print/PDF, MsoHeading1 for DOC
+    reportHtmlContent += `<${forPrint ? 'h1' : 'p class="MsoHeading1"'}>領域共備GO 會議報告</${forPrint ? 'h1' : 'p'}>`;
 
-    // Basic Info Section - Use MsoHeading2 and MsoNormal, alignment forced by MSO styles
+    // Basic Info Section - Use H2 and P for print/PDF, MsoHeading2 and MsoNormal for DOC
     reportHtmlContent += `
         <div class="section info-section">
-          <p class="MsoHeading2">基本資訊</p>
-          <p class="MsoNormal"><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class="MsoNormal"><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class="MsoNormal"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class="MsoNormal"><strong>社群成員：</strong> ${communityMembers}</p>
+          <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>基本資訊</${forPrint ? 'h2' : 'p'}>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>教學領域：</strong> ${teachingArea}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
-    // Photo Record Section
+    // Photo Record Section - Use H2 for print/PDF, MsoHeading2 for DOC
     reportHtmlContent += `
         <div class="section photo-section">
-           <p class="MsoHeading2">照片記錄</p>
+           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
+
+    // Conditionally render table start based on export type
+    if (!forPrint) { // DOC export with MSO styles
+        reportHtmlContent += `
            <!--[if gte mso 9]>
             <table class="PhotoTableStyle" border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'>
            <![endif]-->
@@ -891,52 +949,39 @@ export default function Home() {
             <table class="photo-table" align="center">
            <![endif]-->
              <tbody style="mso-yfti-irow:0; mso-yfti-firstrow:yes;">
-    `;
-
-    // Helper function to generate a table cell for an image
-    const generateImageCellMSO = (photo: Photo | undefined, altText: string): string => {
-        let content = '';
-        if (photo?.dataUrl) {
-              // MSO requires wrapping the image in a paragraph for alignment and spacing.
-              // Set height:5cm; width:auto; via inline style. MSO might not perfectly respect 'auto'.
-              content = `<p class="MsoNormal" align="center" style='text-align:center; margin-bottom:8pt;'><img src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin:0 auto; border-radius: 4px;"></p>`;
-        } else {
-             content = `<p class="MsoNormal" align="center">[${altText} 無法載入]</p>`;
-        }
-        // Apply PhotoCellStyle class to TD for MSO styling and dimensions.
-        return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#F8F9FA;'>${content}</td>`;
-    };
-
-    // Helper function to generate a table cell for a description
-    const generateDescriptionCellMSO = (photo: Photo | undefined): string => {
-      const description = photo?.description || '未產生描述';
-       // Apply PhotoCellStyle and PhotoDescriptionStyle classes for MSO styling.
-       return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#F8F9FA;'><p class="PhotoDescriptionStyle" align="center">${description}</p></td>`;
+        `;
+    } else { // PDF/Print export with standard HTML/CSS
+        reportHtmlContent += `<table class="photo-table"><tbody>`;
     }
 
+
     // Build the table rows: 2 columns, 4 rows total (Image, Desc, Image, Desc)
+    // Use the appropriate cell generation function based on forPrint flag
+    const generateImageCell = forPrint ? generateImageCellPrint : generateImageCellMSO;
+    const generateDescriptionCell = forPrint ? generateDescriptionCellPrint : generateDescriptionCellMSO;
+
     // Row 1: Images 1 & 2
-    reportHtmlContent += `<tr style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'>`;
-    reportHtmlContent += generateImageCellMSO(photosWithDataUrls[0], '照片 1');
-    reportHtmlContent += generateImageCellMSO(photosWithDataUrls[1], '照片 2');
+    reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'" : ""}>`;
+    reportHtmlContent += generateImageCell(photosWithDataUrls[0], '照片 1');
+    reportHtmlContent += generateImageCell(photosWithDataUrls[1], '照片 2');
     reportHtmlContent += `</tr>`;
 
     // Row 2: Descriptions for 1 & 2
-    reportHtmlContent += `<tr style='mso-yfti-irow:1;'>`;
-    reportHtmlContent += generateDescriptionCellMSO(photosWithDataUrls[0]);
-    reportHtmlContent += generateDescriptionCellMSO(photosWithDataUrls[1]);
+    reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:1;'" : ""}>`;
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[0]);
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtmlContent += `</tr>`;
 
     // Row 3: Images 3 & 4
-    reportHtmlContent += `<tr style='mso-yfti-irow:2;'>`;
-    reportHtmlContent += generateImageCellMSO(photosWithDataUrls[2], '照片 3');
-    reportHtmlContent += generateImageCellMSO(photosWithDataUrls[3], '照片 4');
+    reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:2;'" : ""}>`;
+    reportHtmlContent += generateImageCell(photosWithDataUrls[2], '照片 3');
+    reportHtmlContent += generateImageCell(photosWithDataUrls[3], '照片 4');
     reportHtmlContent += `</tr>`;
 
     // Row 4: Descriptions for 3 & 4
-    reportHtmlContent += `<tr style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'>`;
-    reportHtmlContent += generateDescriptionCellMSO(photosWithDataUrls[2]);
-    reportHtmlContent += generateDescriptionCellMSO(photosWithDataUrls[3]);
+    reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'" : ""}>`;
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[2]);
+    reportHtmlContent += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtmlContent += `</tr>`;
 
     // Close table
@@ -946,15 +991,15 @@ export default function Home() {
         </div>
     `;
 
-    // Summary Section - Use MsoHeading2 and SummaryStyle, alignment forced by MSO styles
+    // Summary Section - Use H2/P for print/PDF, MsoHeading2/SummaryStyle for DOC
     reportHtmlContent += `
         <div class="section summary-section">
-           <p class="MsoHeading2">會議大綱摘要</p>
-           <p class="SummaryStyle">${formattedSummary}</p> <!-- Apply SummaryStyle class -->
+           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>會議大綱摘要</${forPrint ? 'h2' : 'p'}>
+           <p class="${forPrint ? '' : 'SummaryStyle'}">${formattedSummary}</p> <!-- Apply SummaryStyle class only for DOC -->
         </div>
 
         </div> <!-- End report-container -->
-      </div> <!-- End Section1 -->
+      </div> <!-- End Section1 (or div for print) -->
       </body>
       </html>
     `;
@@ -1190,13 +1235,13 @@ export default function Home() {
         <Form {...form}>
           <form className="space-y-10"> {/* Add spacing between cards */}
             {/* Step 1: Meeting Info Card */}
-            <Card className="card-step-1 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+            <Card className="card-step-1 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-1 p-6"> {/* Step-specific styling */}
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                  <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
                      <Info className="w-7 h-7 card-icon-step-1" /> {/* Step-specific icon */}
                      第一步：輸入會議資訊
                   </CardTitle>
-                  <CardDescription className="text-muted-foreground">請填寫本次社群會議的基本資料</CardDescription>
+                  <CardDescription className="text-slate-300">請填寫本次社群會議的基本資料</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8 space-y-6">
                 {/* Grid layout for form fields */}
@@ -1206,9 +1251,9 @@ export default function Home() {
                     name="teachingArea"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium text-slate-300">教學領域</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-200">教學領域</FormLabel>
                         <FormControl>
-                          <Input placeholder="例如：國語文、數學..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
+                          <Input placeholder="例如：國語文、數學..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary text-slate-100 placeholder:text-slate-400" />
                         </FormControl>
                         <FormMessage /> {/* Displays validation errors */}
                       </FormItem>
@@ -1219,9 +1264,9 @@ export default function Home() {
                     name="meetingTopic"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium text-slate-300">會議主題</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-200">會議主題</FormLabel>
                         <FormControl>
-                          <Input placeholder="例如：新課綱教學策略..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
+                          <Input placeholder="例如：新課綱教學策略..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary text-slate-100 placeholder:text-slate-400" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1232,7 +1277,7 @@ export default function Home() {
                     name="meetingDate"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel className="text-lg font-medium mb-1 text-slate-300">會議日期</FormLabel>
+                        <FormLabel className="text-lg font-medium mb-1 text-slate-200">會議日期</FormLabel>
                          <Popover> {/* Popover for calendar */}
                             <PopoverTrigger asChild>
                             <FormControl>
@@ -1240,7 +1285,8 @@ export default function Home() {
                                   variant={"outline"}
                                   className={cn(
                                   "w-full pl-3 text-left font-normal justify-start text-base py-2.5",
-                                  !field.value && "text-muted-foreground", // Style differently if no date selected
+                                  !field.value && "text-slate-400", // Style differently if no date selected
+                                   field.value && "text-slate-100",
                                   "bg-slate-700/50 border-slate-600 hover:bg-slate-700/80" // Custom styles
                                   )}
                                 >
@@ -1274,9 +1320,9 @@ export default function Home() {
                     name="communityMembers"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-lg font-medium text-slate-300">社群成員</FormLabel>
+                        <FormLabel className="text-lg font-medium text-slate-200">社群成員</FormLabel>
                         <FormControl>
-                          <Input placeholder="王老師, 李老師..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary" />
+                          <Input placeholder="王老師, 李老師..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary text-slate-100 placeholder:text-slate-400" />
                         </FormControl>
                         <FormDescription className="text-sm text-slate-400">
                           請用逗號分隔姓名。
@@ -1290,13 +1336,13 @@ export default function Home() {
             </Card>
 
             {/* Step 2: Upload Photos Card */}
-            <Card className="card-step-2 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+            <Card className="card-step-2 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-2 p-6"> {/* Step-specific styling */}
-                <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
                     <ImageIcon className="w-7 h-7 card-icon-step-2" /> {/* Step-specific icon */}
                     第二步：上傳會議照片
                 </CardTitle>
-                 <CardDescription className="text-muted-foreground">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 5MB)</CardDescription>
+                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 5MB)</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8">
                  {/* File Upload Area */}
@@ -1312,10 +1358,10 @@ export default function Home() {
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <UploadCloud className={cn("w-10 h-10 mb-3", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-primary")} />
-                      <p className={cn("mb-2 text-sm font-medium", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-foreground")}>
-                        點擊此處或拖曳照片
+                      <p className={cn("mb-2 text-sm font-medium", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-slate-200")}>
+                         點擊此處 或拖曳照片至此
                       </p>
-                      <p className={cn("text-xs", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-muted-foreground")}>
+                      <p className={cn("text-xs", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-slate-400")}>
                         還可上傳 {Math.max(0, MAX_PHOTOS - photos.length)} 張 {/* Show remaining count */}
                       </p>
                     </div>
@@ -1339,7 +1385,7 @@ export default function Home() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8"> {/* Grid for photo previews */}
                       {/* Render uploaded photos */}
                       {photos.map((photo) => (
-                        <div key={photo.id} className="relative group border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
+                        <div key={photo.id} className="relative border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
                           {/* Image Preview Container */}
                           <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden">
                              <NextImage
@@ -1354,7 +1400,7 @@ export default function Home() {
                             <button
                               type="button"
                               onClick={() => handlePhotoRemove(photo.id)}
-                              className="absolute top-2 right-2 bg-destructive/80 text-destructive-foreground rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 z-10 hover:bg-destructive"
+                              className="absolute top-2 right-2 bg-destructive/80 text-destructive-foreground rounded-full p-1.5 transition-opacity focus:opacity-100 z-10 hover:bg-destructive"
                               aria-label="移除照片"
                             >
                               <X className="h-4 w-4" />
@@ -1367,8 +1413,8 @@ export default function Home() {
                               )}
                           </div>
                            {/* Description Section - Always Visible */}
-                           <div className="p-3 bg-slate-700/80 border-t border-slate-600">
-                             <p className="text-xs text-slate-300 text-center text-shadow break-words min-h-[2.5em] flex items-center justify-center">
+                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center"> {/* Ensure minimum height */}
+                             <p className="text-xs text-slate-200 text-center break-words text-shadow">
                                 {photo.description || '尚未產生描述'}
                              </p>
                           </div>
@@ -1376,7 +1422,7 @@ export default function Home() {
                       ))}
                        {/* Render placeholders for remaining slots */}
                        {Array.from({ length: Math.max(0, MAX_PHOTOS - photos.length) }).map((_, index) => (
-                          <div key={`placeholder-${index}`} className="relative group border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
+                          <div key={`placeholder-${index}`} className="relative border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
                              照片 {photos.length + index + 1}
                           </div>
                       ))}
@@ -1404,7 +1450,7 @@ export default function Home() {
                         {descriptionProgress !== null && (
                             <div className="w-full max-w-md"> {/* Constrain width */}
                                 <Progress value={descriptionProgress} className="w-full h-2.5 bg-slate-700" /> {/* Progress bar component */}
-                                <p className="text-sm text-muted-foreground text-center mt-2">
+                                <p className="text-sm text-slate-400 text-center mt-2">
                                     {descriptionProgress < 100 ? `正在產生照片描述... ${descriptionProgress}%` : '描述產生完成！'}
                                 </p>
                             </div>
@@ -1416,13 +1462,13 @@ export default function Home() {
             </Card>
 
             {/* Step 3: Generate Summary Card */}
-            <Card className="card-step-3 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+            <Card className="card-step-3 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-3 p-6"> {/* Step-specific styling */}
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                  <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
                     <FileText className="w-7 h-7 card-icon-step-3" /> {/* Step-specific icon */}
                     第三步：產生會議摘要
                   </CardTitle>
-                  <CardDescription className="text-muted-foreground">整合會議資訊與照片描述，自動產生摘要</CardDescription>
+                  <CardDescription className="text-slate-300">整合會議資訊與照片描述，自動產生摘要</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8 space-y-6">
                  {/* Generate Summary Button */}
@@ -1464,13 +1510,13 @@ export default function Home() {
             </Card>
 
              {/* Step 4: Export Report Card */}
-             <Card className="card-step-4 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
+             <Card className="card-step-4 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-4 p-6"> {/* Step-specific styling */}
-                  <CardTitle className="text-2xl font-semibold text-foreground flex items-center gap-3">
+                  <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
                      <Download className="w-7 h-7 card-icon-step-4" /> {/* Step-specific icon */}
                     第四步：匯出報告
                   </CardTitle>
-                   <CardDescription className="text-muted-foreground">
+                   <CardDescription className="text-slate-300">
                      點擊下方按鈕匯出 Word (.doc) 或 PDF 格式報告。
                    </CardDescription>
                </CardHeader>
@@ -1480,7 +1526,7 @@ export default function Home() {
                       type="button"
                       onClick={handleExportReport}
                       disabled={isExportDisabled} // Control button state
-                      className="w-full sm:flex-1 sm:min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105" // Button styles
+                      className="w-full sm:flex-1 sm:min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg" // Button styles
                     >
                       {isExportingDoc ? ( // Loading state
                           <>
@@ -1497,7 +1543,7 @@ export default function Home() {
                       type="button"
                       onClick={handleExportPdf}
                       disabled={isExportDisabled} // Control button state
-                      className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105" // Button styles
+                      className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg" // Button styles
                       variant="outline" // Use outline variant for visual distinction
                     >
                       {isPreparingPdf ? ( // Loading state
