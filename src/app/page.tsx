@@ -232,6 +232,32 @@ export default function Home() {
      }
     if (isGeneratingAllDescriptions) return; // Prevent multiple overall calls
 
+    // Check if all photos have data URLs before starting generation
+    const photosNeedDataUrlRead = photos.filter(p => !p.dataUrl);
+    if (photosNeedDataUrlRead.length > 0) {
+        // Read missing data URLs first
+        try {
+            const reads = photosNeedDataUrlRead.map(async (photo) => {
+                const dataUrl = await readFileAsDataURL(photo.file);
+                return { id: photo.id, dataUrl };
+            });
+            const results = await Promise.all(reads);
+            setPhotos(prev => prev.map(p => {
+                const found = results.find(r => r.id === p.id);
+                return found ? { ...p, dataUrl: found.dataUrl } : p;
+            }));
+        } catch (error) {
+            console.error('Error pre-reading data URLs:', error);
+            toast({
+                title: '圖片讀取錯誤',
+                description: '產生描述前讀取圖片資料失敗。',
+                variant: 'destructive',
+            });
+            return; // Stop generation if reading failed
+        }
+    }
+
+
     // Check if all photos already have successful descriptions or if generation failed previously
     const needsGeneration = photos.length > 0 && photos.some(p => !p.description || p.description.startsWith('無法描述'));
 
@@ -250,22 +276,27 @@ export default function Home() {
     const totalToProcess = photos.length;
 
     try {
+        // We need the latest state of photos *with* dataUrls
+        const currentPhotos = photos.map(p => {
+             const photoFromState = photos.find(ps => ps.id === p.id);
+             return { ...p, dataUrl: photoFromState?.dataUrl };
+        });
+
         // Map ALL photos to promises that resolve with DescriptionResult
-        const descriptionPromises = photos.map(async (photo): Promise<DescriptionResult> => {
+        const descriptionPromises = currentPhotos.map(async (photo): Promise<DescriptionResult> => {
            let descriptionResult: DescriptionResult | undefined = undefined; // Initialize to undefined
             try {
-                const photoDataUri = photo.dataUrl ?? await readFileAsDataURL(photo.file);
-                if (!photo.dataUrl) {
-                    // Update state immutably if dataUrl was missing
-                     setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, dataUrl: photoDataUri } : p));
-                }
+                 // Ensure dataUrl exists now
+                 if (!photo.dataUrl) {
+                     throw new Error(`Data URL missing for photo ${photo.id} even after pre-read.`);
+                 }
 
                  const result: GeneratePhotoDescriptionsOutput = await generatePhotoDescriptions({
                     teachingArea,
                     meetingTopic,
                     meetingDate: format(meetingDate, 'yyyy-MM-dd'),
                     communityMembers,
-                    photoDataUri,
+                    photoDataUri: photo.dataUrl, // Use the dataUrl from the potentially updated state
                 });
                  // Ensure description is not null/undefined and doesn't start with failure message
                  const success = !!result.photoDescription && !result.photoDescription.startsWith('無法描述');
@@ -369,9 +400,11 @@ export default function Home() {
     }
 
      // Check if any photo is still generating or failed generation
-    if (photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))) {
+     // AND ensure all descriptions actually exist and are successful
+    const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述'));
+    if (photos.some(p => p.isGenerating) || !allDescriptionsGeneratedSuccessfully) {
         // Only show toast if generation wasn't started or failed, not if descriptions just exist
-        if (!photos.every(p => p.description && !p.description.startsWith('無法描述'))) {
+        if (!allDescriptionsGeneratedSuccessfully) {
             toast({
                 title: '請先成功產生所有照片描述',
                 description: '請確保所有照片描述都已成功產生，且沒有錯誤訊息。點擊「重新產生描述」按鈕以重試。',
@@ -444,7 +477,7 @@ export default function Home() {
     // Replace newline characters with <br> tags for HTML display
     formattedSummary = formattedSummary.replace(/\n/g, '<br>');
 
-    // Consistent CSS for both Word and Print - Using Narrow Margins (1.27cm) and modern styles
+    // Consistent CSS for both Word and Print - Enhanced Styling
     let styles = `
       body {
         font-family: '標楷體', 'BiauKai', 'Times New Roman', serif;
@@ -458,19 +491,20 @@ export default function Home() {
         max-width: 18.46cm; /* A4 width - narrow margins */
         margin: 0 auto; /* Center container */
         background-color: #ffffff; /* White paper effect */
-        padding: 1.5cm;
-        border-radius: 5px;
+        padding: ${forPrint ? '0' : '1.5cm'}; /* No padding for print, padding for screen/iframe */
+        border-radius: ${forPrint ? '0' : '5px'};
         box-shadow: ${forPrint ? 'none' : '0 2px 8px rgba(0,0,0,0.1)'}; /* Shadow only for non-print */
       }
       h1 {
         color: #0056b3; /* Professional blue */
-        text-align: left;
+        text-align: left; /* Align main title left */
         font-size: 22pt;
         font-weight: bold;
         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
         border-bottom: 2px solid #0056b3;
         padding-bottom: 10pt;
         margin-bottom: 25pt;
+        page-break-after: avoid;
       }
       h2 {
         color: #0056b3;
@@ -481,6 +515,7 @@ export default function Home() {
         padding-bottom: 6pt;
         margin-top: 25pt;
         margin-bottom: 15pt;
+        page-break-after: avoid;
       }
       p {
         margin-bottom: 10pt;
@@ -496,62 +531,65 @@ export default function Home() {
       }
       .info-section strong {
          display: inline-block;
-         width: 100px;
+         width: 100px; /* Ensure enough space for label */
          color: #495057;
+         font-weight: bold; /* Make labels bold */
+         margin-right: 5px;
       }
+      /* Photo Table Styling */
       .photo-table {
-        width: 100%;
-        max-width: 18.46cm;
-        border-collapse: separate;
+        width: 100%; /* Use full width */
+        max-width: 18.46cm; /* Max width based on A4 narrow margins */
+        border-collapse: collapse; /* Changed to collapse for better Word rendering */
         border-spacing: 0;
-        margin: 20pt auto;
+        margin: 20pt auto; /* Center the table */
         page-break-inside: avoid;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        overflow: hidden;
+        border: 1px solid #cccccc; /* Lighter border */
+        /* Removed border-radius for better docx compatibility */
       }
-       .photo-table tr:first-child td:first-child { border-top-left-radius: 7px; }
-       .photo-table tr:first-child td:last-child { border-top-right-radius: 7px; }
-       .photo-table tr:last-child td:first-child { border-bottom-left-radius: 7px; }
-       .photo-table tr:last-child td:last-child { border-bottom-right-radius: 7px; }
 
       .photo-table td {
-        border: none;
-        border-bottom: 1px solid #dee2e6;
-        border-right: 1px solid #dee2e6;
-        padding: 10pt;
+        border: 1px solid #cccccc; /* Apply border to all cells */
+        padding: 8pt; /* Consistent padding */
         text-align: center;
         vertical-align: top;
-        width: 50%;
+        width: 50%; /* Ensure two equal columns */
         background-color: #ffffff;
       }
-       .photo-table td:last-child { border-right: none; }
-       .photo-table tr:last-child td { border-bottom: none; }
 
       /* Image style: Fixed height (5cm), auto width, centered */
       .photo-table img {
         display: block;
-        margin: 5pt auto;
-        height: 5cm; /* FIXED HEIGHT 5cm */
-        width: auto; /* AUTO WIDTH */
-        max-width: 100%;
+        margin: 0 auto 5pt auto; /* Center image horizontally, add bottom margin */
+        height: 5cm !important; /* FIXED HEIGHT 5cm - Use !important for Word */
+        width: auto !important; /* AUTO WIDTH */
+        max-width: 100% !important; /* Prevent overflow */
         object-fit: contain;
-        border-radius: 4px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        /* Remove shadow/radius for cleaner look in Word */
       }
       .photo-description {
         font-size: 10pt;
         color: #6c757d;
         text-align: center;
         line-height: 1.4;
-        margin-top: 8pt;
+        margin-top: 5pt; /* Adjusted margin */
         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
       }
+      /* Summary Section Styling */
       .summary-section p {
         white-space: pre-wrap; /* Preserve line breaks from AI */
         font-size: 12pt;
         text-align: justify;
         line-height: 1.7;
+        font-family: '標楷體', 'BiauKai', serif; /* Specific font for summary */
+      }
+      .summary-section strong { /* Ensure bold in summary is distinct */
+         font-weight: bold;
+         color: #000000; /* Black for emphasis */
+      }
+       .summary-section em { /* Ensure italics in summary are distinct */
+         font-style: italic;
+         color: #333333;
       }
       .page-break { page-break-before: always; }
 
@@ -581,8 +619,8 @@ export default function Home() {
       }
     `;
 
-    // MSO styles for Word compatibility - ONLY Page Setup for narrow margins
-    const msoPageSetup = `
+    // MSO styles for Word compatibility - Page Setup for narrow margins + font definitions
+    const msoPageSetupAndFonts = `
         <!--[if gte mso 9]><xml>
          <w:WordDocument>
           <w:View>Print</w:View>
@@ -591,6 +629,10 @@ export default function Home() {
           <w:TrackMoves>false</w:TrackMoves>
           <w:TrackFormatting/>
           <w:PunctuationKerning/>
+          <w:DrawingGridHorizontalSpacing>6 pt</w:DrawingGridHorizontalSpacing>
+          <w:DrawingGridVerticalSpacing>6 pt</w:DrawingGridVerticalSpacing>
+          <w:DisplayHorizontalDrawingGridEvery>0</w:DisplayHorizontalDrawingGridEvery>
+          <w:DisplayVerticalDrawingGridEvery>2</w:DisplayVerticalDrawingGridEvery>
           <w:ValidateAgainstSchemas/>
           <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
           <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
@@ -611,40 +653,206 @@ export default function Home() {
                <w:OverrideTableStyleHps/>
                <w:UseFELayout/>
            </w:Compatibility>
-          <m:mathPr>
-           <m:mathFont m:val="Cambria Math"/>
-           <m:brkBin m:val="before"/>
-           <m:brkBinSub m:val="&#45;-"/>
-           <m:smallFrac m:val="off"/>
-           <m:dispDef/>
-           <m:lMargin m:val="0"/>
-           <m:rMargin m:val="0"/>
-           <m:defJc m:val="centerGroup"/>
-           <m:wrapIndent m:val="1440"/>
-           <m:intLim m:val="subSup"/>
-           <m:naryLim m:val="undOvr"/>
-          </m:mathPr></w:WordDocument>
+           <m:mathPr>
+               <m:mathFont m:val="Cambria Math"/>
+               <m:brkBin m:val="before"/>
+               <m:brkBinSub m:val="&#45;-"/>
+               <m:smallFrac m:val="off"/>
+               <m:dispDef/>
+               <m:lMargin m:val="0"/>
+               <m:rMargin m:val="0"/>
+               <m:defJc m:val="centerGroup"/>
+               <m:wrapIndent m:val="1440"/>
+               <m:intLim m:val="subSup"/>
+               <m:naryLim m:val="undOvr"/>
+           </m:mathPr>
+         </w:WordDocument>
          <o:DocumentProperties>
-          <o:Author>領域共備GO</o:Author>
+           <o:Author>領域共備GO</o:Author>
+           <o:Company>領域共備GO</o:Company>
+           <o:Version>1.0</o:Version>
          </o:DocumentProperties>
-        </xml><![endif]-->
-        <!--[if gte mso 9]><xml>
-         <w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="true" DefSemiHidden="true" DefQFormat="false" DefPriority="99" LatentStyleCount="276">
-           <w:LsdException Locked="false" Priority="0" SemiHidden="false" UnhideWhenUsed="false" QFormat="true" Name="Normal"/>
-           <w:LsdException Locked="false" Priority="9" SemiHidden="false" UnhideWhenUsed="false" QFormat="true" Name="heading 1"/>
-           <w:LsdException Locked="false" Priority="9" QFormat="true" Name="heading 2"/>
+         <w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99" LatentStyleCount="376">
+           <w:LsdException Locked="false" Priority="0" QFormat="true" Name="Normal"/>
+           <w:LsdException Locked="false" Priority="9" QFormat="true" Name="heading 1"/>
+           <w:LsdException Locked="false" Priority="9" SemiHidden="true" UnhideWhenUsed="true" QFormat="true" Name="heading 2"/>
+           {/* Add other latent style definitions if needed */}
          </w:LatentStyles>
         </xml><![endif]-->
+         <!--[if gte mso 10]>
+        <style>
+         /* Style Definitions */
+         table.MsoNormalTable {
+           mso-style-name:"Table Normal";
+           mso-tstyle-rowband-size:0;
+           mso-tstyle-colband-size:0;
+           mso-style-noshow:yes;
+           mso-style-priority:99;
+           mso-style-parent:"";
+           mso-padding-alt:0cm 5.4pt 0cm 5.4pt;
+           mso-para-margin:0cm;
+           mso-para-margin-bottom:.0001pt;
+           mso-pagination:widow-orphan;
+           font-size:12.0pt;
+           font-family:"Calibri",sans-serif;
+           mso-ascii-font-family:Calibri;
+           mso-ascii-theme-font:minor-latin;
+           mso-hansi-font-family:Calibri;
+           mso-hansi-theme-font:minor-latin;
+           mso-bidi-font-family:"Times New Roman";
+           mso-bidi-theme-font:minor-bidi;
+           mso-fareast-language:EN-US;
+         }
+         table.PhotoTableStyle { /* Custom style for photo table */
+             mso-style-name:"Photo Table";
+             mso-tstyle-rowband-size:0;
+             mso-tstyle-colband-size:0;
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             mso-padding-alt:8pt 8pt 8pt 8pt;
+             mso-border-insideh:.5pt solid #CCCCCC;
+             mso-border-insidev:.5pt solid #CCCCCC;
+             mso-para-margin:0cm;
+             mso-para-margin-bottom:.0001pt;
+             mso-pagination:widow-orphan;
+             font-size:10.0pt; /* Font size for descriptions */
+             font-family:"Microsoft JhengHei",sans-serif;
+             mso-ascii-font-family:"Times New Roman";
+             mso-hansi-font-family:"Times New Roman";
+             mso-fareast-language:ZH-TW;
+             text-align:center;
+             vertical-align:top;
+         }
+         td.PhotoCellStyle { /* Custom style for photo cells */
+             mso-style-name:"Photo Cell";
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             border:.5pt solid #CCCCCC;
+             padding:8pt 8pt 8pt 8pt;
+             text-align:center;
+             vertical-align:top;
+         }
+         p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
+            mso-style-name:"Photo Description";
+            mso-style-priority:99;
+            mso-style-unhide:no;
+            margin-top:5pt;
+            margin-right:0cm;
+            margin-bottom:0cm;
+            margin-left:0cm;
+            mso-para-margin-top:5pt;
+            mso-para-margin-right:0cm;
+            mso-para-margin-bottom:0cm;
+            mso-para-margin-left:0cm;
+            line-height:140%;
+            mso-line-height-rule:exactly;
+            text-align:center;
+            font-size:10.0pt;
+            font-family:"Microsoft JhengHei",sans-serif;
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#6C757D;
+        }
+        p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 {
+            mso-style-priority:9;
+            mso-style-qformat:yes;
+            mso-style-link:"標題 1 字元";
+            mso-style-next:Normal;
+            margin-top:12.0pt;
+            margin-right:0cm;
+            margin-bottom:25pt;
+            margin-left:0cm;
+            text-align:left;
+            line-height:normal;
+            page-break-after:avoid;
+            mso-pagination:widow-orphan lines-together;
+            font-size:22.0pt;
+            font-family:"Microsoft JhengHei",sans-serif;
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#0056B3;
+            font-weight:bold;
+            border:none;
+            mso-border-bottom-alt:solid #0056B3 1.5pt;
+            padding:0cm;
+            mso-padding-alt:0cm 0cm 10pt 0cm;
+        }
+        p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 {
+            mso-style-priority:9;
+            mso-style-qformat:yes;
+            mso-style-link:"標題 2 字元";
+            mso-style-next:Normal;
+            margin-top:25pt;
+            margin-right:0cm;
+            margin-bottom:15pt;
+            margin-left:0cm;
+            text-align:left;
+            line-height:normal;
+            page-break-after:avoid;
+            mso-pagination:widow-orphan lines-together;
+            font-size:16.0pt;
+            font-family:"Microsoft JhengHei",sans-serif;
+            mso-fareast-font-family:"Microsoft JhengHei";
+            color:#0056B3;
+            font-weight:bold;
+            border:none;
+            mso-border-bottom-alt:solid #DEE2E6 1.0pt;
+            padding:0cm;
+            mso-padding-alt:0cm 0cm 6pt 0cm;
+        }
+        p.MsoNormal, li.MsoNormal, div.MsoNormal {
+            margin-bottom:10.0pt;
+            mso-para-margin-bottom:10.0pt;
+            text-align:justify;
+            text-justify:inter-ideograph; /* Justify for CJK */
+            line-height:160%; /* Line height 1.6 */
+            mso-line-height-rule:exactly;
+            font-size:12.0pt;
+            font-family:"標楷體",serif;
+            mso-ascii-font-family:"Times New Roman";
+            mso-fareast-font-family:"標楷體";
+            mso-hansi-font-family:"Times New Roman";
+            color:#333333;
+        }
+         p.SummaryStyle, li.SummaryStyle, div.SummaryStyle { /* Custom style for summary */
+             mso-style-name:"Summary Text";
+             mso-style-priority:99;
+             mso-style-unhide:no;
+             margin-top:0cm;
+             margin-right:0cm;
+             margin-bottom:10.0pt;
+             margin-left:0cm;
+             text-align:justify;
+             text-justify:inter-ideograph;
+             line-height:170%; /* Line height 1.7 */
+             mso-line-height-rule:exactly;
+             mso-pagination:widow-orphan;
+             font-size:12.0pt;
+             font-family:"標楷體",serif;
+             mso-fareast-font-family:"標楷體";
+             color:#333333;
+             white-space:pre-wrap; /* Attempt to preserve AI newlines */
+         }
+         span.MsoHyperlink {
+             mso-style-priority:99;
+             color:blue;
+             text-decoration:underline;
+             text-underline:single;
+         }
+        /* Ensure bold/italic styles are mapped correctly */
+        strong {mso-style-name:""; font-weight:bold;}
+        em {mso-style-name:""; font-style:italic;}
+
+        </style>
+        <![endif]-->
     `;
 
-    // Use standard HTML structure for both Print and Word, applying MSO page setup for Word
+    // Start of HTML document
     const htmlStart = `
       <!DOCTYPE html>
       <html lang="zh-TW" ${!forPrint ? 'xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40"' : ''}>
       <head>
         <meta charset="utf-8">
         <title>領域共備GO 會議報告</title>
-        ${!forPrint ? `<meta name=ProgId content=Word.Document><meta name=Generator content="Microsoft Word 15"><meta name=Originator content="Microsoft Word 15">${msoPageSetup}` : '<meta name="viewport" content="width=device-width, initial-scale=1.0">'}
+        ${!forPrint ? `<meta name=ProgId content=Word.Document><meta name=Generator content="Microsoft Word 15"><meta name=Originator content="Microsoft Word 15">${msoPageSetupAndFonts}` : '<meta name="viewport" content="width=device-width, initial-scale=1.0">'}
         <style>
           /* Page Setup for Word */
           @page Section1 {
@@ -653,91 +861,103 @@ export default function Home() {
             mso-header-margin: .5in;
             mso-footer-margin: .5in;
             mso-paper-source: 0;
+            mso-gutter-position:left; /* Added */
           }
           div.Section1 { page: Section1; }
 
-          /* Font Definitions for Word (subset) */
-          @font-face { font-family: "標楷體"; /* ... BiauKai definition ... */ }
-          @font-face { font-family: "Microsoft JhengHei"; /* ... MS JhengHei definition ... */ }
-          @font-face { font-family: "Times New Roman"; /* ... Times New Roman definition ... */ }
-          @font-face { font-family: Arial; /* ... Arial definition ... */ }
+          /* Font Definitions for Word (subset) - Ensure these match fonts used */
+          @font-face { font-family: "標楷體"; /* BiauKai */ /* ... BiauKai definition ... */ }
+          @font-face { font-family: "Microsoft JhengHei"; /* MS JhengHei */ /* ... MS JhengHei definition ... */ }
+          @font-face { font-family: "Times New Roman"; /* Times New Roman */ /* ... Times New Roman definition ... */ }
+          @font-face { font-family: Arial; /* Arial */ /* ... Arial definition ... */ }
+          @font-face { font-family: Calibri; /* Calibri */ /* ... Calibri definition ... */ }
+          @font-face { font-family: "Cambria Math"; /* Cambria Math */ /* ... Cambria Math definition ... */ }
 
-          /* Combined Styles */
+          /* Combined Styles (Inline styles take precedence but provide CSS fallback) */
           ${styles}
         </style>
       </head>
-      <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;'>
-      <div class='${!forPrint ? 'Section1 report-container' : 'report-container'}'>
+       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;text-justify-trim:punctuation;'>
+      <div class='Section1'> <!-- Use Section1 for Word page settings -->
     `;
 
     // Initialize reportHtml with the starting HTML structure
     let reportHtml = htmlStart;
 
-    // Main title
-    reportHtml += `<h1>領域共備GO 會議報告</h1>`;
+    // Main title (Map to H1 for Word styles)
+    reportHtml += `<p class="MsoHeading1">領域共備GO 會議報告</p>`;
 
     // Basic Info Section
     reportHtml += `
-        <div class="section info-section">
-          <h2>基本資訊</h2>
-          <p><strong>教學領域：</strong> ${teachingArea}</p>
-          <p><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p><strong>社群成員：</strong> ${communityMembers}</p>
+        <div class="section info-section" style="margin-bottom: 30pt; page-break-inside: avoid;">
+          <p class="MsoHeading2">基本資訊</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>教學領域：</strong> ${teachingArea}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>會議主題：</strong> ${meetingTopic}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class="MsoNormal" style="margin-bottom:5pt; line-height:140%;"><strong>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
-    // Photo Record Section - Use standard HTML table, styling controls layout
+    // Photo Record Section - Use MSO table styles for Word
     reportHtml += `
-        <div class="section photo-section">
-          <h2>照片記錄</h2>
-          <table class="photo-table" align="center">
-             <tbody>
+        <div class="section photo-section" style="margin-bottom: 30pt; page-break-inside: avoid;">
+           <p class="MsoHeading2">照片記錄</p>
+           <!--[if !mso]> <!-- Use standard HTML table for non-Word rendering -->
+            <table class="photo-table" align="center" style="width:100%; max-width:18.46cm; border-collapse:collapse; border:1px solid #CCCCCC; margin:20pt auto;">
+           <![endif]-->
+           <!--[if gte mso 9]> <!-- Use MSO specific table definition for Word -->
+            <table class="PhotoTableStyle" border="1" cellspacing="0" cellpadding="0" align="center" width="699" style="width:18.46cm; margin-left:auto; margin-right:auto; border-collapse:collapse; border:none; mso-border-alt:solid #CCCCCC .5pt; mso-yfti-tbllook:1184; mso-padding-alt:8pt 8pt 8pt 8pt; mso-border-insideh:.5pt solid #CCCCCC; mso-border-insidev:.5pt solid #CCCCCC;">
+           <![endif]-->
+             <tbody style="mso-yfti-irow:0; mso-yfti-firstrow:yes; mso-yfti-lastfirstrow:yes;">
     `;
 
-    // Helper function to generate table cell content for images
+    // Helper function to generate table cell content for images (with Word VML fallback)
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-             // Apply class and inline style for fixed height (5cm) and auto width
-             content = `<p style="text-align:center; margin: 5pt 0;"><img class="photo-image" src="${photo.dataUrl}" alt="${altText}" style="height:5cm; width:auto; max-width:100%; display: block; margin: auto; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"></p>`;
+             // Word needs specific VML for precise image sizing and positioning if complex layout needed
+             // For simple inline, img with style might suffice, but VML offers more control.
+             // Use inline style `height:5cm; width:auto;` for both HTML and hope Word respects it.
+              content = `<p class="PhotoCellStyle" align="center" style="text-align:center; margin: 5pt 0;"><img class="photo-image" src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin: auto;"></p>`;
         } else {
-             content = `<p style="text-align:center;">[${altText} 無法載入]</p>`;
+             content = `<p class="PhotoCellStyle" align="center">[${altText} 無法載入]</p>`;
         }
-         return `<td>${content}</td>`;
+        // Use mso-specific cell style for Word
+         return `<td width="50%" valign="top" class="PhotoCellStyle" style='width:50.0%; border:.5pt solid #CCCCCC; padding:8pt 8pt 8pt 8pt;'>${content}</td>`;
     };
 
     // Helper function to generate table cell content for descriptions
     const generateDescriptionCell = (photo: Photo | undefined): string => {
       const description = photo?.description || '未產生描述';
-      return `<td><p class="photo-description">${description}</p></td>`;
+       // Use mso-specific cell and paragraph styles
+       return `<td width="50%" valign="top" class="PhotoCellStyle" style='width:50.0%; border:.5pt solid #CCCCCC; padding:8pt 8pt 8pt 8pt;'><p class="PhotoDescriptionStyle">${description}</p></td>`;
     }
 
-    // Build the table content (2x4: two columns, four rows total)
-
-     // Row 1: Images 1 & 2
-    reportHtml += `<tr>`;
+    // Build the table content (2x4 structure for Word)
+    // Row 1: Images 1 & 2
+    reportHtml += `<tr style='mso-yfti-irow:0;'>`;
     reportHtml += generateImageCell(photosWithDataUrls[0], '照片 1');
     reportHtml += generateImageCell(photosWithDataUrls[1], '照片 2');
     reportHtml += `</tr>`;
 
     // Row 2: Descriptions 1 & 2
-    reportHtml += `<tr>`;
+    reportHtml += `<tr style='mso-yfti-irow:1;'>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtml += `</tr>`;
 
     // Row 3: Images 3 & 4
-    reportHtml += `<tr>`;
+    reportHtml += `<tr style='mso-yfti-irow:2;'>`;
     reportHtml += generateImageCell(photosWithDataUrls[2], '照片 3');
     reportHtml += generateImageCell(photosWithDataUrls[3], '照片 4');
     reportHtml += `</tr>`;
 
-    // Row 4: Descriptions 3 & 4
-    reportHtml += `<tr>`;
+    // Row 4: Descriptions 3 & 4 (Last row)
+    reportHtml += `<tr style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'>`;
     reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
     reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtml += `</tr>`;
+
 
     reportHtml += `
             </tbody>
@@ -747,12 +967,12 @@ export default function Home() {
 
     // Summary Section
     reportHtml += `
-        <div class="section summary-section">
-          <h2>會議大綱摘要</h2>
-           <p>${formattedSummary}</p>
+        <div class="section summary-section" style="margin-bottom: 30pt; page-break-inside: avoid;">
+           <p class="MsoHeading2">會議大綱摘要</p>
+           <p class="SummaryStyle">${formattedSummary}</p>
         </div>
 
-      </div> <!-- End report-container / Section1 -->
+      </div> <!-- End Section1 -->
       </body>
       </html>
     `;
