@@ -348,7 +348,7 @@ export default function Home() {
 
  const handleGenerateSummary = useCallback(async () => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    const photoDescriptions = photos.map(p => p.description).filter(Boolean); // Filter out empty descriptions
+    const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.startsWith('無法描述')); // Filter out empty/failed descriptions
 
     if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers) {
         toast({
@@ -441,22 +441,120 @@ export default function Home() {
     // Replace newline characters with <br> tags for HTML display
     formattedSummary = formattedSummary.replace(/\n/g, '<br>');
 
-    // Base CSS for both Word and Print - Using Narrow Margins (1.27cm)
+    // Base CSS for both Word and Print - Using Narrow Margins (1.27cm) and improved styles
     let styles = `
-      body { font-family: 'PMingLiU', '新細明體', 'Times New Roman', serif; line-height: 1.6; color: #000000; font-size: 12pt; margin: 1.27cm; } /* Narrow Margin */
-      h1 { color: #000000; text-align: left; font-size: 20pt; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 10pt; margin-bottom: 20pt;}
-      h2 { color: #000000; font-size: 16pt; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 5pt; margin-top: 20pt; margin-bottom: 15pt; }
-      p { margin-bottom: 10pt; font-size: 12pt; }
-      strong { font-weight: bold; }
-      em { font-style: italic; }
-      .section { margin-bottom: 25pt; page-break-inside: avoid; }
-      /* Table Styling: Centered, max-width for A4 narrow margin */
-      .photo-table { width: 100%; max-width: 18.46cm; border-collapse: collapse; margin-bottom: 15pt; page-break-inside: avoid; border: 1px solid #cccccc; margin-left: auto; margin-right: auto; }
-      .photo-table td { border: 1px solid #cccccc; padding: 5pt; text-align: center; vertical-align: top; width: 50%; }
-      /* Image style: Fixed height (5cm = 141.73pt approx 142pt), auto width, max-width 100% of cell, centered */
-      .photo-table img { display: block; margin: 5pt auto; height: 141.73pt; /* 5cm FIXED HEIGHT */ width: auto; /* AUTO WIDTH */ max-width: 100%; object-fit: contain; }
-      .photo-description { font-size: 10pt; color: #333333; text-align: center; line-height: 1.3; margin-top: 5pt; }
-      .summary-section p { white-space: normal; font-size: 12pt; text-align: justify; }
+      body {
+        font-family: '標楷體', 'BiauKai', 'Times New Roman', serif; /* Professional CJK font first */
+        line-height: 1.6;
+        color: #333333; /* Softer black */
+        font-size: 12pt;
+        margin: 1.27cm; /* Narrow Margin */
+        background-color: #f8f9fa; /* Light gray background for subtle texture */
+      }
+      .report-container { /* Add a container for better centering and padding */
+        max-width: 18.46cm; /* A4 width - narrow margins */
+        margin: 0 auto; /* Center container */
+        background-color: #ffffff; /* White paper effect */
+        padding: 1.5cm; /* Padding inside the container */
+        border-radius: 5px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow */
+      }
+      h1 {
+        color: #0056b3; /* Professional blue */
+        text-align: left;
+        font-size: 22pt; /* Slightly larger */
+        font-weight: bold;
+        font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif; /* Modern CJK font */
+        border-bottom: 2px solid #0056b3;
+        padding-bottom: 10pt;
+        margin-bottom: 25pt; /* More space after title */
+      }
+      h2 {
+        color: #0056b3; /* Consistent blue */
+        font-size: 16pt;
+        font-weight: bold;
+        font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
+        border-bottom: 1px solid #dee2e6; /* Lighter border */
+        padding-bottom: 6pt;
+        margin-top: 25pt; /* Consistent spacing */
+        margin-bottom: 15pt;
+      }
+      p {
+        margin-bottom: 10pt;
+        font-size: 12pt;
+        text-align: justify; /* Justify text for better readability */
+      }
+      strong { font-weight: bold; color: #343a40; } /* Slightly darker for emphasis */
+      em { font-style: italic; color: #555555; }
+      .section { margin-bottom: 30pt; page-break-inside: avoid; }
+      /* Info Section Specific Styles */
+      .info-section p {
+        margin-bottom: 5pt;
+        line-height: 1.4;
+      }
+      .info-section strong {
+         display: inline-block;
+         width: 100px; /* Align labels */
+         color: #495057; /* Grayish label */
+      }
+      /* Table Styling: Improved borders, spacing, and centering */
+      .photo-table {
+        width: 100%;
+        max-width: 18.46cm;
+        border-collapse: separate; /* Allows for spacing and rounded corners */
+        border-spacing: 0; /* Reset spacing */
+        margin: 20pt auto; /* Centered with more margin */
+        page-break-inside: avoid;
+        border: 1px solid #dee2e6; /* Lighter border */
+        border-radius: 8px; /* Rounded table */
+        overflow: hidden; /* Clip content to rounded corners */
+      }
+       /* Add border-radius to first/last cells for a cleaner look */
+       .photo-table tr:first-child td:first-child { border-top-left-radius: 7px; }
+       .photo-table tr:first-child td:last-child { border-top-right-radius: 7px; }
+       .photo-table tr:last-child td:first-child { border-bottom-left-radius: 7px; }
+       .photo-table tr:last-child td:last-child { border-bottom-right-radius: 7px; }
+
+      .photo-table td {
+        border: none; /* Remove default cell borders */
+        border-bottom: 1px solid #dee2e6; /* Horizontal separators */
+        border-right: 1px solid #dee2e6; /* Vertical separators */
+        padding: 10pt; /* More padding */
+        text-align: center;
+        vertical-align: top;
+        width: 50%;
+        background-color: #ffffff; /* Ensure white background */
+      }
+       .photo-table td:last-child { border-right: none; } /* Remove right border on last cell */
+       .photo-table tr:last-child td { border-bottom: none; } /* Remove bottom border on last row */
+
+      /* Image style: Fixed height (5cm), auto width, centered */
+      .photo-table img {
+        display: block;
+        margin: 5pt auto;
+        height: 5cm; /* FIXED HEIGHT 5cm */
+        width: auto; /* AUTO WIDTH */
+        max-width: 100%; /* Ensure image fits cell */
+        object-fit: contain; /* Maintain aspect ratio within bounds */
+        border-radius: 4px; /* Slightly rounded image corners */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+      .photo-description {
+        font-size: 10pt;
+        color: #6c757d; /* Muted gray for description */
+        text-align: center;
+        line-height: 1.4;
+        margin-top: 8pt; /* More space above description */
+        font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif; /* Consistent font */
+      }
+      .summary-section p {
+        white-space: pre-wrap; /* Preserve line breaks from AI */
+        font-size: 12pt;
+        text-align: justify;
+        line-height: 1.7; /* Improve line spacing for summary */
+      }
+      /* Utility class for page breaks */
+      .page-break { page-break-before: always; }
     `;
 
     // Add print-specific styles if needed
@@ -464,12 +562,25 @@ export default function Home() {
         styles += `
           @media print {
             @page { size: A4 portrait; margin: 1.27cm; } /* Narrow Margin for print */
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body {
+              background-color: #ffffff; /* Ensure white background for printing */
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .report-container {
+              box-shadow: none; /* Remove shadow for print */
+              border-radius: 0;
+              padding: 0; /* Remove container padding for print */
+            }
             h1, h2 { page-break-after: avoid; }
             .section, .photo-table { page-break-inside: avoid; }
             .photo-table tr { page-break-inside: avoid; }
-            strong { font-weight: bold !important; }
-            em { font-style: italic !important; }
+            strong { font-weight: bold !important; color: #000000 !important; } /* Ensure black for print */
+            em { font-style: italic !important; color: #000000 !important; }
+            h1, h2 { color: #000000 !important; border-color: #000000 !important; } /* Black headings for print */
+            .photo-table, .photo-table td { border-color: #cccccc !important; } /* Standard gray borders for print */
+            .photo-description { color: #333333 !important; }
+            .info-section strong { color: #000000 !important; }
           }
         `;
     }
@@ -486,23 +597,26 @@ export default function Home() {
         }
         div.Section1 { page: Section1; }
         /* Paragraph Styles */
-        p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0cm; margin-bottom: .0001pt; font-size: 12.0pt; font-family: "Times New Roman", serif; mso-fareast-font-family: "新細明體";}
-        h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 20pt; margin-left: 0cm; text-align: left; page-break-after: avoid; font-size: 20.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 2.0pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid windowtext 2.0pt; }
-        h2 { mso-style-link: "標題 2 字元"; margin-top: 20pt; margin-right: 0cm; margin-bottom: 15pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "Arial", sans-serif; color: black; font-weight: bold; border: none; border-bottom: solid windowtext 1.0pt; padding: 0cm; padding-bottom: 5pt; mso-border-bottom-alt: solid windowtext 1.0pt; }
-        p.InfoParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; }
-        /* Table Styles - Center the table within the available width */
-        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 18.46cm; /* Max width for narrow margins (21 - 1.27*2) */ border-collapse: collapse; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; mso-padding-alt: 5.0pt 5.0pt 5.0pt 5.0pt; mso-border-insideh: solid #cccccc .75pt; mso-border-insidev: solid #cccccc .75pt; mso-para-margin: 0cm; }
-        td.MsoNormal { padding: 5.0pt; border: solid #cccccc 1.0pt; mso-border-alt: solid #cccccc .75pt; text-align: center !important; vertical-align: top; width: 50%; }
-        /* Image Paragraph Style - Centers content */
+        p.MsoNormal, li.MsoNormal, div.MsoNormal { margin: 0cm; margin-bottom: .0001pt; font-size: 12.0pt; font-family: "標楷體", serif; mso-fareast-font-family: "標楷體";}
+        h1 { mso-style-link: "標題 1 字元"; margin-top: 12.0pt; margin-right: 0cm; margin-bottom: 25pt; margin-left: 0cm; text-align: left; page-break-after: avoid; font-size: 22.0pt; font-family: "微軟正黑體", sans-serif; mso-fareast-font-family: "微軟正黑體"; color: #0056B3; font-weight: bold; border: none; border-bottom: solid #0056B3 2.0pt; padding: 0cm; padding-bottom: 10pt; mso-border-bottom-alt: solid #0056B3 2.0pt; }
+        h2 { mso-style-link: "標題 2 字元"; margin-top: 25pt; margin-right: 0cm; margin-bottom: 15pt; margin-left: 0cm; page-break-after: avoid; font-size: 16.0pt; font-family: "微軟正黑體", sans-serif; mso-fareast-font-family: "微軟正黑體"; color: #0056B3; font-weight: bold; border: none; border-bottom: solid #DEE2E6 1.0pt; padding: 0cm; padding-bottom: 6pt; mso-border-bottom-alt: solid #DEE2E6 1.0pt; }
+        p.InfoParagraph { margin-bottom: 5pt; font-size: 12.0pt; font-family: "標楷體", serif; mso-fareast-font-family: "標楷體"; line-height: 140%; }
+        span.InfoLabel /* Word Character Style */ { mso-style-name:"InfoLabel"; font-weight: bold; color: #495057; mso-themecolor: text2; mso-themeshade: 191; }
+        /* Table Styles */
+        table.MsoNormalTable { margin-left: auto !important; margin-right: auto !important; width: 100%; max-width: 18.46cm; border-collapse: collapse; mso-border-alt: solid #DEE2E6 .75pt; mso-padding-alt: 10.0pt 10.0pt 10.0pt 10.0pt; mso-border-insideh: solid #DEE2E6 .75pt; mso-border-insidev: solid #DEE2E6 .75pt; mso-para-margin: 0cm; }
+        td.MsoNormal { padding: 10.0pt; border-left: none; border-right: solid #DEE2E6 .75pt; border-top: none; border-bottom: solid #DEE2E6 .75pt; mso-border-top-alt: none; mso-border-left-alt: none; mso-border-bottom-alt: solid #DEE2E6 .75pt; mso-border-right-alt: solid #DEE2E6 .75pt; text-align: center !important; vertical-align: top; width: 50%; }
+        td.MsoNormalLastCellInRow { border-right: none; mso-border-right-alt: none; }
+        tr.MsoNormalLastRow td { border-bottom: none; mso-border-bottom-alt: none; }
+        /* Image Paragraph Style */
         p.ImageParagraph { text-align: center; margin: 5pt 0; }
-        /* Image Style - Fixed height (141.73pt ≈ 5cm), auto width */
+        /* Image Style - Fixed height (5cm), auto width */
         img.PhotoStyle { display: block; margin: auto; height: 141.73pt; /* FIXED HEIGHT 5cm */ width: auto; /* AUTO WIDTH */ max-width: 100%; mso-position-horizontal: center; }
         /* Description Style */
-        p.DescriptionStyle { font-size: 10.0pt; font-family: 'PMingLiU', '新細明體', serif; text-align: center; margin: 5pt 0; line-height: 1.3; }
+        p.DescriptionStyle { font-size: 10.0pt; font-family: "微軟正黑體", sans-serif; mso-fareast-font-family: "微軟正黑體"; color: #6C757D; text-align: center; margin: 8pt 0; line-height: 140%; }
         /* Summary Paragraph Style */
-        p.SummaryParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "新細明體", serif; text-align: justify; mso-line-break-override: none; }
-        strong { mso-bidi-font-weight: normal; font-weight: bold; }
-        em { mso-bidi-font-style: normal; font-style: italic; }
+        p.SummaryParagraph { margin-bottom: 10pt; font-size: 12.0pt; font-family: "標楷體", serif; mso-fareast-font-family: "標楷體"; text-align: justify; mso-line-break-override: none; line-height: 170%; }
+        strong { mso-bidi-font-weight: normal; font-weight: bold; color: #343A40; }
+        em { mso-bidi-font-style: normal; font-style: italic; color: #555555; }
     ` : '';
 
      // Use Word XML structure for DOC, standard HTML for Print
@@ -527,6 +641,7 @@ export default function Home() {
           <w:Zoom>100</w:Zoom>
           <w:DoNotOptimizeForBrowser/>
           <w:DrawingGridVerticalSpacing>10 pt</w:DrawingGridVerticalSpacing>
+          <w:DisplayVerticalDrawingGridEvery>2</w:DisplayVerticalDrawingGridEvery>
           <w:PunctuationKerning/>
           <w:ValidateAgainstSchemas/>
           <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
@@ -553,15 +668,6 @@ export default function Home() {
             <w:PunctuationKerning/>
             <w:DrawingGridHorizontalSpacing>5.25 pt</w:DrawingGridHorizontalSpacing>
             <w:DisplayHorizontalDrawingGridEvery>0</w:DisplayHorizontalDrawingGridEvery>
-            <w:DisplayVerticalDrawingGridEvery>2</w:DisplayVerticalDrawingGridEvery>
-            <w:ValidateAgainstSchemas/>
-            <w:SaveIfXMLInvalid>false</w:SaveIfXMLInvalid>
-            <w:IgnoreMixedContent>false</w:IgnoreMixedContent>
-            <w:AlwaysShowPlaceholderText>false</w:AlwaysShowPlaceholderText>
-            <w:DoNotPromoteQF/>
-            <w:LidThemeOther>EN-US</w:LidThemeOther>
-            <w:LidThemeAsian>ZH-TW</w:LidThemeAsian>
-            <w:LidThemeComplexScript>X-NONE</w:LidThemeComplexScript>
           <m:mathPr>
            <m:mathFont m:val="Cambria Math"/>
            <m:brkBin m:val="before"/>
@@ -576,19 +682,33 @@ export default function Home() {
            <m:naryLim m:val="undOvr"/>
           </m:mathPr></w:WordDocument>
         </xml><![endif]-->
+        <!--[if gte mso 9]><xml>
+         <w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99" LatentStyleCount="382">
+           <w:LsdException Locked="false" Priority="0" QFormat="true" Name="Normal"/>
+           <w:LsdException Locked="false" Priority="9" QFormat="true" Name="heading 1"/>
+           <w:LsdException Locked="false" Priority="9" SemiHidden="true" UnhideWhenUsed="true" QFormat="true" Name="heading 2"/>
+           {/* ... Add other latent styles if needed ... */}
+           <w:LsdException Locked="false" Priority="60" Name="Light Shading Accent 1"/>
+           <w:LsdException Locked="false" Priority="61" Name="Light List Accent 1"/>
+           <w:LsdException Locked="false" Priority="62" Name="Light Grid Accent 1"/>
+           {/* Add character style definitions */}
+            <w:LsdException Locked="false" Priority="9" SemiHidden="true" UnhideWhenUsed="true" Name="標題 1 字元"/>
+            <w:LsdException Locked="false" Priority="9" SemiHidden="true" UnhideWhenUsed="true" Name="標題 2 字元"/>
+            <w:LsdException Locked="false" Priority="0" SemiHidden="true" UnhideWhenUsed="true" Name="InfoLabel"/>
+         </w:LatentStyles>
+        </xml><![endif]-->
         <style>
         <!--
          /* Font Definitions */
-         @font-face
-            {font-family:PMingLiU; panose-1:2 2 5 0 0 0 0 0 0 0;}
-         @font-face
-            {font-family:新細明體; panose-1:2 2 5 0 0 0 0 0 0 0;}
-         @font-face
-            {font-family:"Cambria Math"; panose-1:2 4 5 3 5 4 6 3 2 4;}
-         @font-face
-            {font-family:"\@PMingLiU"; panose-1:2 2 5 0 0 0 0 0 0 0;}
-         @font-face
-            {font-family:"\@新細明體"; panose-1:2 2 5 0 0 0 0 0 0 0;}
+         @font-face { font-family: PMingLiU; panose-1: 2 2 5 0 0 0 0 0 0 0; mso-font-charset: 136; mso-generic-font-family: roman; mso-font-pitch: variable; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: 標楷體; panose-1: 3 0 5 9 0 0 0 0 0 0; mso-font-charset: 136; mso-generic-font-family: script; mso-font-pitch: fixed; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: 新細明體; panose-1: 2 2 5 0 0 0 0 0 0 0; mso-font-alt: PMingLiU; mso-font-charset: 136; mso-generic-font-family: roman; mso-font-pitch: variable; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: 微軟正黑體; panose-1: 2 11 6 4 3 5 4 4 2 4; mso-font-charset: 136; mso-generic-font-family: swiss; mso-font-pitch: variable; mso-font-signature: -2147483001 672087122 22 0 1048577 0; }
+         @font-face { font-family: "Cambria Math"; panose-1: 2 4 5 3 5 4 6 3 2 4; mso-font-charset: 0; mso-generic-font-family: roman; mso-font-pitch: variable; mso-font-signature: -536870145 1107305727 0 0 415 0; }
+         @font-face { font-family: "\@PMingLiU"; panose-1: 2 2 5 0 0 0 0 0 0 0; mso-font-charset: 136; mso-generic-font-family: roman; mso-font-pitch: variable; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: "\@標楷體"; panose-1: 3 0 5 9 0 0 0 0 0 0; mso-font-charset: 136; mso-generic-font-family: script; mso-font-pitch: fixed; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: "\@新細明體"; panose-1: 2 2 5 0 0 0 0 0 0 0; mso-font-charset: 136; mso-generic-font-family: roman; mso-font-pitch: variable; mso-font-signature: 3 137232384 22 0 1048577 0; }
+         @font-face { font-family: "\@微軟正黑體"; panose-1: 2 11 6 4 3 5 4 4 2 4; mso-font-charset: 136; mso-generic-font-family: swiss; mso-font-pitch: variable; mso-font-signature: -2147483001 672087122 22 0 1048577 0; }
          /* Style Definitions */
          ${styles}
          ${msoStyles}
@@ -596,7 +716,7 @@ export default function Home() {
         </style>
       </head>
       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;'>
-      <div class=${forPrint ? '' : 'Section1'}>
+      <div class='${forPrint ? 'report-container' : 'Section1 report-container'}'>
     ` : `
     <!DOCTYPE html>
     <html lang="zh-TW">
@@ -609,7 +729,7 @@ export default function Home() {
         </style>
     </head>
     <body>
-    <div>
+    <div class="report-container">
     `;
 
     // Initialize reportHtml with the starting HTML structure
@@ -620,12 +740,12 @@ export default function Home() {
 
     // Basic Info Section
     reportHtml += `
-        <div class="section">
+        <div class="section info-section">
           <h2>基本資訊</h2>
-          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>教學領域：</strong> ${teachingArea}</p>
-          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p class="${forPrint ? '' : 'InfoParagraph'}"><strong>社群成員：</strong> ${communityMembers}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><span class="${forPrint ? 'info-label-strong' : 'InfoLabel'}">教學領域：</span> ${teachingArea}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><span class="${forPrint ? 'info-label-strong' : 'InfoLabel'}">會議主題：</span> ${meetingTopic}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><span class="${forPrint ? 'info-label-strong' : 'InfoLabel'}">會議日期：</span> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p class="${forPrint ? '' : 'InfoParagraph'}"><span class="${forPrint ? 'info-label-strong' : 'InfoLabel'}">社群成員：</span> ${communityMembers}</p>
         </div>
     `;
 
@@ -634,7 +754,7 @@ export default function Home() {
         <div class="section photo-section">
           <h2>照片記錄</h2>
            <!-- Use MsoNormalTable for Word styling, ensure centering -->
-          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=1 cellspacing=0 cellpadding=0 align=center style="margin-left:auto; margin-right:auto;">
+          <table class="${forPrint ? 'photo-table' : 'MsoNormalTable'}" border=0 cellspacing=0 cellpadding=0 align=center style='margin-left:auto; margin-right:auto; border-collapse:collapse; mso-table-lspace:9.0pt; mso-table-rspace:9.0pt; mso-table-bspace:0; mso-table-vspace:0; mso-padding-alt:10.0pt 10.0pt 10.0pt 10.0pt;'>
              <tbody>
     `;
 
@@ -642,30 +762,40 @@ export default function Home() {
     // Helper function to generate table cell content for images
     const generateImageCell = (photo: Photo | undefined, altText: string): string => {
         let content = '';
+        const tdClass = forPrint ? '' : 'MsoNormal'; // Base class for Word
+        const lastCellClass = forPrint ? '' : 'MsoNormalLastCellInRow'; // For last cell in Word row
+
         if (photo?.dataUrl) {
              const paragraphClass = forPrint ? 'photo-paragraph' : 'ImageParagraph';
              // Apply PhotoStyle class with fixed height and auto width for Word
              const imgStyle = !forPrint ? `class="PhotoStyle"` : '';
              // Apply inline styles for standard HTML/Print (fixed height, auto width)
-             const inlineImgStyle = forPrint ? 'style="height: 141.73pt; width: auto; max-width: 100%; display: block; margin: auto;"' : '';
+             const inlineImgStyle = forPrint ? 'style="height: 5cm; width: auto; max-width: 100%; display: block; margin: auto; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);"' : '';
 
-             content = `<p class="${paragraphClass}" align=center style='text-align:center;'><img ${imgStyle} ${inlineImgStyle} src="${photo.dataUrl}" alt="${altText}"></p>`;
+             content = `<p class="${paragraphClass}" align=center style='text-align:center; margin: 5pt 0;'><img ${imgStyle} ${inlineImgStyle} src="${photo.dataUrl}" alt="${altText}" style="height:5cm; width:auto; max-width:100%;"></p>`;
         } else {
              content = `<p class="${forPrint ? '' : 'MsoNormal'}" align=center style='text-align:center'>[${altText} 無法載入]</p>`;
         }
-         // Use MsoNormal class for Word cell styling
-        return `<td class="${forPrint ? '' : 'MsoNormal'}">${content}</td>`;
+         // Add last cell class conditionally
+         const finalTdClass = `${tdClass} ${altText.includes('2') || altText.includes('4') ? lastCellClass : ''}`;
+         return `<td class="${finalTdClass}">${content}</td>`;
     };
 
     // Helper function to generate table cell content for descriptions
-    const generateDescriptionCell = (photo: Photo | undefined): string => {
+    const generateDescriptionCell = (photo: Photo | undefined, isLastCell: boolean): string => {
       const description = photo?.description || '未產生描述';
        const paragraphClass = forPrint ? 'photo-description' : 'DescriptionStyle';
+       const tdClass = forPrint ? '' : 'MsoNormal';
+       const lastCellClass = forPrint ? '' : 'MsoNormalLastCellInRow';
+       const finalTdClass = `${tdClass} ${isLastCell ? lastCellClass : ''}`;
        // Use MsoNormal class for Word cell styling
-       return `<td class="${forPrint ? '' : 'MsoNormal'}"><p class="${paragraphClass}">${description}</p></td>`;
+       return `<td class="${finalTdClass}"><p class="${paragraphClass}">${description}</p></td>`;
     }
 
     // Build the table content (2x4: two columns, four rows total)
+    const lastRowStyle = !forPrint ? 'style="mso-yfti-irow:3;mso-yfti-lastrow:yes"' : '';
+    const lastRowClass = !forPrint ? 'MsoNormalLastRow' : '';
+
      // Row 1: Images 1 & 2
     reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:0;mso-yfti-firstrow:yes"' : ''}>`;
     reportHtml += generateImageCell(photosWithDataUrls[0], '照片 1');
@@ -674,8 +804,8 @@ export default function Home() {
 
     // Row 2: Descriptions 1 & 2
     reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:1"' : ''}>`;
-    reportHtml += generateDescriptionCell(photosWithDataUrls[0]);
-    reportHtml += generateDescriptionCell(photosWithDataUrls[1]);
+    reportHtml += generateDescriptionCell(photosWithDataUrls[0], false);
+    reportHtml += generateDescriptionCell(photosWithDataUrls[1], true);
     reportHtml += `</tr>`;
 
     // Row 3: Images 3 & 4
@@ -685,9 +815,9 @@ export default function Home() {
     reportHtml += `</tr>`;
 
     // Row 4: Descriptions 3 & 4
-    reportHtml += `<tr ${!forPrint ? 'style="mso-yfti-irow:3;mso-yfti-lastrow:yes"' : ''}>`;
-    reportHtml += generateDescriptionCell(photosWithDataUrls[2]);
-    reportHtml += generateDescriptionCell(photosWithDataUrls[3]);
+    reportHtml += `<tr class="${lastRowClass}" ${lastRowStyle}>`;
+    reportHtml += generateDescriptionCell(photosWithDataUrls[2], false);
+    reportHtml += generateDescriptionCell(photosWithDataUrls[3], true);
     reportHtml += `</tr>`;
 
     reportHtml += `
@@ -703,7 +833,7 @@ export default function Home() {
            <p class="${forPrint ? '' : 'SummaryParagraph'}">${formattedSummary}</p>
         </div>
 
-      </div> <!-- End Section / Section1 -->
+      </div> <!-- End report-container / Section1 -->
       </body>
       </html>
     `;
@@ -1170,7 +1300,7 @@ export default function Home() {
              <CardHeader className="bg-primary">
                 <CardTitle className="text-2xl text-primary-foreground">第四步：匯出報告</CardTitle>
                  <CardDescription className="text-primary-foreground/80">
-                    點擊下方按鈕匯出 Word (.doc) 或 PDF 格式的報告檔案。
+                   點擊下方按鈕匯出 Word (.doc) 或 PDF 格式的報告檔案。
                  </CardDescription>
              </CardHeader>
              <CardContent className="p-6 flex flex-col sm:flex-row gap-4">
