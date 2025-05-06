@@ -37,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Added Tooltip
 
 const MAX_PHOTOS = 4;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const formSchema = z.object({
@@ -132,7 +132,7 @@ export default function Home() {
         if (file.size > MAX_FILE_SIZE) {
           toast({
             title: '上傳錯誤',
-            description: `檔案 ${file.name} 過大，請選擇小於 5MB 的檔案。`,
+            description: `檔案 ${file.name} 過大，請選擇小於 20MB 的檔案。`,
             variant: 'destructive',
           });
           continue;
@@ -229,59 +229,75 @@ export default function Home() {
      }
     if (isGeneratingAllDescriptions) return;
 
-    // Re-read data URLs if any are missing (e.g., due to page refresh/state loss)
+    // Filter photos that need data URL read (or re-read)
     const photosNeedDataUrlRead = photos.filter(p => !p.dataUrl);
-    if (photosNeedDataUrlRead.length > 0) {
+
+    // Start reading data URLs concurrently
+    const readPromises = photosNeedDataUrlRead.map(async (photo) => {
         try {
-            const reads = photosNeedDataUrlRead.map(async (photo) => {
-                const dataUrl = await readFileAsDataURL(photo.file);
-                return { id: photo.id, dataUrl };
-            });
-            const results = await Promise.all(reads);
-            setPhotos(prev => prev.map(p => {
-                const found = results.find(r => r.id === p.id);
-                return found ? { ...p, dataUrl: found.dataUrl } : p;
-            }));
+            const dataUrl = await readFileAsDataURL(photo.file);
+            return { id: photo.id, dataUrl };
         } catch (error) {
-            console.error('Error pre-reading data URLs:', error);
+            console.error(`Error reading data URL for ${photo.file.name}:`, error);
             toast({
                 title: '圖片讀取錯誤',
-                description: '產生描述前讀取圖片資料失敗。',
+                description: `讀取檔案 ${photo.file.name} 時發生錯誤。`,
                 variant: 'destructive',
             });
-            return;
+            return { id: photo.id, dataUrl: null }; // Indicate failure
         }
+    });
+
+    // Wait for all reads to complete
+    const readResults = await Promise.all(readPromises);
+
+    // Update photo state with read data URLs or handle failures
+    let allDataUrlsReadSuccessfully = true;
+    const updatedPhotos = photos.map(p => {
+        const result = readResults.find(r => r.id === p.id);
+        if (result) { // If this photo needed reading
+            if (result.dataUrl) {
+                return { ...p, dataUrl: result.dataUrl };
+            } else {
+                allDataUrlsReadSuccessfully = false; // Mark failure
+                return p; // Keep original photo state (without dataUrl)
+            }
+        }
+        return p; // Return photos that didn't need reading
+    });
+
+    // Update state with newly read data URLs
+    setPhotos(updatedPhotos);
+
+    // If any data URL read failed, stop generation
+    if (!allDataUrlsReadSuccessfully) {
+        toast({
+            title: '無法產生描述',
+            description: '讀取部分圖片資料失敗，請檢查檔案或重新上傳。',
+            variant: 'destructive',
+        });
+        return;
     }
 
+    // Proceed with description generation if all data URLs are available
+    const currentPhotos = updatedPhotos; // Use the state with potentially updated dataUrls
 
     // Check if generation is needed (at least one photo without a valid description)
-    const needsGeneration = photos.length > 0 && photos.some(p => !p.description || p.description.startsWith('無法描述'));
+    // const needsGeneration = currentPhotos.length > 0 && currentPhotos.some(p => !p.description || p.description.startsWith('無法描述'));
 
-    // If not needed, optionally inform the user or just return
-    // if (!needsGeneration) {
-    //   toast({ title: '提示', description: '所有照片已有描述。' });
-    //   return;
-    // }
-
-    // Reset descriptions and set generating state only for photos that need it (or all if re-generating)
+    // Reset descriptions and set generating state for all photos (simplifies logic)
     setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
     let completedCount = 0;
-    const totalToProcess = photos.length; // Process all photos
+    const totalToProcess = currentPhotos.length; // Process all photos
 
     try {
-        // Ensure we use the latest photo state including potentially re-read dataUrls
-        const currentPhotos = photos.map(p => {
-             const photoFromState = photos.find(ps => ps.id === p.id); // Find potentially updated photo
-             return { ...p, dataUrl: photoFromState?.dataUrl };
-        });
-
         const descriptionPromises = currentPhotos.map(async (photo): Promise<DescriptionResult> => {
            let descriptionResult: DescriptionResult | undefined = undefined;
             try {
                  if (!photo.dataUrl) {
-                     // This might happen if the re-read failed just before this step
+                     // Should not happen after the check above, but as a safeguard
                      throw new Error(`Data URL missing for photo ${photo.id} even after pre-read.`);
                  }
 
@@ -323,7 +339,7 @@ export default function Home() {
 
         const results = await Promise.allSettled(descriptionPromises);
 
-        // Process results after all promises settle (though state updated individually)
+        // Process results after all promises settle
         let allSucceeded = true;
         let failedCount = 0;
         let hasSuccess = false; // Track if at least one description succeeded
@@ -368,7 +384,10 @@ export default function Home() {
          variant: 'destructive',
        });
        // Ensure loading state is cleared on error for relevant photos
-       setPhotos(prev => prev.map(p => photos.some(ptp => ptp.id === p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
+       // Find the IDs of photos that were supposed to be processed in this batch
+       const processedPhotoIds = currentPhotos.map(p => p.id);
+       setPhotos(prev => prev.map(p => processedPhotoIds.includes(p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
+
     } finally {
       // Ensure progress reaches 100% and loading state is fully cleared
       setDescriptionProgress(100);
@@ -1342,7 +1361,7 @@ export default function Home() {
                     <ImageIcon className="w-7 h-7 card-icon-step-2" /> {/* Step-specific icon */}
                     第二步：上傳會議照片
                 </CardTitle>
-                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 5MB)</CardDescription>
+                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 20MB)</CardDescription> {/* Updated size limit */}
               </CardHeader>
               <CardContent className="p-6 md:p-8">
                  {/* File Upload Area */}
