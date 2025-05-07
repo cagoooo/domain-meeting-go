@@ -602,18 +602,39 @@ export default function Home() {
       strong { font-weight: bold; color: #000000; } /* Black bold for emphasis */
       em { font-style: italic; color: #333333; } /* Dark gray italic */
       .section { margin-bottom: 30pt; page-break-inside: avoid; }
+      
+      .info-section {
+        background-color: #f8f9fa; /* Light background */
+        padding: 15pt;
+        border-radius: 6px;
+        border: 1px solid #e0e0e0;
+        margin-top: 15pt; /* Space above the section */
+      }
+      .info-section h2, .info-section .MsoHeading2 { /* Targeting MSO class too for consistency */
+        margin-top: 0 !important; 
+        padding-top: 0 !important;
+        border-bottom: 1px solid #ced4da; 
+        margin-bottom: 15pt !important; /* Ensure consistent bottom margin */
+        color: #0056b3; /* Consistent with other h2 */
+        font-size: 16pt !important; /* Ensure consistent font size */
+        font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important;
+      }
       .info-section p {
-        margin-bottom: 6pt;
-        line-height: 1.4;
+        margin-bottom: 8pt;
+        line-height: 1.5;
         text-align: left;
+        font-size: 12pt; 
+        font-family: '標楷體', 'BiauKai', serif;
       }
-      .info-section strong {
-         display: inline-block;
-         min-width: 90px;
-         color: #495057; /* Keep label color slightly muted */
+      .info-section p strong { /* Styles for the label part "教學領域：" */
+         display: inline-block; /* Allows min-width to work */
+         min-width: 110px; /* Adjust as needed for alignment */
          font-weight: bold;
-         margin-right: 8px;
+         color: #212529; /* Darker label color */
+         margin-right: 10px;
+         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif; /* Different font for labels */
       }
+
       /* Photo Table Styling */
       .photo-table {
         width: 100%;
@@ -711,7 +732,26 @@ export default function Home() {
         .photo-table, .photo-table td, .photo-table-cell { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
         .photo-table img { box-shadow: none !important; border-radius: 0 !important;}
         .photo-description { color: #333333 !important; text-align: center !important; }
-        .info-section strong { color: #000000 !important; }
+        
+        .info-section {
+          background-color: #ffffff !important;
+          border: 1px solid #cccccc !important; /* Ensure border for print */
+          border-radius: 0 !important;
+          padding: 10pt !important;
+        }
+        .info-section h2, .info-section .MsoHeading2 {
+           color: #000000 !important;
+           border-color: #000000 !important;
+           font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important;
+        }
+        .info-section p strong {
+           color: #000000 !important;
+           font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important; /* Ensure label font for print */
+        }
+         .info-section p {
+            font-family: '標楷體', 'BiauKai', serif !important; /* Ensure value font for print */
+         }
+
         .summary-section p { background-color: #ffffff !important; border-color: #cccccc !important; border-radius: 0 !important; text-align: left !important; }
       }
     `;
@@ -843,16 +883,29 @@ export default function Home() {
             padding:0cm; mso-padding-alt:0cm 0cm 6.0pt 0cm; /* Match CSS padding */
             text-align:left; /* Force left align */
          }
-         /* Normal Paragraph Style */
+         /* Normal Paragraph Style (for general text, including info items) */
          p.MsoNormal, li.MsoNormal, div.MsoNormal {
             mso-style-unhide:no; mso-style-qformat:yes; mso-style-parent:"";
-            margin-top:0cm; margin-right:0cm; margin-bottom:10.0pt; margin-left:0cm; /* Match CSS margin */
-            line-height:160%; mso-pagination:widow-orphan;
+            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm; /* Match .info-section p CSS margin */
+            line-height:150%; mso-pagination:widow-orphan;
             font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
             color:#333333;
             text-align:left; /* Force left align */
             mso-line-height-rule:exactly; /* Control line height precisely */
          }
+         /* MSO specific style for info section strong (label) */
+         span.InfoLabelStyle {
+            mso-style-name:"Info Label"; mso-style-priority:99; mso-style-unhide:no;
+            font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei";
+            font-weight:bold; color:#212529;
+            mso-ansi-font-size:12.0pt; mso-bidi-font-size:12.0pt; /* Ensure size matches surrounding text */
+         }
+         /* MSO specific for the info section paragraphs that might be wrapped in a div or other block */
+         div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal {
+             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt; /* Consistent margin */
+             /* Background and border are applied to the containing div.InfoSectionBlock */
+         }
+
          /* Summary Paragraph Style */
          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
              mso-style-name:"Summary Text"; mso-style-priority:99; mso-style-unhide:no;
@@ -910,7 +963,7 @@ export default function Home() {
           }
           div.Section1 { page: Section1; }
 
-          /* MSO Specific Overrides - Force left alignment */
+          /* MSO Specific Overrides - Force left alignment and info section specific styling */
           <!--[if gte mso 9]>
            p.MsoNormal, li.MsoNormal, div.MsoNormal,
            p.MsoHeading1, li.MsoHeading1, div.MsoHeading1,
@@ -932,6 +985,42 @@ export default function Home() {
               text-align: center !important;
               margin-bottom: 8pt !important; /* Match CSS margin below image */
            }
+           /* Specific MSO styling for info section background/border */
+           div.InfoSectionBlock {
+               mso-border-alt:solid #e0e0e0 .75pt; /* Match CSS border */
+               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Match CSS padding */
+               background:#F8F9FA;
+               mso-shading:#F8F9FA; /* MSO background color */
+               mso-margin-top-alt:15pt; /* Space above the section */
+               margin-bottom:30pt; /* Consistent with .section */
+           }
+           /* Make sure H2 inside InfoSectionBlock has correct MSO class and spacing */
+           div.InfoSectionBlock p.MsoHeading2 {
+               mso-margin-top-alt:0cm !important; /* Remove top margin for H2 in this block */
+               mso-margin-bottom-alt:15pt !important;
+               border:none;
+               mso-border-bottom-alt:solid #ced4da 1.0pt !important; /* Bottom border */
+               mso-padding-bottom-alt:6pt !important;
+           }
+           /* Ensure info items within the block use MsoNormal with appropriate spacing */
+           div.InfoSectionBlock p.MsoNormal {
+               margin-bottom:8.0pt !important;
+               line-height:150% !important;
+               font-family:"標楷體",serif !important;
+               mso-fareast-font-family:"標楷體" !important;
+           }
+           /* MSO specific: Need to ensure min-width for label is somewhat respected or use fixed width.
+              Since MSO doesn't directly support min-width on inline-block for spans,
+              we can simulate it by using a small table for each info item or manually space.
+              For simplicity here, we'll rely on the span styling and hope Word renders it reasonably.
+              A more robust solution for MSO would be a 2-column table for the info section.
+           */
+           div.InfoSectionBlock p.MsoNormal span.InfoLabelStyle {
+              /* Min-width is tricky, Word might ignore it. Consider a table or fixed spaces if crucial. */
+              mso-spacerun:yes; /* Helps with spacing for some Word versions */
+              margin-right:7.5pt; /* Approx 10px */
+           }
+
           <![endif]-->
           ` : ''}
         </style>
@@ -947,13 +1036,14 @@ export default function Home() {
     reportHtmlContent += `<${forPrint ? 'h1' : 'p class="MsoHeading1"'}>領域共備GO 會議報告</${forPrint ? 'h1' : 'p'}>`;
 
     // Basic Info Section - Use H2 and P for print/PDF, MsoHeading2 and MsoNormal for DOC
+    // Wrap in InfoSectionBlock for MSO-specific background/border if not for print
     reportHtmlContent += `
-        <div class="section info-section">
+        <div class="section info-section ${!forPrint ? 'InfoSectionBlock' : ''}">
           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>基本資訊</${forPrint ? 'h2' : 'p'}>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>教學領域：</strong> ${teachingArea}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>會議主題：</strong> ${meetingTopic}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong>社群成員：</strong> ${communityMembers}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>教學領域：</strong> ${teachingArea}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>會議主題：</strong> ${meetingTopic}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
@@ -1599,3 +1689,4 @@ export default function Home() {
       </TooltipProvider> // Close TooltipProvider
     );
 }
+
