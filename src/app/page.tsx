@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -880,12 +879,17 @@ export default function Home() {
     `;
 
     // Start constructing the HTML content
+    // Use teachingArea and meetingDate to generate a dynamic title for PDF if forPrint is true
+    const reportTitle = forPrint
+      ? `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}`
+      : '領域共備GO 會議報告';
+
     const htmlStart = `
       <!DOCTYPE html>
       <html lang="zh-TW" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
         <meta charset="utf-8">
-        <title>領域共備GO 會議報告</title>
+        <title>${reportTitle}</title>
         ${!forPrint ? `
         <meta name=ProgId content=Word.Document>
         <meta name=Generator content="Microsoft Word 15">
@@ -1138,6 +1142,9 @@ export default function Home() {
         try {
             // Generate content specifically for PDF/Print (forPrint=true uses print styles)
             const reportContent = await generateReportContent(true);
+            const { teachingArea, meetingDate } = form.getValues();
+            const pdfFileName = `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.pdf`;
+
 
             if (printIframeRef.current) {
                 const iframe = printIframeRef.current;
@@ -1148,6 +1155,10 @@ export default function Home() {
                   // Add a small delay to ensure rendering is complete before printing
                   setTimeout(() => {
                     try {
+                        // Set the document title which some browsers use as default filename
+                        if (iframe.contentWindow?.document) {
+                             iframe.contentWindow.document.title = pdfFileName;
+                        }
                         // Trigger the browser's print dialog
                         iframe.contentWindow?.print();
                          toast({
