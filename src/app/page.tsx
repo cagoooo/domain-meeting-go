@@ -24,16 +24,16 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download } from 'lucide-react'; // Added Info, FileText, Download icons
+import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import NextImage from 'next/image'; // Renamed to avoid conflict with ImageIcon
+import NextImage from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { generatePhotoDescriptions, type GeneratePhotoDescriptionsOutput } from '@/ai/flows/generate-photo-descriptions';
 import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Added Tooltip
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -188,12 +188,11 @@ export default function Home() {
           });
        }
 
-      // Reset file input value to allow uploading the same file again
       if (event.target) {
         event.target.value = '';
       }
     },
-    [photos.length, toast] // Ensure dependency includes photos.length
+    [photos.length, toast]
   );
 
   const handlePhotoRemove = useCallback((id: string) => {
@@ -203,12 +202,10 @@ export default function Home() {
         URL.revokeObjectURL(photoToRemove.previewUrl);
       }
        const remainingPhotos = prevPhotos.filter((photo) => photo.id !== id);
-       // Reset summary and description states only if a photo was actually removed
        if (remainingPhotos.length < prevPhotos.length) {
          setSummary('');
          setDescriptionProgress(null);
          setIsGeneratingAllDescriptions(false);
-         // Reset descriptions of remaining photos
          return remainingPhotos.map(p => ({ ...p, description: '', isGenerating: false }));
        }
        return remainingPhotos;
@@ -228,10 +225,8 @@ export default function Home() {
      }
     if (isGeneratingAllDescriptions) return;
 
-    // Filter photos that need data URL read (or re-read)
     const photosNeedDataUrlRead = photos.filter(p => !p.dataUrl);
 
-    // Start reading data URLs concurrently
     const readPromises = photosNeedDataUrlRead.map(async (photo) => {
         try {
             const dataUrl = await readFileAsDataURL(photo.file);
@@ -243,32 +238,28 @@ export default function Home() {
                 description: `讀取檔案 ${photo.file.name} 時發生錯誤。`,
                 variant: 'destructive',
             });
-            return { id: photo.id, dataUrl: null }; // Indicate failure
+            return { id: photo.id, dataUrl: null };
         }
     });
 
-    // Wait for all reads to complete
     const readResults = await Promise.all(readPromises);
 
-    // Update photo state with read data URLs or handle failures
     let allDataUrlsReadSuccessfully = true;
     const updatedPhotos = photos.map(p => {
         const result = readResults.find(r => r.id === p.id);
-        if (result) { // If this photo needed reading
+        if (result) {
             if (result.dataUrl) {
                 return { ...p, dataUrl: result.dataUrl };
             } else {
-                allDataUrlsReadSuccessfully = false; // Mark failure
-                return p; // Keep original photo state (without dataUrl)
+                allDataUrlsReadSuccessfully = false;
+                return p;
             }
         }
-        return p; // Return photos that didn't need reading
+        return p;
     });
 
-    // Update state with newly read data URLs
     setPhotos(updatedPhotos);
 
-    // If any data URL read failed, stop generation
     if (!allDataUrlsReadSuccessfully) {
         toast({
             title: '無法產生描述',
@@ -278,25 +269,19 @@ export default function Home() {
         return;
     }
 
-    // Proceed with description generation if all data URLs are available
-    const currentPhotos = updatedPhotos; // Use the state with potentially updated dataUrls
+    const currentPhotos = updatedPhotos;
 
-    // Check if generation is needed (at least one photo without a valid description)
-    // const needsGeneration = currentPhotos.length > 0 && currentPhotos.some(p => !p.description || p.description.startsWith('無法描述'));
-
-    // Reset descriptions and set generating state for all photos (simplifies logic)
     setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
     let completedCount = 0;
-    const totalToProcess = currentPhotos.length; // Process all photos
+    const totalToProcess = currentPhotos.length;
 
     try {
         const descriptionPromises = currentPhotos.map(async (photo): Promise<DescriptionResult> => {
            let descriptionResult: DescriptionResult | undefined = undefined;
             try {
                  if (!photo.dataUrl) {
-                     // Should not happen after the check above, but as a safeguard
                      throw new Error(`Data URL missing for photo ${photo.id} even after pre-read.`);
                  }
 
@@ -307,55 +292,44 @@ export default function Home() {
                     communityMembers,
                     photoDataUri: photo.dataUrl,
                 });
-                 // Determine success based on non-empty and not starting with "無法描述"
                  const success = !!result.photoDescription && !result.photoDescription.startsWith('無法描述');
                  descriptionResult = { id: photo.id, description: result.photoDescription || '描述失敗', success: success };
             } catch (error) {
                 console.error(`Error generating description for ${photo.file.name}:`, error);
                 const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
-                // Handle specific safety error message from GenAI
                 const finalDescription = (errorDescription.includes("safety") || errorDescription.includes("SAFETY"))
                     ? '無法描述此圖片（安全限制）。'
-                    : '無法描述此圖片。'; // Generic failure message
+                    : '無法描述此圖片。';
                  descriptionResult = { id: photo.id, description: finalDescription, success: false };
             } finally {
                 completedCount++;
                 const newProgress = Math.round((completedCount / totalToProcess) * 100);
-                 // Update progress immediately after each completion
                  setDescriptionProgress(newProgress);
 
-                 // Update individual photo state immediately
                  if (descriptionResult) {
                      setPhotos(prev => prev.map(p => p.id === descriptionResult!.id ? { ...p, description: descriptionResult!.description, isGenerating: false } : p));
                  } else {
-                      // Should ideally not happen with the try/catch/finally, but as a fallback
                      setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: '更新錯誤', isGenerating: false } : p));
                  }
             }
-            // Ensure a result is always returned
             return descriptionResult || { id: photo.id, description: '未處理', success: false };
         });
 
         const results = await Promise.allSettled(descriptionPromises);
 
-        // Process results after all promises settle
-        let allSucceeded = true;
         let failedCount = 0;
-        let hasSuccess = false; // Track if at least one description succeeded
+        let hasSuccess = false;
 
         results.forEach(result => {
-            // Check the success flag we set in the DescriptionResult
             if (result.status === 'fulfilled' && result.value.success) {
                 hasSuccess = true;
             } else {
-                allSucceeded = false;
                 failedCount++;
             }
         });
 
 
-        // Provide consolidated feedback based on overall outcome
-        if (hasSuccess && failedCount === 0 && photos.length > 0) {
+        if (hasSuccess && failedCount === 0 && currentPhotos.length > 0) { // ensure currentPhotos is used
           toast({
             title: '成功',
             description: '照片描述產生完成！',
@@ -364,16 +338,16 @@ export default function Home() {
            toast({
             title: '部分完成',
             description: `${failedCount} 張照片描述產生失敗，請檢查標示為「無法描述」的圖片。`,
-            variant: 'destructive', // Use destructive variant for partial failure
+            variant: 'destructive',
            });
-        } else if (!hasSuccess && failedCount > 0) { // All failed
+        } else if (!hasSuccess && failedCount > 0 && currentPhotos.length > 0) { // ensure currentPhotos is used
              toast({
                 title: '產生失敗',
                 description: `所有照片描述產生失敗，請檢查錯誤訊息或稍後重試。`,
                 variant: 'destructive',
              });
         }
-       setSummary(''); // Reset summary after generating descriptions
+       setSummary('');
 
     } catch (error) {
       console.error('Error in generating descriptions batch:', error);
@@ -382,18 +356,15 @@ export default function Home() {
          description: '產生照片描述過程中發生嚴重錯誤。',
          variant: 'destructive',
        });
-       // Ensure loading state is cleared on error for relevant photos
-       // Find the IDs of photos that were supposed to be processed in this batch
        const processedPhotoIds = currentPhotos.map(p => p.id);
        setPhotos(prev => prev.map(p => processedPhotoIds.includes(p.id) ? { ...p, isGenerating: false, description: '產生失敗' } : p));
 
     } finally {
-      // Ensure progress reaches 100% and loading state is fully cleared
       setDescriptionProgress(100);
-       setTimeout(() => { // Delay hiding progress bar for better UX
+       setTimeout(() => {
          setDescriptionProgress(null);
          setIsGeneratingAllDescriptions(false);
-       }, 1000); // Wait 1 second before hiding
+       }, 1000);
     }
   }, [form, photos, toast, isGeneratingAllDescriptions]);
 
@@ -420,18 +391,16 @@ export default function Home() {
       return;
     }
 
-    // Check if descriptions are still being generated
     const descriptionsPending = photos.some(p => p.isGenerating);
      if (descriptionsPending) {
          toast({
             title: '請稍候',
             description: '照片描述仍在產生中，請完成後再產生摘要。',
-            variant: 'default', // Use default variant, not destructive
+            variant: 'default',
          });
          return;
      }
 
-    // Check if ALL descriptions were generated successfully
     const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述'));
     if (!allDescriptionsGeneratedSuccessfully) {
          toast({
@@ -450,7 +419,7 @@ export default function Home() {
         meetingTopic,
         meetingDate: format(meetingDate, 'yyyy-MM-dd'),
         communityMembers,
-        photoDescriptions, // Only send valid descriptions
+        photoDescriptions,
       });
       setSummary(result.summary);
       toast({
@@ -470,48 +439,37 @@ export default function Home() {
   }, [form, photos, toast]);
 
 
-  // Helper function to generate a table cell for an image for DOC export (MSO styles)
     const generateImageCellMSO = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            // MSO requires wrapping the image in a paragraph for alignment and spacing.
-            // Set fixed height (5cm) and auto width via inline style.
             content = `<p class="MsoNormal" align="center" style='text-align:center; margin-bottom:8pt;'>
                         <img src="${photo.dataUrl}" alt="${altText}" style="display:block; height:5cm; width:auto; max-width:100%; margin:0 auto; border-radius: 4px;">
                        </p>`;
         } else {
             content = `<p class="MsoNormal" align="center">[${altText} 無法載入]</p>`;
         }
-        // Apply PhotoCellStyle class to TD for MSO styling and dimensions.
         return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#f8f9fa;'>${content}</td>`;
     };
 
-    // Helper function to generate a table cell for a description for DOC export (MSO styles)
     const generateDescriptionCellMSO = (photo: Photo | undefined): string => {
         const description = photo?.description || '未產生描述';
-        // Apply PhotoCellStyle and PhotoDescriptionStyle classes for MSO styling.
         return `<td width="349" valign="top" class="PhotoCellStyle" style='width:9.23cm; border:solid #e0e0e0 .75pt; padding:10.0pt; background:#f8f9fa;'>
                    <p class="PhotoDescriptionStyle" align="center">${description}</p>
                  </td>`;
     };
 
-    // Helper function to generate a table cell for an image for PDF/Print export (standard HTML/CSS)
     const generateImageCellPrint = (photo: Photo | undefined, altText: string): string => {
         let content = '';
         if (photo?.dataUrl) {
-            // Use standard HTML/CSS with inline styles for fixed height and auto width.
             content = `<img src="${photo.dataUrl}" alt="${altText}" style="display: block; margin: 0 auto 8pt auto; height: 5cm; width: auto; max-width: 100%; object-fit: contain; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">`;
         } else {
             content = `<p style="text-align: center;">[${altText} 無法載入]</p>`;
         }
-        // Use standard td with class for CSS styling.
         return `<td class="photo-table-cell">${content}</td>`;
     };
 
-     // Helper function to generate a table cell for a description for PDF/Print export (standard HTML/CSS)
      const generateDescriptionCellPrint = (photo: Photo | undefined): string => {
         const description = photo?.description || '未產生描述';
-        // Use standard p with class for CSS styling.
         return `<td class="photo-table-cell"><p class="photo-description">${description}</p></td>`;
     };
 
@@ -519,7 +477,6 @@ export default function Home() {
   const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
-    // Ensure photos have data URLs before proceeding
     const photosWithDataUrls = await Promise.all(
         photos.map(async (photo) => {
             if (!photo.dataUrl) {
@@ -533,47 +490,44 @@ export default function Home() {
                         description: `匯出時無法讀取照片 ${photo.file.name}。`,
                         variant: 'destructive',
                     });
-                    return { ...photo, dataUrl: '' }; // Mark as failed
+                    return { ...photo, dataUrl: '' };
                 }
             }
             return photo;
         })
     );
 
-    // Check if any photo failed to load dataUrl
      if (photosWithDataUrls.some(p => !p.dataUrl)) {
         throw new Error("無法讀取所有照片資料以進行匯出。");
      }
 
 
-    // Format summary: Replace Markdown bold/italic with HTML tags, and newlines with <br>
     let formattedSummary = summary || '尚未產生摘要';
     formattedSummary = formattedSummary
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>');             // Italic
-    formattedSummary = formattedSummary.replace(/\n/g, '<br>');         // Newlines
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>');
+    formattedSummary = formattedSummary.replace(/\n/g, '<br>');
 
-    // Define CSS styles for the report (consistent for both DOC and PDF generation)
     let styles = `
       body {
         font-family: '標楷體', 'BiauKai', 'Times New Roman', serif;
         line-height: 1.6;
         color: #333333;
         font-size: 12pt;
-        margin: 1.27cm; /* Narrow Margin for A4 */
+        margin: 1.27cm;
         background-color: #ffffff;
       }
       .report-container {
-        max-width: 18.46cm; /* Approx width within narrow margins */
+        max-width: 18.46cm;
         margin: 0 auto;
         background-color: #ffffff;
-        padding: ${forPrint ? '0' : '1.5cm'}; /* No padding for actual print */
+        padding: ${forPrint ? '0' : '1.5cm'};
         border-radius: ${forPrint ? '0' : '8px'};
         box-shadow: ${forPrint ? 'none' : '0 4px 12px rgba(0,0,0,0.1)'};
       }
       h1 {
         color: #003f5c;
-        text-align: left; /* Force left alignment */
+        text-align: left;
         font-size: 22pt;
         font-weight: bold;
         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
@@ -591,32 +545,32 @@ export default function Home() {
         padding-bottom: 6pt;
         margin-top: 25pt;
         margin-bottom: 15pt;
-        text-align: left; /* Force left alignment */
+        text-align: left;
         page-break-after: avoid;
       }
       p {
         margin-bottom: 10pt;
         font-size: 12pt;
-        text-align: left; /* Force left alignment */
+        text-align: left;
       }
-      strong { font-weight: bold; color: #000000; } /* Black bold for emphasis */
-      em { font-style: italic; color: #333333; } /* Dark gray italic */
+      strong { font-weight: bold; color: #000000; }
+      em { font-style: italic; color: #333333; }
       .section { margin-bottom: 30pt; page-break-inside: avoid; }
       
       .info-section {
-        background-color: #f8f9fa; /* Light background */
+        background-color: #f8f9fa;
         padding: 15pt;
         border-radius: 6px;
         border: 1px solid #e0e0e0;
-        margin-top: 15pt; /* Space above the section */
+        margin-top: 15pt;
       }
-      .info-section h2, .info-section .MsoHeading2 { /* Targeting MSO class too for consistency */
+      .info-section h2, .info-section .MsoHeading2 {
         margin-top: 0 !important; 
         padding-top: 0 !important;
         border-bottom: 1px solid #ced4da; 
-        margin-bottom: 15pt !important; /* Ensure consistent bottom margin */
-        color: #0056b3; /* Consistent with other h2 */
-        font-size: 16pt !important; /* Ensure consistent font size */
+        margin-bottom: 15pt !important;
+        color: #0056b3;
+        font-size: 16pt !important;
         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important;
       }
       .info-section p {
@@ -626,69 +580,63 @@ export default function Home() {
         font-size: 12pt; 
         font-family: '標楷體', 'BiauKai', serif;
       }
-      .info-section p strong { /* Styles for the label part "教學領域：" */
-         display: inline-block; /* Allows min-width to work */
-         min-width: 110px; /* Adjust as needed for alignment */
+      .info-section p strong {
+         display: inline-block;
+         min-width: 110px;
          font-weight: bold;
-         color: #212529; /* Darker label color */
+         color: #212529;
          margin-right: 10px;
-         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif; /* Different font for labels */
+         font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
       }
 
-      /* Photo Table Styling */
       .photo-table {
         width: 100%;
         max-width: 18.46cm;
         border-collapse: collapse;
         border-spacing: 0;
-        margin: 20pt auto; /* Center table */
+        margin: 20pt auto;
         page-break-inside: avoid;
         border: 1px solid #e0e0e0;
         border-radius: 6px;
         overflow: hidden;
-        background-color: #f8f9fa; /* Apply background to table itself */
+        background-color: #f8f9fa;
       }
-      .photo-table td, .photo-table-cell /* Add class for print */ {
+      .photo-table td, .photo-table-cell {
         border: 1px solid #e0e0e0;
         padding: 10pt;
-        text-align: center; /* Center cell content (image and text) */
+        text-align: center;
         vertical-align: top;
-        width: 50%; /* Ensure two equal columns */
-        /* Background moved to .photo-table */
+        width: 50%;
       }
-      /* Style only first/last rows/cells for border radius (if not printing) */
       ${!forPrint ? `
       .photo-table tr:first-child td:first-child { border-top-left-radius: 6px; }
       .photo-table tr:first-child td:last-child { border-top-right-radius: 6px; }
-      /* Apply bottom radius to cells in the *last* row (description row of last image pair) */
       .photo-table tr:nth-child(4) td:first-child { border-bottom-left-radius: 6px; }
       .photo-table tr:nth-child(4) td:last-child { border-bottom-right-radius: 6px; }
       ` : ''}
 
-      /* Image style: Fixed height (5cm), auto width, centered */
       .photo-table img {
         display: block;
-        margin: 0 auto 8pt auto; /* Center image horizontally, add space below */
-        height: 5cm; /* Fixed height */
-        width: auto; /* Auto width to maintain aspect ratio */
-        max-width: 100%; /* Prevent overflow */
-        object-fit: contain; /* Ensure image fits within bounds without distortion */
+        margin: 0 auto 8pt auto;
+        height: 5cm;
+        width: auto;
+        max-width: 100%;
+        object-fit: contain;
         border-radius: 4px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
       }
       .photo-description {
         font-size: 10pt;
         color: #495057;
-        text-align: center; /* Center description text */
+        text-align: center;
         line-height: 1.4;
         margin-top: 5pt;
         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
       }
-      /* Summary Section Styling */
       .summary-section p {
-        white-space: pre-wrap; /* Preserve line breaks from input */
+        white-space: pre-wrap;
         font-size: 12pt;
-        text-align: left; /* Keep summary text left-aligned */
+        text-align: left;
         line-height: 1.7;
         font-family: '標楷體', 'BiauKai', serif;
         padding: 15pt;
@@ -696,25 +644,23 @@ export default function Home() {
         border-radius: 6px;
         border: 1px solid #e0e0e0;
       }
-       /* Summary specific formatting */
        .summary-section strong {
          font-weight: bold;
-         color: #000000; /* Black bold */
+         color: #000000;
       }
        .summary-section em {
          font-style: italic;
-         color: #333333; /* Dark gray italic */
+         color: #333333;
       }
       .page-break { page-break-before: always; }
 
-      /* Print-specific overrides */
       @media print {
-        @page { size: A4 portrait; margin: 1.27cm; } /* Ensure A4 Portrait with narrow margins */
+        @page { size: A4 portrait; margin: 1.27cm; }
         body {
           background-color: #ffffff !important;
           -webkit-print-color-adjust: exact;
           print-color-adjust: exact;
-          margin: 0; /* Remove body margin for print */
+          margin: 0;
         }
         .report-container {
           box-shadow: none !important;
@@ -727,7 +673,7 @@ export default function Home() {
         h1, h2 { page-break-after: avoid; color: #000000 !important; border-color: #000000 !important; text-align: left !important; }
         .section, .photo-table { page-break-inside: avoid; }
         .photo-table tr { page-break-inside: avoid; }
-        strong, em { color: #000000 !important; } /* Ensure black text for print */
+        strong, em { color: #000000 !important; }
         p { text-align: left !important; }
         .photo-table, .photo-table td, .photo-table-cell { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
         .photo-table img { box-shadow: none !important; border-radius: 0 !important;}
@@ -735,7 +681,7 @@ export default function Home() {
         
         .info-section {
           background-color: #ffffff !important;
-          border: 1px solid #cccccc !important; /* Ensure border for print */
+          border: 1px solid #cccccc !important;
           border-radius: 0 !important;
           padding: 10pt !important;
         }
@@ -746,18 +692,16 @@ export default function Home() {
         }
         .info-section p strong {
            color: #000000 !important;
-           font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important; /* Ensure label font for print */
+           font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important;
         }
          .info-section p {
-            font-family: '標楷體', 'BiauKai', serif !important; /* Ensure value font for print */
+            font-family: '標楷體', 'BiauKai', serif !important;
          }
 
         .summary-section p { background-color: #ffffff !important; border-color: #cccccc !important; border-radius: 0 !important; text-align: left !important; }
       }
     `;
 
-    // MSO (Microsoft Office) specific styles for Word compatibility
-    // These styles attempt to mimic the CSS styles for Word's rendering engine.
     const msoPageSetupAndFonts = `
         <!--[if gte mso 9]><xml>
          <w:WordDocument>
@@ -813,26 +757,23 @@ export default function Home() {
            <o:Version>1.0</o:Version>
          </o:DocumentProperties>
          <w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99" LatentStyleCount="371">
-            {/* Common Latent Styles */}
          </w:LatentStyles>
         </xml><![endif]-->
          <!--[if gte mso 10]>
         <style>
-         /* Style Definitions */
          table.MsoNormalTable {mso-style-name:"Table Normal"; mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-noshow:yes; mso-style-priority:99; mso-style-parent:""; mso-padding-alt:0cm 5.4pt 0cm 5.4pt; mso-para-margin:0cm; mso-para-margin-bottom:.0001pt; mso-pagination:widow-orphan; font-size:12.0pt; font-family:"Calibri",sans-serif; mso-ascii-font-family:Calibri; mso-ascii-theme-font:minor-latin; mso-hansi-font-family:Calibri; mso-hansi-theme-font:minor-latin; mso-bidi-font-family:"Times New Roman"; mso-bidi-theme-font:minor-bidi; mso-fareast-language:EN-US;}
 
-         /* Photo Table Specific Styles for MSO */
          table.PhotoTableStyle {
              mso-style-name:"Photo Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
-             mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; /* Anchor to margin */
-             mso-table-left:center; /* Center align table relative to margins */
+             mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
+             mso-table-left:center;
              mso-table-right:center;
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-lspace:0cm; mso-table-rspace:0cm;
-             mso-table-layout-alt:fixed; /* Use fixed layout for better control */
-             mso-border-alt:solid #e0e0e0 .75pt; /* Match CSS border */
+             mso-table-layout-alt:fixed;
+             mso-border-alt:solid #e0e0e0 .75pt;
              mso-padding-alt:0cm 0cm 0cm 0cm;
              mso-border-insideh:.75pt solid #e0e0e0;
              mso-border-insidev:.75pt solid #e0e0e0;
@@ -841,98 +782,85 @@ export default function Home() {
              font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
              background:#F8F9FA; mso-shading:white; mso-pattern:auto none;
          }
-         /* Photo Cell Style */
          td.PhotoCellStyle {
              mso-style-name:"Photo Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"Photo Table";
-             width: 9.23cm; /* Approximately half of 18.46cm */
+             width: 9.23cm;
              mso-border-alt:solid #e0e0e0 .75pt;
-             padding:10.0pt 10.0pt 10.0pt 10.0pt; /* Match CSS padding */
+             padding:10.0pt 10.0pt 10.0pt 10.0pt;
              vertical-align:top;
              background:#F8F9FA;
-             text-align:center; /* Center align cell content */
+             text-align:center;
              mso-element:para-border-div;
          }
-         /* Photo Description Paragraph Style */
          p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
             mso-style-name:"Photo Description"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"";
             margin-top:5.0pt; margin-right:0cm; margin-bottom:0cm; margin-left:0cm;
             mso-para-margin-top:.5gd; mso-para-margin-right:0cm; mso-para-margin-bottom:0cm; mso-para-margin-left:0cm;
-            text-align:center; /* Center align text */
+            text-align:center;
             line-height:140%; mso-pagination:widow-orphan;
             font-size:10.0pt; font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei";
-            color:#495057; /* Match CSS color */
+            color:#495057;
          }
-         /* Heading Styles */
          p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 1 Char";
-            mso-margin-top-alt:auto; margin-right:0cm; mso-margin-bottom-alt:25.0pt; margin-left:0cm; /* Adjusted bottom margin */
+            mso-margin-top-alt:auto; margin-right:0cm; mso-margin-bottom-alt:25.0pt; margin-left:0cm;
             line-height:normal; mso-pagination:widow-orphan lines-together; page-break-after:avoid; mso-outline-level:1;
             font-size:22.0pt; font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei";
             color:#003F5C; font-weight:bold;
-            border:none; mso-border-bottom-alt:solid #003F5C 2.0pt; /* Match CSS border */
-            padding:0cm; mso-padding-alt:0cm 0cm 10.0pt 0cm; /* Match CSS padding */
-            text-align:left; /* Force left align */
+            border:none; mso-border-bottom-alt:solid #003F5C 2.0pt;
+            padding:0cm; mso-padding-alt:0cm 0cm 10.0pt 0cm;
+            text-align:left;
          }
          p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 2 Char";
-            mso-margin-top-alt:25pt; margin-right:0cm; mso-margin-bottom-alt:15pt; margin-left:0cm; /* Match CSS margins */
+            mso-margin-top-alt:25pt; margin-right:0cm; mso-margin-bottom-alt:15pt; margin-left:0cm;
             line-height:normal; mso-pagination:widow-orphan lines-together; page-break-after:avoid; mso-outline-level:2;
             font-size:16.0pt; font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei";
             color:#0056B3; font-weight:bold;
-            border:none; mso-border-bottom-alt:solid #DEE2E6 1.0pt; /* Match CSS border */
-            padding:0cm; mso-padding-alt:0cm 0cm 6.0pt 0cm; /* Match CSS padding */
-            text-align:left; /* Force left align */
+            border:none; mso-border-bottom-alt:solid #DEE2E6 1.0pt;
+            padding:0cm; mso-padding-alt:0cm 0cm 6.0pt 0cm;
+            text-align:left;
          }
-         /* Normal Paragraph Style (for general text, including info items) */
          p.MsoNormal, li.MsoNormal, div.MsoNormal {
             mso-style-unhide:no; mso-style-qformat:yes; mso-style-parent:"";
-            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm; /* Match .info-section p CSS margin */
+            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm;
             line-height:150%; mso-pagination:widow-orphan;
             font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
             color:#333333;
-            text-align:left; /* Force left align */
-            mso-line-height-rule:exactly; /* Control line height precisely */
+            text-align:left;
+            mso-line-height-rule:exactly;
          }
-         /* MSO specific style for info section strong (label) */
          span.InfoLabelStyle {
             mso-style-name:"Info Label"; mso-style-priority:99; mso-style-unhide:no;
             font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei";
             font-weight:bold; color:#212529;
-            mso-ansi-font-size:12.0pt; mso-bidi-font-size:12.0pt; /* Ensure size matches surrounding text */
+            mso-ansi-font-size:12.0pt; mso-bidi-font-size:12.0pt;
          }
-         /* MSO specific for the info section paragraphs that might be wrapped in a div or other block */
          div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal {
-             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt; /* Consistent margin */
-             /* Background and border are applied to the containing div.InfoSectionBlock */
+             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt;
          }
 
-         /* Summary Paragraph Style */
          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
              mso-style-name:"Summary Text"; mso-style-priority:99; mso-style-unhide:no;
-             margin:0cm; margin-bottom:.0001pt; /* Minimal bottom margin */
-             text-align:left; /* Force left align */
+             margin:0cm; margin-bottom:.0001pt;
+             text-align:left;
              line-height:170%; mso-pagination:widow-orphan;
-             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Match CSS padding */
-             mso-border-alt:solid #E0E0E0 .75pt; /* Match CSS border */
+             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt;
+             mso-border-alt:solid #E0E0E0 .75pt;
              font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
              background:#F8F9FA;
              mso-line-height-rule:exactly;
          }
-          /* Character Styles */
          span.Heading1Char {mso-style-name:"Heading 1 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 1"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#003F5C; font-weight:bold;}
          span.Heading2Char {mso-style-name:"Heading 2 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 2"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#0056B3; font-weight:bold;}
-         /* Bold/Italic Styles within normal text */
-         strong {mso-style-name:""; font-weight:bold; color: #000000;} /* Black bold */
-         em {mso-style-name:""; font-style:italic; color: #333333;} /* Dark gray italic */
-         /* Bold/Italic Styles specific to Summary */
+         strong {mso-style-name:""; font-weight:bold; color: #000000;}
+         em {mso-style-name:""; font-style:italic; color: #333333;}
          .SummaryStyle strong {mso-style-name:""; font-weight:bold; color: #000000;}
          .SummaryStyle em {mso-style-name:""; font-style:italic; color: #333333;}
         </style>
         <![endif]-->
     `;
 
-    // Start constructing the HTML content
-    // Use teachingArea and meetingDate to generate a dynamic title for PDF if forPrint is true
     const reportTitle = forPrint
       ? `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}`
       : '領域共備GO 會議報告';
@@ -949,76 +877,60 @@ export default function Home() {
         <meta name=Originator content="Microsoft Word 15">
         ${msoPageSetupAndFonts}` : ''}
         <style>
-          /* Embed base CSS */
           ${styles}
-
-          /* Page Setup for Word (only if not for print) */
           ${!forPrint ? `
           @page Section1 {
-            size: 21cm 29.7cm; /* A4 Portrait */
-            margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins: 0.5 inch */
+            size: 21cm 29.7cm;
+            margin: 1.27cm 1.27cm 1.27cm 1.27cm;
             mso-header-margin: .5in;
             mso-footer-margin: .5in;
             mso-paper-source: 0;
           }
           div.Section1 { page: Section1; }
 
-          /* MSO Specific Overrides - Force left alignment and info section specific styling */
           <!--[if gte mso 9]>
            p.MsoNormal, li.MsoNormal, div.MsoNormal,
            p.MsoHeading1, li.MsoHeading1, div.MsoHeading1,
            p.MsoHeading2, li.MsoHeading2, div.MsoHeading2,
            p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
               text-align: left !important;
-              mso-text-align-alt: left !important; /* Ensure left align */
+              mso-text-align-alt: left !important;
            }
            p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
-              text-align: center !important; /* Keep description centered */
+              text-align: center !important;
            }
-           /* Center content within table cells */
            td.PhotoCellStyle {
                text-align: center !important;
-               vertical-align: top !important; /* Align content top */
+               vertical-align: top !important;
            }
-           /* Paragraphs containing images need centering for MSO */
            td.PhotoCellStyle p.MsoNormal {
               text-align: center !important;
-              margin-bottom: 8pt !important; /* Match CSS margin below image */
+              margin-bottom: 8pt !important;
            }
-           /* Specific MSO styling for info section background/border */
            div.InfoSectionBlock {
-               mso-border-alt:solid #e0e0e0 .75pt; /* Match CSS border */
-               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Match CSS padding */
+               mso-border-alt:solid #e0e0e0 .75pt;
+               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt;
                background:#F8F9FA;
-               mso-shading:#F8F9FA; /* MSO background color */
-               mso-margin-top-alt:15pt; /* Space above the section */
-               margin-bottom:30pt; /* Consistent with .section */
+               mso-shading:#F8F9FA;
+               mso-margin-top-alt:15pt;
+               margin-bottom:30pt;
            }
-           /* Make sure H2 inside InfoSectionBlock has correct MSO class and spacing */
            div.InfoSectionBlock p.MsoHeading2 {
-               mso-margin-top-alt:0cm !important; /* Remove top margin for H2 in this block */
+               mso-margin-top-alt:0cm !important;
                mso-margin-bottom-alt:15pt !important;
                border:none;
-               mso-border-bottom-alt:solid #ced4da 1.0pt !important; /* Bottom border */
+               mso-border-bottom-alt:solid #ced4da 1.0pt !important;
                mso-padding-bottom-alt:6pt !important;
            }
-           /* Ensure info items within the block use MsoNormal with appropriate spacing */
            div.InfoSectionBlock p.MsoNormal {
                margin-bottom:8.0pt !important;
                line-height:150% !important;
                font-family:"標楷體",serif !important;
                mso-fareast-font-family:"標楷體" !important;
            }
-           /* MSO specific: Need to ensure min-width for label is somewhat respected or use fixed width.
-              Since MSO doesn't directly support min-width on inline-block for spans,
-              we can simulate it by using a small table for each info item or manually space.
-              For simplicity here, we'll rely on the span styling and hope Word renders it reasonably.
-              A more robust solution for MSO would be a 2-column table for the info section.
-           */
            div.InfoSectionBlock p.MsoNormal span.InfoLabelStyle {
-              /* Min-width is tricky, Word might ignore it. Consider a table or fixed spaces if crucial. */
-              mso-spacerun:yes; /* Helps with spacing for some Word versions */
-              margin-right:7.5pt; /* Approx 10px */
+              mso-spacerun:yes;
+              margin-right:7.5pt;
            }
 
           <![endif]-->
@@ -1026,17 +938,14 @@ export default function Home() {
         </style>
       </head>
       <body lang=ZH-TW style='tab-interval:21.0pt;word-wrap:break-word;background-color:#ffffff;'>
-      <div class='${!forPrint ? 'Section1' : ''}'> <!-- Use Section1 for Word page settings only for DOC export -->
-        <div class='report-container'> <!-- Container for structure -->
+      <div class='${!forPrint ? 'Section1' : ''}'>
+        <div class='report-container'>
     `;
 
     let reportHtmlContent = htmlStart;
 
-    // Main title - Use H1 for print/PDF, MsoHeading1 for DOC
     reportHtmlContent += `<${forPrint ? 'h1' : 'p class="MsoHeading1"'}>領域共備GO 會議報告</${forPrint ? 'h1' : 'p'}>`;
 
-    // Basic Info Section - Use H2 and P for print/PDF, MsoHeading2 and MsoNormal for DOC
-    // Wrap in InfoSectionBlock for MSO-specific background/border if not for print
     reportHtmlContent += `
         <div class="section info-section ${!forPrint ? 'InfoSectionBlock' : ''}">
           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>基本資訊</${forPrint ? 'h2' : 'p'}>
@@ -1047,78 +956,60 @@ export default function Home() {
         </div>
     `;
 
-    // Photo Record Section - Use H2 for print/PDF, MsoHeading2 for DOC
     reportHtmlContent += `
         <div class="section photo-section">
            <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
 
-    // Conditionally render table start based on export type
-    if (!forPrint) { // DOC export with MSO styles
-        reportHtmlContent += `
-           <!--[if gte mso 9]>
-            <table class="PhotoTableStyle" border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'>
-           <![endif]-->
-           <!--[if !mso]>
-            <table class="photo-table" align="center">
-           <![endif]-->
-             <tbody style="mso-yfti-irow:0; mso-yfti-firstrow:yes;">
-        `;
-    } else { // PDF/Print export with standard HTML/CSS
-        reportHtmlContent += `<table class="photo-table"><tbody>`;
-    }
+    // Use a single table tag with appropriate classes for DOC export
+    // For PDF/Print, it will use 'photo-table'. For DOC, it adds 'PhotoTableStyle' and MSO-specific attributes.
+    reportHtmlContent += `
+        <table class="${forPrint ? 'photo-table' : 'photo-table PhotoTableStyle'}" 
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'` : ''}
+        >
+         <tbody ${!forPrint ? "style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'" : ""}>
+    `;
 
 
-    // Build the table rows: 2 columns, 4 rows total (Image, Desc, Image, Desc)
-    // Use the appropriate cell generation function based on forPrint flag
     const generateImageCell = forPrint ? generateImageCellPrint : generateImageCellMSO;
     const generateDescriptionCell = forPrint ? generateDescriptionCellPrint : generateDescriptionCellMSO;
 
-    // Row 1: Images 1 & 2
     reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'" : ""}>`;
     reportHtmlContent += generateImageCell(photosWithDataUrls[0], '照片 1');
     reportHtmlContent += generateImageCell(photosWithDataUrls[1], '照片 2');
     reportHtmlContent += `</tr>`;
 
-    // Row 2: Descriptions for 1 & 2
     reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:1;'" : ""}>`;
     reportHtmlContent += generateDescriptionCell(photosWithDataUrls[0]);
     reportHtmlContent += generateDescriptionCell(photosWithDataUrls[1]);
     reportHtmlContent += `</tr>`;
 
-    // Row 3: Images 3 & 4
     reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:2;'" : ""}>`;
     reportHtmlContent += generateImageCell(photosWithDataUrls[2], '照片 3');
     reportHtmlContent += generateImageCell(photosWithDataUrls[3], '照片 4');
     reportHtmlContent += `</tr>`;
 
-    // Row 4: Descriptions for 3 & 4
     reportHtmlContent += `<tr ${!forPrint ? "style='mso-yfti-irow:3; mso-yfti-lastrow:yes;'" : ""}>`;
     reportHtmlContent += generateDescriptionCell(photosWithDataUrls[2]);
     reportHtmlContent += generateDescriptionCell(photosWithDataUrls[3]);
     reportHtmlContent += `</tr>`;
 
-    // Close table
     reportHtmlContent += `
             </tbody>
           </table>
         </div>
     `;
 
-    // Summary Section - Use H2/P for print/PDF, MsoHeading2/SummaryStyle for DOC
     reportHtmlContent += `
         <div class="section summary-section">
            <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>會議大綱摘要</${forPrint ? 'h2' : 'p'}>
-           <p class="${forPrint ? '' : 'SummaryStyle'}">${formattedSummary}</p> <!-- Apply SummaryStyle class only for DOC -->
+           <p class="${forPrint ? '' : 'SummaryStyle'}">${formattedSummary}</p>
         </div>
 
-        </div> <!-- End report-container -->
-      </div> <!-- End Section1 (or div for print) -->
+        </div>
+      </div>
       </body>
       </html>
     `;
-
-    // Log the final HTML for debugging if needed
-    // console.log("Generated Report HTML:", reportHtmlContent);
 
     return reportHtmlContent;
   }, [photos, summary, form, toast]);
@@ -1149,23 +1040,19 @@ export default function Home() {
         });
         return;
     }
-     // Ensure all photos have dataUrls before exporting
      if (photos.some(p => !p.dataUrl)) {
         toast({
             title: '圖片處理中',
             description: '圖片資料尚未完全載入，請稍候幾秒鐘再試。',
-            variant: 'default', // Informational, not an error yet
+            variant: 'default',
         });
-         // Optionally trigger a re-read here if necessary, or rely on generateReportContent's internal check
         return;
     }
 
     setIsExportingDoc(true);
     try {
-        // Generate content specifically for DOC (forPrint=false enables MSO styles)
         const reportContent = await generateReportContent(false);
 
-        // Create Blob with UTF-8 BOM for better Word compatibility
         const blob = new Blob([`\ufeff${reportContent}`], { type: 'application/msword;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1218,7 +1105,6 @@ export default function Home() {
             });
             return;
         }
-        // Ensure all photos have dataUrls before exporting
         if (photos.some(p => !p.dataUrl)) {
             toast({
                 title: '圖片處理中',
@@ -1230,7 +1116,6 @@ export default function Home() {
 
         setIsPreparingPdf(true);
         try {
-            // Generate content specifically for PDF/Print (forPrint=true uses print styles)
             const reportContent = await generateReportContent(true);
             const { teachingArea, meetingDate } = form.getValues();
             const pdfFileName = `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}.pdf`;
@@ -1238,18 +1123,14 @@ export default function Home() {
 
             if (printIframeRef.current) {
                 const iframe = printIframeRef.current;
-                iframe.srcdoc = reportContent; // Load the generated HTML into the iframe
+                iframe.srcdoc = reportContent;
 
-                // Wait for the iframe to load the content
                 iframe.onload = () => {
-                  // Add a small delay to ensure rendering is complete before printing
                   setTimeout(() => {
                     try {
-                        // Set the document title which some browsers use as default filename
                         if (iframe.contentWindow?.document) {
                              iframe.contentWindow.document.title = pdfFileName;
                         }
-                        // Trigger the browser's print dialog
                         iframe.contentWindow?.print();
                          toast({
                             title: '準備列印',
@@ -1263,13 +1144,11 @@ export default function Home() {
                             variant: 'destructive',
                         });
                     } finally {
-                       // Clean up and reset state regardless of print success/failure
                        setIsPreparingPdf(false);
-                       iframe.onload = null; // Prevent potential multiple calls
+                       iframe.onload = null;
                     }
-                  }, 500); // 500ms delay, adjust if needed
+                  }, 500);
                 };
-                 // Handle potential errors during iframe content loading
                  iframe.onerror = (error) => {
                     console.error('Error loading iframe content:', error);
                     toast({
@@ -1295,41 +1174,34 @@ export default function Home() {
     }, [form, photos, summary, toast, generateReportContent]);
 
 
-   // Effect to watch form changes and reset dependent states
    useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {
-         // If any form field changes, reset descriptions, summary, and progress
          if (type === 'change' && name !== undefined) {
-             // Clear descriptions and stop generation state for all photos
             setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
             setSummary('');
             setDescriptionProgress(null);
             setIsGeneratingAllDescriptions(false);
          }
       });
-      // Clean up the subscription on component unmount
       return () => subscription.unsubscribe();
-   }, [form]); // Dependency array includes the form object itself
+   }, [form]);
 
 
-  // Determine if export buttons should be disabled
   const isExportDisabled =
-    isExportingDoc || // Disable if exporting DOC
-    isPreparingPdf || // Disable if preparing PDF
-    !summary || // Disable if no summary generated
-    photos.length !== MAX_PHOTOS || // Disable if not exactly MAX_PHOTOS are uploaded
-    photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl); // Disable if any photo lacks a valid description or dataUrl
+    isExportingDoc ||
+    isPreparingPdf ||
+    !summary ||
+    photos.length !== MAX_PHOTOS ||
+    photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl);
 
-  // Determine if "Generate Descriptions" button should be disabled
   const isGenerateDescriptionsDisabled =
-      isGeneratingAllDescriptions || // Disable if already generating all
-      photos.length === 0 || // Disable if no photos uploaded
-      photos.some(p => p.isGenerating); // Disable if any single photo is currently generating (unlikely with current logic but safe check)
+      isGeneratingAllDescriptions ||
+      photos.length === 0 ||
+      photos.some(p => p.isGenerating);
 
 
   return (
-    <TooltipProvider> {/* Required for Tooltip components */}
-      {/* Hidden iframe used for triggering the print dialog for PDF export */}
+    <TooltipProvider>
       <iframe
           ref={printIframeRef}
           style={{
@@ -1337,34 +1209,30 @@ export default function Home() {
               width: '0',
               height: '0',
               border: '0',
-              visibility: 'hidden', // Hide the iframe visually
+              visibility: 'hidden',
           }}
-          title="Print Content Frame" // Accessibility title
+          title="Print Content Frame"
       ></iframe>
 
-      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen"> {/* Main container */}
-        {/* Header Section */}
+      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen">
         <header className="mb-10 md:mb-12 text-center relative group">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-blue-400 to-purple-400 py-4 rounded-lg transition-all duration-300 group-hover:scale-105 drop-shadow-lg">
-            領域共備GO {/* Updated Title */}
+            領域共備GO
           </h1>
           <p className="text-slate-300 text-base sm:text-lg mt-2 transition-opacity duration-300 opacity-90 group-hover:opacity-100 text-shadow">國小教師社群領域會議報告協作產出平台</p>
         </header>
 
-        {/* Main Form */}
         <Form {...form}>
-          <form className="space-y-10"> {/* Add spacing between cards */}
-            {/* Step 1: Meeting Info Card */}
+          <form className="space-y-10">
             <Card className="card-step-1 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
-               <CardHeader className="card-header-step-1 p-6"> {/* Step-specific styling */}
+               <CardHeader className="card-header-step-1 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-                     <Info className="w-7 h-7 card-icon-step-1" /> {/* Step-specific icon */}
+                     <Info className="w-7 h-7 card-icon-step-1" />
                      第一步：輸入會議資訊
                   </CardTitle>
                   <CardDescription className="text-slate-300">請填寫本次社群會議的基本資料</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8 space-y-6">
-                {/* Grid layout for form fields */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                   <FormField
                     control={form.control}
@@ -1375,7 +1243,7 @@ export default function Home() {
                         <FormControl>
                           <Input placeholder="例如：國語文、數學..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary text-slate-100 placeholder:text-slate-400" />
                         </FormControl>
-                        <FormMessage /> {/* Displays validation errors */}
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -1398,36 +1266,36 @@ export default function Home() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel className="text-lg font-medium mb-1 text-slate-200">會議日期</FormLabel>
-                         <Popover> {/* Popover for calendar */}
+                         <Popover>
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
                                   variant={"outline"}
                                   className={cn(
                                   "w-full pl-3 text-left font-normal justify-start text-base py-2.5",
-                                  !field.value && "text-slate-400", // Style differently if no date selected
+                                  !field.value && "text-slate-400",
                                    field.value && "text-slate-100",
-                                  "bg-slate-700/50 border-slate-600 hover:bg-slate-700/80" // Custom styles
+                                  "bg-slate-700/50 border-slate-600 hover:bg-slate-700/80"
                                   )}
                                 >
                                 {field.value ? (
-                                    format(field.value, "yyyy年MM月dd日") // Format selected date
+                                    format(field.value, "yyyy年MM月dd日")
                                 ) : (
-                                    <span>選擇日期</span> // Placeholder text
+                                    <span>選擇日期</span>
                                 )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" /> {/* Calendar icon */}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
                             </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start"> {/* Calendar popover content */}
+                            <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
-                                mode="single" // Allow selecting only one date
+                                mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange} // Update form value on select
-                                disabled={(date) => // Disable future dates and dates before 1900
+                                onSelect={field.onChange}
+                                disabled={(date) =>
                                 date > new Date() || date < new Date("1900-01-01")
                                 }
-                                initialFocus // Focus the calendar when opened
+                                initialFocus
                             />
                             </PopoverContent>
                         </Popover>
@@ -1455,25 +1323,23 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Step 2: Upload Photos Card */}
             <Card className="card-step-2 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
-               <CardHeader className="card-header-step-2 p-6"> {/* Step-specific styling */}
+               <CardHeader className="card-header-step-2 p-6">
                 <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-                    <ImageIcon className="w-7 h-7 card-icon-step-2" /> {/* Step-specific icon */}
+                    <ImageIcon className="w-7 h-7 card-icon-step-2" />
                     第二步：上傳會議照片
                 </CardTitle>
-                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 20MB)</CardDescription> {/* Updated size limit */}
+                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 20MB)</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8">
-                 {/* File Upload Area */}
                 <div className="mb-6">
                   <label
                     htmlFor="photo-upload"
                     className={cn(
                       "flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ease-in-out",
                       photos.length >= MAX_PHOTOS
-                        ? "border-slate-600 bg-slate-800/30 cursor-not-allowed opacity-60" // Disabled state
-                        : "border-accent hover:border-primary hover:bg-accent/20" // Active state
+                        ? "border-slate-600 bg-slate-800/30 cursor-not-allowed opacity-60"
+                        : "border-accent hover:border-primary hover:bg-accent/20"
                     )}
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -1482,41 +1348,36 @@ export default function Home() {
                          點擊此處 或拖曳照片至此
                       </p>
                       <p className={cn("text-xs", photos.length >= MAX_PHOTOS ? "text-slate-500" : "text-slate-400")}>
-                        還可上傳 {Math.max(0, MAX_PHOTOS - photos.length)} 張 {/* Show remaining count */}
+                        還可上傳 {Math.max(0, MAX_PHOTOS - photos.length)} 張
                       </p>
                     </div>
-                    {/* Hidden file input */}
                     <input
                       id="photo-upload"
                       ref={fileInputRef}
                       type="file"
-                      multiple // Allow multiple file selection
-                      accept={ACCEPTED_IMAGE_TYPES.join(',')} // Set accepted file types
+                      multiple
+                      accept={ACCEPTED_IMAGE_TYPES.join(',')}
                       className="hidden"
-                      onChange={handleFileChange} // Handle file selection
-                      disabled={photos.length >= MAX_PHOTOS} // Disable if max photos reached
+                      onChange={handleFileChange}
+                      disabled={photos.length >= MAX_PHOTOS}
                     />
                   </label>
                 </div>
 
-                {/* Display Uploaded Photos and Placeholders */}
                 {photos.length > 0 && (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8"> {/* Grid for photo previews */}
-                      {/* Render uploaded photos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
                       {photos.map((photo) => (
                         <div key={photo.id} className="relative border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
-                          {/* Image Preview Container */}
                           <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden">
                              <NextImage
-                                src={photo.previewUrl} // Use object URL for preview
+                                src={photo.previewUrl}
                                 alt={`照片 ${photo.file.name}`}
-                                fill // Fill the container
-                                style={{ objectFit: 'contain' }} // Ensure image fits without cropping
-                                priority // Prioritize loading visible images
+                                fill
+                                style={{ objectFit: 'contain' }}
+                                priority
                                 className="transition-transform duration-300 group-hover:scale-105"
                               />
-                             {/* Remove Button */}
                             <button
                               type="button"
                               onClick={() => handlePhotoRemove(photo.id)}
@@ -1525,51 +1386,46 @@ export default function Home() {
                             >
                               <X className="h-4 w-4" />
                             </button>
-                             {/* Loading Spinner */}
                              {photo.isGenerating && (
                                 <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-20 backdrop-blur-sm rounded-t-lg">
                                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                 </div>
                               )}
                           </div>
-                           {/* Description Section - Always Visible */}
-                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center"> {/* Ensure minimum height */}
+                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center">
                              <p className="text-xs text-slate-200 text-center break-words text-shadow">
                                 {photo.description || '尚未產生描述'}
                              </p>
                           </div>
                         </div>
                       ))}
-                       {/* Render placeholders for remaining slots */}
                        {Array.from({ length: Math.max(0, MAX_PHOTOS - photos.length) }).map((_, index) => (
                           <div key={`placeholder-${index}`} className="relative border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
                              照片 {photos.length + index + 1}
                           </div>
                       ))}
                     </div>
-                     {/* Generate Descriptions Button and Progress Bar */}
                      <div className="flex flex-col items-center gap-4">
                         <Button
                             type="button"
                             onClick={handleGenerateDescriptions}
-                            disabled={isGenerateDescriptionsDisabled} // Control button state
-                            className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105" // Button styles
+                            disabled={isGenerateDescriptionsDisabled}
+                            className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
                             variant="secondary"
                             size="lg"
                         >
-                            {isGeneratingAllDescriptions ? ( // Show loading state
+                            {isGeneratingAllDescriptions ? (
                             <>
                                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                 描述產生中...
                             </>
-                            ) : ( // Show appropriate text based on state
+                            ) : (
                                 photos.length > 0 && photos.some(p => p.description && !p.description.startsWith('無法描述')) ? '重新產生描述' : '產生照片描述'
                             )}
                         </Button>
-                        {/* Progress Bar - Visible when generating descriptions */}
                         {descriptionProgress !== null && (
-                            <div className="w-full max-w-md"> {/* Constrain width */}
-                                <Progress value={descriptionProgress} className="w-full h-2.5 bg-slate-700" /> {/* Progress bar component */}
+                            <div className="w-full max-w-md">
+                                <Progress value={descriptionProgress} className="w-full h-2.5 bg-slate-700" />
                                 <p className="text-sm text-slate-400 text-center mt-2">
                                     {descriptionProgress < 100 ? `正在產生照片描述... ${descriptionProgress}%` : '描述產生完成！'}
                                 </p>
@@ -1581,47 +1437,43 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Step 3: Generate Summary Card */}
             <Card className="card-step-3 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
-               <CardHeader className="card-header-step-3 p-6"> {/* Step-specific styling */}
+               <CardHeader className="card-header-step-3 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-                    <FileText className="w-7 h-7 card-icon-step-3" /> {/* Step-specific icon */}
+                    <FileText className="w-7 h-7 card-icon-step-3" />
                     第三步：產生會議摘要
                   </CardTitle>
                   <CardDescription className="text-slate-300">整合會議資訊與照片描述，自動產生摘要</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8 space-y-6">
-                 {/* Generate Summary Button */}
                  <Button
                     type="button"
                     onClick={handleGenerateSummary}
-                    disabled={ // Control button state
+                    disabled={
                         isGeneratingSummary ||
                         photos.length !== MAX_PHOTOS ||
                         photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))
                     }
-                    className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105" // Button styles
+                    className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
                     variant="secondary"
                     size="lg"
                   >
-                    {isGeneratingSummary ? ( // Loading state
+                    {isGeneratingSummary ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         摘要產生中...
                       </>
-                    ) : ( // Default text
+                    ) : (
                       '產生會議摘要'
                     )}
                   </Button>
-                 {/* Display Generated Summary */}
                  {summary && (
                   <div className="mt-4 p-4 md:p-6 border border-slate-600 rounded-lg bg-slate-800/30 shadow-inner">
                     <h3 className="text-xl font-semibold mb-3 text-slate-200">會議摘要：</h3>
-                    {/* Use Textarea for display, allows easy copying */}
                     <Textarea
                        value={summary}
-                       readOnly // Make it non-editable
-                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" // Styling
+                       readOnly
+                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100"
                        aria-label="會議摘要內容"
                     />
                   </div>
@@ -1629,49 +1481,46 @@ export default function Home() {
               </CardContent>
             </Card>
 
-             {/* Step 4: Export Report Card */}
              <Card className="card-step-4 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
-               <CardHeader className="card-header-step-4 p-6"> {/* Step-specific styling */}
+               <CardHeader className="card-header-step-4 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
-                     <Download className="w-7 h-7 card-icon-step-4" /> {/* Step-specific icon */}
+                     <Download className="w-7 h-7 card-icon-step-4" />
                     第四步：匯出報告
                   </CardTitle>
                    <CardDescription className="text-slate-300">
                      點擊下方按鈕匯出 Word (.doc) 或 PDF 格式報告。
                    </CardDescription>
                </CardHeader>
-               <CardContent className="p-6 md:p-8 flex flex-col sm:flex-row flex-wrap gap-4"> {/* Button container */}
-                   {/* Export DOC Button */}
+               <CardContent className="p-6 md:p-8 flex flex-col sm:flex-row flex-wrap gap-4">
                    <Button
                       type="button"
                       onClick={handleExportReport}
-                      disabled={isExportDisabled} // Control button state
-                      className="w-full sm:flex-1 sm:min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg" // Button styles
+                      disabled={isExportDisabled}
+                      className="w-full sm:flex-1 sm:min-w-[200px] bg-primary text-primary-foreground hover:bg-primary/90 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg"
                     >
-                      {isExportingDoc ? ( // Loading state
+                      {isExportingDoc ? (
                           <>
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                             匯出 DOC 中...
                           </>
-                        ) : ( // Default text
+                        ) : (
                          '匯出會議報告 (.doc)'
                         )
                       }
                    </Button>
-                    {/* Export PDF Button */}
                     <Button
                       type="button"
                       onClick={handleExportPdf}
-                      disabled={isExportDisabled} // Control button state
-                      className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg" // Button styles
-                      variant="outline" // Use outline variant for visual distinction
+                      disabled={isExportDisabled}
+                      className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg"
+                      variant="outline"
                     >
-                      {isPreparingPdf ? ( // Loading state
+                      {isPreparingPdf ? (
                           <>
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                             準備 PDF 中...
                           </>
-                        ) : ( // Default text with icon
+                        ) : (
                          <>
                           <Printer className="mr-2 h-5 w-5" />
                           匯出會議報告 (PDF)
@@ -1685,8 +1534,7 @@ export default function Home() {
           </form>
         </Form>
       </div>
-       <Toaster /> {/* Renders toast notifications */}
-      </TooltipProvider> // Close TooltipProvider
+       <Toaster />
+      </TooltipProvider>
     );
 }
-
