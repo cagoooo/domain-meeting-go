@@ -1,4 +1,4 @@
-# **App Name**: 領域共學誌
+# **App Name**: 領域共備GO
 
 ## Core Features:
 

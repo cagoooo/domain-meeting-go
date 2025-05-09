@@ -131,7 +131,7 @@ export default function Home() {
         if (file.size > MAX_FILE_SIZE) {
           toast({
             title: '上傳錯誤',
-            description: `檔案 ${file.name} 過大，請選擇小於 20MB 的檔案。`,
+            description: `檔案 ${file.name} 過大，請選擇小於 ${MAX_FILE_SIZE / 1024 / 1024}MB 的檔案。`,
             variant: 'destructive',
           });
           continue;
@@ -1329,7 +1329,7 @@ export default function Home() {
                     <ImageIcon className="w-7 h-7 card-icon-step-2" />
                     第二步：上傳會議照片
                 </CardTitle>
-                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; 20MB)</CardDescription>
+                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; {MAX_FILE_SIZE / 1024 / 1024}MB)</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8">
                 <div className="mb-6">
@@ -1533,6 +1533,11 @@ export default function Home() {
 
           </form>
         </Form>
+        <footer className="mt-12 py-6 text-center text-slate-400 text-sm">
+          <p>
+            &copy; 2025 <a href="https://www.smes.tyc.edu.tw/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline">桃園市石門國小 資訊組 阿凱老師</a>
+          </p>
+        </footer>
       </div>
        <Toaster />
       </TooltipProvider>

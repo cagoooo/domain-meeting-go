@@ -27,7 +27,7 @@ export type GeneratePhotoDescriptionsInput = z.infer<typeof GeneratePhotoDescrip
 const GeneratePhotoDescriptionsOutputSchema = z.object({
   photoDescription: z
     .string()
-    .describe('A detailed 30-60 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, and the scene.'),
+    .describe('A detailed 60-100 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, people, and the scene.'),
 });
 export type GeneratePhotoDescriptionsOutput = z.infer<typeof GeneratePhotoDescriptionsOutputSchema>;
 
@@ -56,7 +56,7 @@ const prompt = ai.definePrompt({
     schema: z.object({
       photoDescription: z
         .string()
-        .describe('A detailed 30-60 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, and the scene.'),
+        .describe('A detailed 60-100 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, people, and the scene.'),
     }),
   },
   prompt: `你是教育專業助理，任務是為老師分析照片。
@@ -66,7 +66,7 @@ const prompt = ai.definePrompt({
 - 社群成員：{{{communityMembers}}}
 - 會議日期：{{{meetingDate}}}
 
-**任務：** 請仔細觀察以下提供的照片，並用**繁體中文（台灣用語）**寫一段詳細描述照片的文字，長度約30至60字。描述應涵蓋照片中的主要人物、他們的活動，以及場景佈置。
+**任務：** 請仔細觀察以下提供的照片，並用**繁體中文（台灣用語）**寫一段詳細描述照片的文字，長度約60至100字。描述應涵蓋照片中的主要人物、他們的活動、場景佈置，以及任何值得注意的細節。
 
 **輸出要求：**
 1. 你的回應**必須**只包含這句繁體中文描述，不要有任何其他文字、標籤或格式。
@@ -89,4 +89,3 @@ const generatePhotoDescriptionsFlow = ai.defineFlow<
     return {photoDescription: output!.photoDescription!};
   }
 );
-
