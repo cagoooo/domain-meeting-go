@@ -32,8 +32,8 @@ import { Progress } from '@/components/ui/progress';
 import { generatePhotoDescriptions, type GeneratePhotoDescriptionsOutput } from '@/ai/flows/generate-photo-descriptions';
 import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
 import { Toaster } from '@/components/ui/toaster';
-import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast'; // Moved import here
 
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -1533,10 +1533,14 @@ export default function Home() {
 
           </form>
         </Form>
-        <footer className="mt-12 py-6 text-center text-slate-400 text-sm">
-          <p>
-            &copy; 2025 <a href="https://www.smes.tyc.edu.tw/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-200 underline">桃園市石門國小 資訊組 阿凱老師</a>
-          </p>
+       <footer className="mt-16 py-8 text-center">
+         <div className="container mx-auto px-4">
+           <div className="bg-slate-800/70 backdrop-blur-sm rounded-lg p-6 border border-slate-700 shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105">
+             <p className="text-sm text-slate-300">
+                &copy; 2025 <a href="https://www.smes.tyc.edu.tw/" target="_blank" rel="noopener noreferrer" className="hover:text-primary underline transition-colors duration-200">桃園市石門國小 資訊組 阿凱老師</a> 設計
+             </p>
+           </div>
+         </div>
         </footer>
       </div>
        <Toaster />
