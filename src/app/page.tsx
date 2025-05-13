@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ChangeEvent } from 'react';
@@ -33,7 +34,7 @@ import { generatePhotoDescriptions, type GeneratePhotoDescriptionsOutput } from 
 import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
 import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useToast } from '@/hooks/use-toast'; // Moved import here
+import { useToast } from '@/hooks/use-toast';
 
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -329,7 +330,7 @@ export default function Home() {
         });
 
 
-        if (hasSuccess && failedCount === 0 && currentPhotos.length > 0) { // ensure currentPhotos is used
+        if (hasSuccess && failedCount === 0 && currentPhotos.length > 0) { 
           toast({
             title: '成功',
             description: '照片描述產生完成！',
@@ -340,7 +341,7 @@ export default function Home() {
             description: `${failedCount} 張照片描述產生失敗，請檢查標示為「無法描述」的圖片。`,
             variant: 'destructive',
            });
-        } else if (!hasSuccess && failedCount > 0 && currentPhotos.length > 0) { // ensure currentPhotos is used
+        } else if (!hasSuccess && failedCount > 0 && currentPhotos.length > 0) { 
              toast({
                 title: '產生失敗',
                 description: `所有照片描述產生失敗，請檢查錯誤訊息或稍後重試。`,
@@ -518,7 +519,7 @@ export default function Home() {
         background-color: #ffffff;
       }
       .report-container {
-        max-width: 18.46cm;
+        max-width: 18.46cm; /* A4 width - margins */
         margin: 0 auto;
         background-color: #ffffff;
         padding: ${forPrint ? '0' : '1.5cm'};
@@ -591,14 +592,14 @@ export default function Home() {
 
       .photo-table {
         width: 100%;
-        max-width: 18.46cm;
+        max-width: 18.46cm; /* A4 width - margins */
         border-collapse: collapse;
         border-spacing: 0;
         margin: 20pt auto;
         page-break-inside: avoid;
         border: 1px solid #e0e0e0;
         border-radius: 6px;
-        overflow: hidden;
+        overflow: hidden; /* for border-radius on table */
         background-color: #f8f9fa;
       }
       .photo-table td, .photo-table-cell {
@@ -606,24 +607,25 @@ export default function Home() {
         padding: 10pt;
         text-align: center;
         vertical-align: top;
-        width: 50%;
+        width: 50%; /* Two equal columns */
       }
       ${!forPrint ? `
+      /* Rounded corners for DOC export table cells (visual only, not Word rendering) */
       .photo-table tr:first-child td:first-child { border-top-left-radius: 6px; }
       .photo-table tr:first-child td:last-child { border-top-right-radius: 6px; }
-      .photo-table tr:nth-child(4) td:first-child { border-bottom-left-radius: 6px; }
+      .photo-table tr:nth-child(4) td:first-child { border-bottom-left-radius: 6px; } /* Assuming 2 rows of images + 2 rows of descriptions */
       .photo-table tr:nth-child(4) td:last-child { border-bottom-right-radius: 6px; }
       ` : ''}
 
       .photo-table img {
         display: block;
-        margin: 0 auto 8pt auto;
-        height: 5cm;
-        width: auto;
-        max-width: 100%;
-        object-fit: contain;
-        border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin: 0 auto 8pt auto; /* Center image and add space below */
+        height: 5cm; /* Fixed height */
+        width: auto;   /* Auto width to maintain aspect ratio */
+        max-width: 100%; /* Ensure image doesn't overflow cell */
+        object-fit: contain; /* Ensure image fits within bounds, maintaining aspect ratio */
+        border-radius: 4px; /* Rounded corners for images */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Subtle shadow for images */
       }
       .photo-description {
         font-size: 10pt;
@@ -634,10 +636,10 @@ export default function Home() {
         font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
       }
       .summary-section p {
-        white-space: pre-wrap;
+        white-space: pre-wrap; /* Preserve line breaks from summary */
         font-size: 12pt;
         text-align: left;
-        line-height: 1.7;
+        line-height: 1.7; /* Increased line height for readability */
         font-family: '標楷體', 'BiauKai', serif;
         padding: 15pt;
         background-color: #f8f9fa;
@@ -654,13 +656,17 @@ export default function Home() {
       }
       .page-break { page-break-before: always; }
 
+      /* Print specific styles */
       @media print {
-        @page { size: A4 portrait; margin: 1.27cm; }
+        @page { 
+          size: A4 portrait; 
+          margin: 1.27cm; /* Standard Word Narrow Margin */
+        }
         body {
-          background-color: #ffffff !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-          margin: 0;
+          background-color: #ffffff !important; /* Ensure white background for printing */
+          -webkit-print-color-adjust: exact; /* Force print background colors in Chrome/Safari */
+          print-color-adjust: exact; /* Standard way to force print background colors */
+          margin: 0; /* Remove browser default margin for print */
         }
         .report-container {
           box-shadow: none !important;
@@ -672,9 +678,9 @@ export default function Home() {
         }
         h1, h2 { page-break-after: avoid; color: #000000 !important; border-color: #000000 !important; text-align: left !important; }
         .section, .photo-table { page-break-inside: avoid; }
-        .photo-table tr { page-break-inside: avoid; }
+        .photo-table tr { page-break-inside: avoid; } /* Try to keep table rows together */
         strong, em { color: #000000 !important; }
-        p { text-align: left !important; }
+        p { text-align: left !important; } /* Ensure paragraphs are left-aligned for print */
         .photo-table, .photo-table td, .photo-table-cell { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
         .photo-table img { box-shadow: none !important; border-radius: 0 !important;}
         .photo-description { color: #333333 !important; text-align: center !important; }
@@ -761,18 +767,20 @@ export default function Home() {
         </xml><![endif]-->
          <!--[if gte mso 10]>
         <style>
+         /* Style Definitions */
          table.MsoNormalTable {mso-style-name:"Table Normal"; mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-noshow:yes; mso-style-priority:99; mso-style-parent:""; mso-padding-alt:0cm 5.4pt 0cm 5.4pt; mso-para-margin:0cm; mso-para-margin-bottom:.0001pt; mso-pagination:widow-orphan; font-size:12.0pt; font-family:"Calibri",sans-serif; mso-ascii-font-family:Calibri; mso-ascii-theme-font:minor-latin; mso-hansi-font-family:Calibri; mso-hansi-theme-font:minor-latin; mso-bidi-font-family:"Times New Roman"; mso-bidi-theme-font:minor-bidi; mso-fareast-language:EN-US;}
 
+         /* Custom Photo Table Style for Word */
          table.PhotoTableStyle {
              mso-style-name:"Photo Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
              mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
-             mso-table-left:center;
-             mso-table-right:center;
+             mso-table-left:center; /* Center table on page */
+             mso-table-right:center; /* Center table on page */
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-lspace:0cm; mso-table-rspace:0cm;
-             mso-table-layout-alt:fixed;
+             mso-table-layout-alt:fixed; /* Fixed layout helps with consistency */
              mso-border-alt:solid #e0e0e0 .75pt;
              mso-padding-alt:0cm 0cm 0cm 0cm;
              mso-border-insideh:.75pt solid #e0e0e0;
@@ -784,23 +792,24 @@ export default function Home() {
          }
          td.PhotoCellStyle {
              mso-style-name:"Photo Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"Photo Table";
-             width: 9.23cm;
+             width: 9.23cm; /* Width of cell (approx half of A4 content width) */
              mso-border-alt:solid #e0e0e0 .75pt;
              padding:10.0pt 10.0pt 10.0pt 10.0pt;
              vertical-align:top;
-             background:#F8F9FA;
-             text-align:center;
-             mso-element:para-border-div;
+             background:#F8F9FA; /* Cell background */
+             text-align:center; /* Center align text in cell */
+             mso-element:para-border-div; /* Important for Word rendering */
          }
          p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
             mso-style-name:"Photo Description"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"";
             margin-top:5.0pt; margin-right:0cm; margin-bottom:0cm; margin-left:0cm;
             mso-para-margin-top:.5gd; mso-para-margin-right:0cm; mso-para-margin-bottom:0cm; mso-para-margin-left:0cm;
-            text-align:center;
+            text-align:center; /* Center description text */
             line-height:140%; mso-pagination:widow-orphan;
             font-size:10.0pt; font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei";
             color:#495057;
          }
+         /* Heading Styles for Word */
          p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 1 Char";
             mso-margin-top-alt:auto; margin-right:0cm; mso-margin-bottom-alt:25.0pt; margin-left:0cm;
@@ -809,7 +818,7 @@ export default function Home() {
             color:#003F5C; font-weight:bold;
             border:none; mso-border-bottom-alt:solid #003F5C 2.0pt;
             padding:0cm; mso-padding-alt:0cm 0cm 10.0pt 0cm;
-            text-align:left;
+            text-align:left; /* Left align Heading 1 */
          }
          p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 2 Char";
@@ -819,40 +828,45 @@ export default function Home() {
             color:#0056B3; font-weight:bold;
             border:none; mso-border-bottom-alt:solid #DEE2E6 1.0pt;
             padding:0cm; mso-padding-alt:0cm 0cm 6.0pt 0cm;
-            text-align:left;
+            text-align:left; /* Left align Heading 2 */
          }
+         /* Normal Paragraph Style for Word */
          p.MsoNormal, li.MsoNormal, div.MsoNormal {
             mso-style-unhide:no; mso-style-qformat:yes; mso-style-parent:"";
-            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm;
+            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm; /* Default margin */
             line-height:150%; mso-pagination:widow-orphan;
             font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
             color:#333333;
-            text-align:left;
-            mso-line-height-rule:exactly;
+            text-align:left; /* Left align normal text */
+            mso-line-height-rule:exactly; /* More precise line height */
          }
-         span.InfoLabelStyle {
+         /* Info Section Styles for Word */
+         span.InfoLabelStyle { /* For styling the labels like "教學領域：" */
             mso-style-name:"Info Label"; mso-style-priority:99; mso-style-unhide:no;
             font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei";
             font-weight:bold; color:#212529;
             mso-ansi-font-size:12.0pt; mso-bidi-font-size:12.0pt;
          }
-         div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal {
-             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt;
+         div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal { /* Specific paragraph style for info section */
+             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt; /* Custom margins for info section paragraphs */
          }
 
+         /* Summary Section Style for Word */
          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
              mso-style-name:"Summary Text"; mso-style-priority:99; mso-style-unhide:no;
              margin:0cm; margin-bottom:.0001pt;
-             text-align:left;
+             text-align:left; /* Left align summary text */
              line-height:170%; mso-pagination:widow-orphan;
-             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt;
-             mso-border-alt:solid #E0E0E0 .75pt;
+             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Padding for summary block */
+             mso-border-alt:solid #E0E0E0 .75pt; /* Border for summary block */
              font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
-             background:#F8F9FA;
+             background:#F8F9FA; /* Background for summary block */
              mso-line-height-rule:exactly;
          }
+         /* Character Styles for Headings (Word specific) */
          span.Heading1Char {mso-style-name:"Heading 1 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 1"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#003F5C; font-weight:bold;}
          span.Heading2Char {mso-style-name:"Heading 2 Char"; mso-style-priority:9; mso-style-unhide:no; mso-style-locked:yes; mso-style-link:"Heading 2"; font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; color:#0056B3; font-weight:bold;}
+         /* Ensure strong and em tags are rendered correctly in Word for summary */
          strong {mso-style-name:""; font-weight:bold; color: #000000;}
          em {mso-style-name:""; font-style:italic; color: #333333;}
          .SummaryStyle strong {mso-style-name:""; font-weight:bold; color: #000000;}
@@ -879,58 +893,64 @@ export default function Home() {
         <style>
           ${styles}
           ${!forPrint ? `
+          /* Word-specific page setup */
           @page Section1 {
-            size: 21cm 29.7cm;
-            margin: 1.27cm 1.27cm 1.27cm 1.27cm;
+            size: 21cm 29.7cm; /* A4 size */
+            margin: 1.27cm 1.27cm 1.27cm 1.27cm; /* Narrow margins: 0.5 inch */
             mso-header-margin: .5in;
             mso-footer-margin: .5in;
             mso-paper-source: 0;
           }
           div.Section1 { page: Section1; }
 
+          /* MSO specific overrides for text alignment */
           <!--[if gte mso 9]>
            p.MsoNormal, li.MsoNormal, div.MsoNormal,
            p.MsoHeading1, li.MsoHeading1, div.MsoHeading1,
            p.MsoHeading2, li.MsoHeading2, div.MsoHeading2,
            p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
-              text-align: left !important;
-              mso-text-align-alt: left !important;
+              text-align: left !important; /* Force left alignment for Word */
+              mso-text-align-alt: left !important; /* Alternative Word property for left alignment */
            }
            p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
-              text-align: center !important;
+              text-align: center !important; /* Center align photo descriptions */
            }
            td.PhotoCellStyle {
-               text-align: center !important;
-               vertical-align: top !important;
+               text-align: center !important; /* Center align content in photo cells */
+               vertical-align: top !important; /* Top align content in photo cells */
            }
-           td.PhotoCellStyle p.MsoNormal {
-              text-align: center !important;
-              margin-bottom: 8pt !important;
+           td.PhotoCellStyle p.MsoNormal { /* Paragraphs within photo cells */
+              text-align: center !important; /* Center align text within photo cells */
+              margin-bottom: 8pt !important; /* Add some bottom margin */
            }
+           /* Styling for the Info Section block in Word */
            div.InfoSectionBlock {
-               mso-border-alt:solid #e0e0e0 .75pt;
-               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt;
-               background:#F8F9FA;
-               mso-shading:#F8F9FA;
-               mso-margin-top-alt:15pt;
-               margin-bottom:30pt;
+               mso-border-alt:solid #e0e0e0 .75pt; /* Border for the info block */
+               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Padding for the info block */
+               background:#F8F9FA; /* Background color for the info block */
+               mso-shading:#F8F9FA; /* MSO specific background color */
+               mso-margin-top-alt:15pt; /* Top margin */
+               margin-bottom:30pt; /* Bottom margin */
            }
+           /* Styling for H2 within the Info Section block in Word */
            div.InfoSectionBlock p.MsoHeading2 {
-               mso-margin-top-alt:0cm !important;
-               mso-margin-bottom-alt:15pt !important;
-               border:none;
-               mso-border-bottom-alt:solid #ced4da 1.0pt !important;
-               mso-padding-bottom-alt:6pt !important;
+               mso-margin-top-alt:0cm !important; /* Remove top margin for H2 */
+               mso-margin-bottom-alt:15pt !important; /* Bottom margin for H2 */
+               border:none; /* Remove default border */
+               mso-border-bottom-alt:solid #ced4da 1.0pt !important; /* Bottom border for H2 */
+               mso-padding-bottom-alt:6pt !important; /* Bottom padding for H2 */
            }
+           /* Styling for paragraphs within the Info Section block in Word */
            div.InfoSectionBlock p.MsoNormal {
-               margin-bottom:8.0pt !important;
-               line-height:150% !important;
-               font-family:"標楷體",serif !important;
-               mso-fareast-font-family:"標楷體" !important;
+               margin-bottom:8.0pt !important; /* Bottom margin for paragraphs */
+               line-height:150% !important; /* Line height */
+               font-family:"標楷體",serif !important; /* Font family */
+               mso-fareast-font-family:"標楷體" !important; /* MSO specific font family */
            }
+           /* Styling for labels (strong tags) within Info Section paragraphs in Word */
            div.InfoSectionBlock p.MsoNormal span.InfoLabelStyle {
-              mso-spacerun:yes;
-              margin-right:7.5pt;
+              mso-spacerun:yes; /* Ensure space is rendered correctly */
+              margin-right:7.5pt; /* Right margin for labels */
            }
 
           <![endif]-->
@@ -949,10 +969,10 @@ export default function Home() {
     reportHtmlContent += `
         <div class="section info-section ${!forPrint ? 'InfoSectionBlock' : ''}">
           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>基本資訊</${forPrint ? 'h2' : 'p'}>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>教學領域：</strong> ${teachingArea}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>會議主題：</strong> ${meetingTopic}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
-          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'style="mso-style-name: InfoLabelStyle;"' : ''}>社群成員：</strong> ${communityMembers}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'class="InfoLabelStyle" style="mso-style-name: InfoLabelStyle;"' : ''}>教學領域：</strong> ${teachingArea}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'class="InfoLabelStyle" style="mso-style-name: InfoLabelStyle;"' : ''}>會議主題：</strong> ${meetingTopic}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'class="InfoLabelStyle" style="mso-style-name: InfoLabelStyle;"' : ''}>會議日期：</strong> ${format(meetingDate, 'yyyy年MM月dd日')}</p>
+          <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'class="InfoLabelStyle" style="mso-style-name: InfoLabelStyle;"' : ''}>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
 
@@ -960,8 +980,6 @@ export default function Home() {
         <div class="section photo-section">
            <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
 
-    // Use a single table tag with appropriate classes for DOC export
-    // For PDF/Print, it will use 'photo-table'. For DOC, it adds 'PhotoTableStyle' and MSO-specific attributes.
     reportHtmlContent += `
         <table class="${forPrint ? 'photo-table' : 'photo-table PhotoTableStyle'}" 
                ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'` : ''}
@@ -1147,7 +1165,7 @@ export default function Home() {
                        setIsPreparingPdf(false);
                        iframe.onload = null;
                     }
-                  }, 500);
+                  }, 500); // Delay ensures content is fully rendered, especially images
                 };
                  iframe.onerror = (error) => {
                     console.error('Error loading iframe content:', error);
@@ -1176,7 +1194,8 @@ export default function Home() {
 
    useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {
-         if (type === 'change' && name !== undefined) {
+         // Reset photo descriptions and summary if any form field changes
+         if (type === 'change' && name !== undefined) { // ensure 'name' is defined
             setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
             setSummary('');
             setDescriptionProgress(null);
@@ -1184,7 +1203,7 @@ export default function Home() {
          }
       });
       return () => subscription.unsubscribe();
-   }, [form]);
+   }, [form]); // form is stable, no need to list all fields
 
 
   const isExportDisabled =
@@ -1209,7 +1228,7 @@ export default function Home() {
               width: '0',
               height: '0',
               border: '0',
-              visibility: 'hidden',
+              visibility: 'hidden', // Keep it hidden, not 'none' for loading
           }}
           title="Print Content Frame"
       ></iframe>
@@ -1224,6 +1243,7 @@ export default function Home() {
 
         <Form {...form}>
           <form className="space-y-10">
+            {/* Step 1: Meeting Information */}
             <Card className="card-step-1 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-1 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
@@ -1323,6 +1343,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
+            {/* Step 2: Upload Photos */}
             <Card className="card-step-2 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-2 p-6">
                 <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
@@ -1375,7 +1396,7 @@ export default function Home() {
                                 alt={`照片 ${photo.file.name}`}
                                 fill
                                 style={{ objectFit: 'contain' }}
-                                priority
+                                priority // Ensures LCP images are loaded quickly
                                 className="transition-transform duration-300 group-hover:scale-105"
                               />
                             <button
@@ -1392,13 +1413,14 @@ export default function Home() {
                                 </div>
                               )}
                           </div>
-                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center">
+                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center"> {/* min-h to ensure consistent height */}
                              <p className="text-xs text-slate-200 text-center break-words text-shadow">
                                 {photo.description || '尚未產生描述'}
                              </p>
                           </div>
                         </div>
                       ))}
+                       {/* Placeholders for empty slots */}
                        {Array.from({ length: Math.max(0, MAX_PHOTOS - photos.length) }).map((_, index) => (
                           <div key={`placeholder-${index}`} className="relative border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
                              照片 {photos.length + index + 1}
@@ -1411,7 +1433,7 @@ export default function Home() {
                             onClick={handleGenerateDescriptions}
                             disabled={isGenerateDescriptionsDisabled}
                             className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
-                            variant="secondary"
+                            variant="secondary" // Consider using a distinct variant if needed
                             size="lg"
                         >
                             {isGeneratingAllDescriptions ? (
@@ -1437,6 +1459,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
+            {/* Step 3: Generate Summary */}
             <Card className="card-step-3 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-3 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
@@ -1451,11 +1474,11 @@ export default function Home() {
                     onClick={handleGenerateSummary}
                     disabled={
                         isGeneratingSummary ||
-                        photos.length !== MAX_PHOTOS ||
-                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述'))
+                        photos.length !== MAX_PHOTOS || // Ensure MAX_PHOTOS are uploaded
+                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述')) // All descriptions must be successfully generated
                     }
                     className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
-                    variant="secondary"
+                    variant="secondary" // Or a specific variant for this action
                     size="lg"
                   >
                     {isGeneratingSummary ? (
@@ -1473,7 +1496,7 @@ export default function Home() {
                     <Textarea
                        value={summary}
                        readOnly
-                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100"
+                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" // Increased height for better readability
                        aria-label="會議摘要內容"
                     />
                   </div>
@@ -1481,6 +1504,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
+            {/* Step 4: Export Report */}
              <Card className="card-step-4 shadow-lg rounded-xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 bg-slate-800/70 backdrop-blur-sm">
                <CardHeader className="card-header-step-4 p-6">
                   <CardTitle className="text-2xl font-semibold text-slate-100 flex items-center gap-3">
@@ -1513,7 +1537,7 @@ export default function Home() {
                       onClick={handleExportPdf}
                       disabled={isExportDisabled}
                       className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg"
-                      variant="outline"
+                      variant="outline" // Use outline or another distinct variant for PDF
                     >
                       {isPreparingPdf ? (
                           <>
@@ -1543,7 +1567,8 @@ export default function Home() {
          </div>
         </footer>
       </div>
-       <Toaster />
+       <Toaster /> {/* Ensure Toaster is rendered for notifications */}
       </TooltipProvider>
     );
 }
+
