@@ -873,11 +873,14 @@ export default function Home() {
          table.SignInTableStyle {
              mso-style-name:"Sign-In Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
-             mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
-             mso-table-left:center; mso-table-right:center;
+             /* mso-table-anchor-vertical:paragraph; */ /* Removed for testing flow */
+             /* mso-table-anchor-horizontal:margin; */ /* Removed for testing flow */
+             mso-table-lspace:0pt; mso-table-rspace:0pt; /* Ensure no extra space */
+             margin-left:auto; margin-right:auto; /* Try CSS auto margins for centering */
+             mso-table-left:center; /* Keep MSO centering as fallback */
+             mso-table-right:center; /* Keep MSO centering as fallback */
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
-             mso-table-lspace:0cm; mso-table-rspace:0cm;
              mso-table-layout-alt:fixed;
              mso-border-alt:solid windowtext .75pt; /* Thicker outer border */
              mso-padding-alt:0cm 5.4pt 0cm 5.4pt;
@@ -1088,7 +1091,7 @@ export default function Home() {
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
         <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; mso-table-left:center; mso-table-right:center; margin-left:auto; margin-right:auto;'` : ''}
         >
           <thead>
             <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
@@ -1739,3 +1742,4 @@ export default function Home() {
       </TooltipProvider>
     );
 }
+
