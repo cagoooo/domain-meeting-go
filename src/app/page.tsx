@@ -297,10 +297,19 @@ export default function Home() {
                  descriptionResult = { id: photo.id, description: result.photoDescription || '描述失敗', success: success };
             } catch (error) {
                 console.error(`Error generating description for ${photo.file.name}:`, error);
-                const errorDescription = error instanceof Error ? error.message : '產生描述時發生未知錯誤。';
-                const finalDescription = (errorDescription.includes("safety") || errorDescription.includes("SAFETY"))
-                    ? '無法描述此圖片（安全限制）。'
-                    : '無法描述此圖片。';
+                let errorDescription = '產生描述時發生未知錯誤。';
+                if (error instanceof Error) {
+                    errorDescription = error.message;
+                }
+                
+                const isModelOverloadedError = errorDescription.includes("overloaded") || errorDescription.includes("Service Unavailable") || errorDescription.includes("503");
+
+                const finalDescription = isModelOverloadedError
+                    ? '模型目前忙碌中，請稍後再試。'
+                    : (errorDescription.includes("safety") || errorDescription.includes("SAFETY"))
+                        ? '無法描述此圖片（安全限制）。'
+                        : '無法描述此圖片。';
+
                  descriptionResult = { id: photo.id, description: finalDescription, success: false };
             } finally {
                 completedCount++;
@@ -320,11 +329,19 @@ export default function Home() {
 
         let failedCount = 0;
         let hasSuccess = false;
+        let modelOverloadedDuringProcess = false;
 
         results.forEach(result => {
-            if (result.status === 'fulfilled' && result.value.success) {
-                hasSuccess = true;
-            } else {
+            if (result.status === 'fulfilled') {
+                if (result.value.success) {
+                    hasSuccess = true;
+                } else {
+                    failedCount++;
+                    if (result.value.description.includes('模型目前忙碌中')) {
+                        modelOverloadedDuringProcess = true;
+                    }
+                }
+            } else { // status === 'rejected'
                 failedCount++;
             }
         });
@@ -335,6 +352,12 @@ export default function Home() {
             title: '成功',
             description: '照片描述產生完成！',
           });
+        } else if (modelOverloadedDuringProcess) {
+             toast({
+                title: '模型忙碌',
+                description: '部分照片因模型忙碌無法產生描述，請稍後再試。',
+                variant: 'destructive',
+             });
         } else if (hasSuccess && failedCount > 0) {
            toast({
             title: '部分完成',
@@ -372,7 +395,7 @@ export default function Home() {
 
  const handleGenerateSummary = useCallback(async () => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.startsWith('無法描述'));
+    const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.startsWith('無法描述') && !d.startsWith('模型目前忙碌中'));
 
     if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers) {
         toast({
@@ -402,11 +425,11 @@ export default function Home() {
          return;
      }
 
-    const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述'));
+    const allDescriptionsGeneratedSuccessfully = photos.every(p => p.description && !p.description.startsWith('無法描述') && !p.description.startsWith('模型目前忙碌中'));
     if (!allDescriptionsGeneratedSuccessfully) {
          toast({
              title: '請先成功產生所有照片描述',
-             description: '報告中包含無法描述或產生失敗的照片描述，請點擊「重新產生描述」按鈕以重試，或移除問題照片。',
+             description: '報告中包含無法描述、產生失敗或因模型忙碌未產生的照片描述。請點擊「重新產生描述」按鈕以重試，或移除問題照片。',
              variant: 'destructive',
          });
          return;
@@ -477,6 +500,8 @@ export default function Home() {
 
   const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const membersArray = communityMembers.split(',').map(name => name.trim()).filter(name => name.length > 0);
+
 
     const photosWithDataUrls = await Promise.all(
         photos.map(async (photo) => {
@@ -590,6 +615,39 @@ export default function Home() {
          font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
       }
 
+      /* Sign-in Table Styles */
+      .signin-table {
+        width: 100%;
+        max-width: 18.46cm; /* A4 width - margins */
+        border-collapse: collapse;
+        border-spacing: 0;
+        margin: 20pt auto;
+        page-break-inside: avoid;
+        border: 1px solid #ababab; /* Outer border based on image */
+        background-color: #ffffff;
+      }
+      .signin-table th, .signin-table td {
+        border: 1px solid #cccccc; /* Inner borders */
+        padding: 7pt; /* Adjusted padding */
+        text-align: center;
+        vertical-align: middle;
+        font-size: 11pt;
+        font-family: '標楷體', 'BiauKai', serif;
+      }
+      .signin-table th {
+        font-weight: bold;
+        background-color: #e9ecef; /* Lighter gray for header */
+        font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif;
+      }
+      .signin-table td.name-cell {
+        width: 25%;
+      }
+      .signin-table td.signature-cell {
+        width: 25%;
+        height: 2.2cm; /* Slightly adjusted height for signature */
+      }
+
+
       .photo-table {
         width: 100%;
         max-width: 18.46cm; /* A4 width - margins */
@@ -677,13 +735,15 @@ export default function Home() {
           border: none;
         }
         h1, h2 { page-break-after: avoid; color: #000000 !important; border-color: #000000 !important; text-align: left !important; }
-        .section, .photo-table { page-break-inside: avoid; }
-        .photo-table tr { page-break-inside: avoid; } /* Try to keep table rows together */
+        .section, .photo-table, .signin-table { page-break-inside: avoid; }
+        .photo-table tr, .signin-table tr { page-break-inside: avoid; } /* Try to keep table rows together */
         strong, em { color: #000000 !important; }
         p { text-align: left !important; } /* Ensure paragraphs are left-aligned for print */
-        .photo-table, .photo-table td, .photo-table-cell { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
+        .photo-table, .photo-table td, .photo-table-cell, .signin-table, .signin-table th, .signin-table td { border-color: #cccccc !important; background-color: #ffffff !important; border-radius: 0 !important;}
         .photo-table img { box-shadow: none !important; border-radius: 0 !important;}
         .photo-description { color: #333333 !important; text-align: center !important; }
+        .signin-table th { background-color: #f0f0f0 !important; font-family: 'Microsoft JhengHei', '微軟正黑體', Arial, sans-serif !important; }
+        .signin-table td { font-family: '標楷體', 'BiauKai', serif !important;}
         
         .info-section {
           background-color: #ffffff !important;
@@ -775,8 +835,7 @@ export default function Home() {
              mso-style-name:"Photo Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
              mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
-             mso-table-left:center; /* Center table on page */
-             mso-table-right:center; /* Center table on page */
+             mso-table-left:center; mso-table-right:center;
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-lspace:0cm; mso-table-rspace:0cm;
@@ -809,6 +868,51 @@ export default function Home() {
             font-size:10.0pt; font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei";
             color:#495057;
          }
+
+         /* Custom Sign-In Table Style for Word */
+         table.SignInTableStyle {
+             mso-style-name:"Sign-In Table";
+             mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
+             mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
+             mso-table-left:center; mso-table-right:center;
+             mso-table-bspace:0cm; mso-table-vspace:0cm;
+             mso-table-top:20pt; mso-table-bottom:auto;
+             mso-table-lspace:0cm; mso-table-rspace:0cm;
+             mso-table-layout-alt:fixed;
+             mso-border-alt:solid windowtext .75pt; /* Thicker outer border */
+             mso-padding-alt:0cm 5.4pt 0cm 5.4pt;
+             mso-border-insideh:.5pt solid windowtext; /* Thinner inner horizontal border */
+             mso-border-insidev:.5pt solid windowtext; /* Thinner inner vertical border */
+             mso-para-margin:0cm; mso-para-margin-bottom:.0001pt;
+             mso-pagination:widow-orphan;
+             font-size:11.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體";
+             background:#FFFFFF;
+         }
+         td.SignInHeaderCellStyle {
+             mso-style-name:"Sign-In Header Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
+             mso-border-alt:solid windowtext .75pt;
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             text-align:center; vertical-align:middle;
+             background:#E9ECEF; mso-shading:#E9ECEF;
+             font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei"; font-weight:bold;
+         }
+         td.SignInNameCellStyle {
+             mso-style-name:"Sign-In Name Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
+             width:4.615cm; /* (18.46cm / 4) */
+             mso-border-alt:solid windowtext .5pt;
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             text-align:center; vertical-align:middle;
+         }
+         td.SignInSignatureCellStyle {
+             mso-style-name:"Sign-In Signature Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
+             width:4.615cm; /* (18.46cm / 4) */
+             height:2.2cm; mso-height-rule:exactly;
+             mso-border-alt:solid windowtext .5pt;
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             text-align:center; vertical-align:middle;
+         }
+
+
          /* Heading Styles for Word */
          p.MsoHeading1, li.MsoHeading1, div.MsoHeading1 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 1 Char";
@@ -915,13 +1019,17 @@ export default function Home() {
            p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
               text-align: center !important; /* Center align photo descriptions */
            }
-           td.PhotoCellStyle {
+           td.PhotoCellStyle, td.SignInHeaderCellStyle, td.SignInNameCellStyle, td.SignInSignatureCellStyle {
                text-align: center !important; /* Center align content in photo cells */
-               vertical-align: top !important; /* Top align content in photo cells */
+               vertical-align: middle !important; /* Top align content in photo cells */
            }
-           td.PhotoCellStyle p.MsoNormal { /* Paragraphs within photo cells */
-              text-align: center !important; /* Center align text within photo cells */
-              margin-bottom: 8pt !important; /* Add some bottom margin */
+            td.PhotoCellStyle p.MsoNormal, 
+            td.SignInHeaderCellStyle p.MsoNormal, 
+            td.SignInNameCellStyle p.MsoNormal, 
+            td.SignInSignatureCellStyle p.MsoNormal { /* Paragraphs within cells */
+              text-align: center !important; /* Center align text within cells */
+              margin-bottom: 0pt !important;
+              mso-para-margin-bottom:0 !important;
            }
            /* Styling for the Info Section block in Word */
            div.InfoSectionBlock {
@@ -975,6 +1083,67 @@ export default function Home() {
           <p ${!forPrint ? 'class="MsoNormal"' : ''}><strong ${!forPrint ? 'class="InfoLabelStyle" style="mso-style-name: InfoLabelStyle;"' : ''}>社群成員：</strong> ${communityMembers}</p>
         </div>
     `;
+
+    // Add Sign-in Table
+    reportHtmlContent += `
+      <div class="section signin-section">
+        <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
+        <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'` : ''}
+        >
+          <thead>
+            <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
+              <${forPrint ? 'th' : 'td'} class="${forPrint ? '' : 'SignInHeaderCellStyle'}" ${!forPrint ? 'width="173"' : ''}>${forPrint ? '姓名' : '<p class=MsoNormal align=center style=\'text-align:center\'><b><span style=\'font-family:"Microsoft JhengHei",sans-serif\'>姓名</span></b></p>'}</${forPrint ? 'th' : 'td'}>
+              <${forPrint ? 'th' : 'td'} class="${forPrint ? '' : 'SignInHeaderCellStyle'}" ${!forPrint ? 'width="173"' : ''}>${forPrint ? '簽到處 (需親簽)' : '<p class=MsoNormal align=center style=\'text-align:center\'><b><span style=\'font-family:"Microsoft JhengHei",sans-serif\'>簽到處 (需親簽)</span></b></p>'}</${forPrint ? 'th' : 'td'}>
+              <${forPrint ? 'th' : 'td'} class="${forPrint ? '' : 'SignInHeaderCellStyle'}" ${!forPrint ? 'width="173"' : ''}>${forPrint ? '姓名' : '<p class=MsoNormal align=center style=\'text-align:center\'><b><span style=\'font-family:"Microsoft JhengHei",sans-serif\'>姓名</span></b></p>'}</${forPrint ? 'th' : 'td'}>
+              <${forPrint ? 'th' : 'td'} class="${forPrint ? '' : 'SignInHeaderCellStyle'}" ${!forPrint ? 'width="173"' : ''}>${forPrint ? '簽到處 (需親簽)' : '<p class=MsoNormal align=center style=\'text-align:center\'><b><span style=\'font-family:"Microsoft JhengHei",sans-serif\'>簽到處 (需親簽)</span></b></p>'}</${forPrint ? 'th' : 'td'}>
+            </tr>
+          </thead>
+          <tbody ${!forPrint ? "style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'" : ""}>
+            ${(() => {
+              let rowsHtml = '';
+              const numRows = Math.ceil(membersArray.length / 2);
+              if (membersArray.length === 0 && forPrint) { // Add one empty row for PDF if no members, to show table structure
+                 rowsHtml += `<tr>
+                               <td class="name-cell">&nbsp;</td>
+                               <td class="signature-cell">&nbsp;</td>
+                               <td class="name-cell">&nbsp;</td>
+                               <td class="signature-cell">&nbsp;</td>
+                             </tr>`;
+              } else if (membersArray.length === 0 && !forPrint) { // MSO
+                 rowsHtml += `<tr style='mso-yfti-irow:1; mso-yfti-lastrow:yes;'>
+                               <td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
+                               <td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
+                               <td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
+                               <td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
+                             </tr>`;
+              }
+
+              for (let i = 0; i < numRows; i++) {
+                const member1 = membersArray[i * 2];
+                const member2 = membersArray[i * 2 + 1];
+                rowsHtml += `<tr ${!forPrint ? `style="mso-yfti-irow:${i + 1}; ${i === numRows -1 ? 'mso-yfti-lastrow:yes;' : ''}"` : ''}>`;
+                
+                if (forPrint) {
+                  rowsHtml += `<td class="name-cell">${member1 || '&nbsp;'}</td>`;
+                  rowsHtml += `<td class="signature-cell">&nbsp;</td>`;
+                  rowsHtml += `<td class="name-cell">${member2 || '&nbsp;'}</td>`;
+                  rowsHtml += `<td class="signature-cell">${member2 ? '&nbsp;' : '&nbsp;'}</td>`; // Always add &nbsp; for signature cells
+                } else { // MSO
+                  rowsHtml += `<td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>${member1 || '&nbsp;'}</p></td>`;
+                  rowsHtml += `<td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>`;
+                  rowsHtml += `<td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>${member2 || '&nbsp;'}</p></td>`;
+                  rowsHtml += `<td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>${member2 ? '&nbsp;' : '&nbsp;'}</p></td>`;
+                }
+                rowsHtml += `</tr>`;
+              }
+              return rowsHtml;
+            })()}
+          </tbody>
+        </table>
+      </div>
+    `;
+
 
     reportHtmlContent += `
         <div class="section photo-section">
@@ -1050,10 +1219,10 @@ export default function Home() {
          });
          return;
      }
-     if (photos.some(p => !p.description || p.description.startsWith('無法描述'))) {
+     if (photos.some(p => !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中'))) {
         toast({
             title: '無法匯出',
-            description: '報告中包含無法描述或產生失敗的照片描述，請確認所有照片描述是否成功產生。',
+            description: '報告中包含無法描述、產生失敗或因模型忙碌未產生的照片描述，請確認所有照片描述是否成功產生。',
             variant: 'destructive',
         });
         return;
@@ -1115,10 +1284,10 @@ export default function Home() {
             });
             return;
         }
-        if (photos.some(p => !p.description || p.description.startsWith('無法描述'))) {
+        if (photos.some(p => !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中'))) {
             toast({
                 title: '無法匯出 PDF',
-                description: '報告中包含無法描述或產生失敗的照片描述，請確認所有照片描述是否成功產生。',
+                description: '報告中包含無法描述、產生失敗或因模型忙碌未產生的照片描述，請確認所有照片描述是否成功產生。',
                 variant: 'destructive',
             });
             return;
@@ -1211,7 +1380,7 @@ export default function Home() {
     isPreparingPdf ||
     !summary ||
     photos.length !== MAX_PHOTOS ||
-    photos.some(p => !p.description || p.description.startsWith('無法描述') || !p.dataUrl);
+    photos.some(p => !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中') || !p.dataUrl);
 
   const isGenerateDescriptionsDisabled =
       isGeneratingAllDescriptions ||
@@ -1442,7 +1611,7 @@ export default function Home() {
                                 描述產生中...
                             </>
                             ) : (
-                                photos.length > 0 && photos.some(p => p.description && !p.description.startsWith('無法描述')) ? '重新產生描述' : '產生照片描述'
+                                photos.length > 0 && photos.some(p => p.description && !p.description.startsWith('無法描述') && !p.description.startsWith('模型目前忙碌中')) ? '重新產生描述' : '產生照片描述'
                             )}
                         </Button>
                         {descriptionProgress !== null && (
@@ -1475,7 +1644,7 @@ export default function Home() {
                     disabled={
                         isGeneratingSummary ||
                         photos.length !== MAX_PHOTOS || // Ensure MAX_PHOTOS are uploaded
-                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述')) // All descriptions must be successfully generated
+                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中')) // All descriptions must be successfully generated
                     }
                     className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
                     variant="secondary" // Or a specific variant for this action
@@ -1571,4 +1740,3 @@ export default function Home() {
       </TooltipProvider>
     );
 }
-
