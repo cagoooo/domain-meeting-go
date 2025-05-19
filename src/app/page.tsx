@@ -983,7 +983,7 @@ export default function Home() {
       ? `領域共備GO_${teachingArea}_${format(meetingDate, 'yyyyMMdd')}`
       : '領域共備GO 會議報告';
 
-    const htmlStart = `
+    let reportHtmlContent = `
       <!DOCTYPE html>
       <html lang="zh-TW" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -1070,10 +1070,9 @@ export default function Home() {
         <div class='report-container'>
     `;
 
-    let reportHtmlContent = htmlStart;
-
     reportHtmlContent += `<${forPrint ? 'h1' : 'p class="MsoHeading1"'}>領域共備GO 會議報告</${forPrint ? 'h1' : 'p'}>`;
 
+    // Basic Info Section
     reportHtmlContent += `
         <div class="section info-section ${!forPrint ? 'InfoSectionBlock' : ''}">
           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>基本資訊</${forPrint ? 'h2' : 'p'}>
@@ -1084,7 +1083,7 @@ export default function Home() {
         </div>
     `;
 
-    // Add Sign-in Table
+    // Sign-in Table Section
     reportHtmlContent += `
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
@@ -1103,14 +1102,14 @@ export default function Home() {
             ${(() => {
               let rowsHtml = '';
               const numRows = Math.ceil(membersArray.length / 2);
-              if (membersArray.length === 0 && forPrint) { // Add one empty row for PDF if no members, to show table structure
+              if (membersArray.length === 0 && forPrint) { 
                  rowsHtml += `<tr>
                                <td class="name-cell">&nbsp;</td>
                                <td class="signature-cell">&nbsp;</td>
                                <td class="name-cell">&nbsp;</td>
                                <td class="signature-cell">&nbsp;</td>
                              </tr>`;
-              } else if (membersArray.length === 0 && !forPrint) { // MSO
+              } else if (membersArray.length === 0 && !forPrint) { 
                  rowsHtml += `<tr style='mso-yfti-irow:1; mso-yfti-lastrow:yes;'>
                                <td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
                                <td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>
@@ -1128,8 +1127,8 @@ export default function Home() {
                   rowsHtml += `<td class="name-cell">${member1 || '&nbsp;'}</td>`;
                   rowsHtml += `<td class="signature-cell">&nbsp;</td>`;
                   rowsHtml += `<td class="name-cell">${member2 || '&nbsp;'}</td>`;
-                  rowsHtml += `<td class="signature-cell">${member2 ? '&nbsp;' : '&nbsp;'}</td>`; // Always add &nbsp; for signature cells
-                } else { // MSO
+                  rowsHtml += `<td class="signature-cell">${member2 ? '&nbsp;' : '&nbsp;'}</td>`; 
+                } else { 
                   rowsHtml += `<td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>${member1 || '&nbsp;'}</p></td>`;
                   rowsHtml += `<td class='SignInSignatureCellStyle'><p class=MsoNormal align=center style='text-align:center'>&nbsp;</p></td>`;
                   rowsHtml += `<td class='SignInNameCellStyle'><p class=MsoNormal align=center style='text-align:center'>${member2 || '&nbsp;'}</p></td>`;
@@ -1144,7 +1143,7 @@ export default function Home() {
       </div>
     `;
 
-
+    // Photo Record Section
     reportHtmlContent += `
         <div class="section photo-section">
            <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
@@ -1186,6 +1185,7 @@ export default function Home() {
         </div>
     `;
 
+    // Summary Section
     reportHtmlContent += `
         <div class="section summary-section">
            <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>會議大綱摘要</${forPrint ? 'h2' : 'p'}>
@@ -1334,7 +1334,7 @@ export default function Home() {
                        setIsPreparingPdf(false);
                        iframe.onload = null;
                     }
-                  }, 500); // Delay ensures content is fully rendered, especially images
+                  }, 500); 
                 };
                  iframe.onerror = (error) => {
                     console.error('Error loading iframe content:', error);
@@ -1363,8 +1363,7 @@ export default function Home() {
 
    useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {
-         // Reset photo descriptions and summary if any form field changes
-         if (type === 'change' && name !== undefined) { // ensure 'name' is defined
+         if (type === 'change' && name !== undefined) { 
             setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
             setSummary('');
             setDescriptionProgress(null);
@@ -1372,7 +1371,7 @@ export default function Home() {
          }
       });
       return () => subscription.unsubscribe();
-   }, [form]); // form is stable, no need to list all fields
+   }, [form]); 
 
 
   const isExportDisabled =
@@ -1397,7 +1396,7 @@ export default function Home() {
               width: '0',
               height: '0',
               border: '0',
-              visibility: 'hidden', // Keep it hidden, not 'none' for loading
+              visibility: 'hidden', 
           }}
           title="Print Content Frame"
       ></iframe>
@@ -1565,7 +1564,7 @@ export default function Home() {
                                 alt={`照片 ${photo.file.name}`}
                                 fill
                                 style={{ objectFit: 'contain' }}
-                                priority // Ensures LCP images are loaded quickly
+                                priority 
                                 className="transition-transform duration-300 group-hover:scale-105"
                               />
                             <button
@@ -1582,14 +1581,14 @@ export default function Home() {
                                 </div>
                               )}
                           </div>
-                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center"> {/* min-h to ensure consistent height */}
+                           <div className="p-3 bg-slate-700/80 border-t border-slate-600 min-h-[4.5em] flex items-center justify-center"> 
                              <p className="text-xs text-slate-200 text-center break-words text-shadow">
                                 {photo.description || '尚未產生描述'}
                              </p>
                           </div>
                         </div>
                       ))}
-                       {/* Placeholders for empty slots */}
+                       
                        {Array.from({ length: Math.max(0, MAX_PHOTOS - photos.length) }).map((_, index) => (
                           <div key={`placeholder-${index}`} className="relative border border-dashed border-slate-600 rounded-lg overflow-hidden shadow-sm aspect-video flex items-center justify-center bg-slate-800/30 text-slate-500 text-sm">
                              照片 {photos.length + index + 1}
@@ -1602,7 +1601,7 @@ export default function Home() {
                             onClick={handleGenerateDescriptions}
                             disabled={isGenerateDescriptionsDisabled}
                             className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
-                            variant="secondary" // Consider using a distinct variant if needed
+                            variant="secondary" 
                             size="lg"
                         >
                             {isGeneratingAllDescriptions ? (
@@ -1643,11 +1642,11 @@ export default function Home() {
                     onClick={handleGenerateSummary}
                     disabled={
                         isGeneratingSummary ||
-                        photos.length !== MAX_PHOTOS || // Ensure MAX_PHOTOS are uploaded
-                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中')) // All descriptions must be successfully generated
+                        photos.length !== MAX_PHOTOS || 
+                        photos.some(p => p.isGenerating || !p.description || p.description.startsWith('無法描述') || p.description.startsWith('模型目前忙碌中')) 
                     }
                     className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
-                    variant="secondary" // Or a specific variant for this action
+                    variant="secondary" 
                     size="lg"
                   >
                     {isGeneratingSummary ? (
@@ -1665,7 +1664,7 @@ export default function Home() {
                     <Textarea
                        value={summary}
                        readOnly
-                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" // Increased height for better readability
+                       className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" 
                        aria-label="會議摘要內容"
                     />
                   </div>
@@ -1706,7 +1705,7 @@ export default function Home() {
                       onClick={handleExportPdf}
                       disabled={isExportDisabled}
                       className="w-full sm:flex-1 sm:min-w-[200px] bg-secondary text-secondary-foreground hover:bg-secondary/80 text-lg py-3 px-6 transition-transform duration-200 hover:scale-105 shadow-md hover:shadow-lg"
-                      variant="outline" // Use outline or another distinct variant for PDF
+                      variant="outline" 
                     >
                       {isPreparingPdf ? (
                           <>
@@ -1736,7 +1735,7 @@ export default function Home() {
          </div>
         </footer>
       </div>
-       <Toaster /> {/* Ensure Toaster is rendered for notifications */}
+       <Toaster /> 
       </TooltipProvider>
     );
 }
