@@ -75,6 +75,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printIframeRef = useRef<HTMLIFrameElement>(null);
   const photoRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const generateDescriptionsButtonRef = useRef<HTMLButtonElement>(null);
+  const summaryTextareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -189,6 +191,11 @@ export default function Home() {
               setIsGeneratingAllDescriptions(false);
               return combined.slice(0, MAX_PHOTOS).map(p => ({ ...p, description: '', isGenerating: false }));
           });
+          setTimeout(() => {
+            if (generateDescriptionsButtonRef.current) {
+                generateDescriptionsButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 100);
        }
 
       if (event.target) {
@@ -464,6 +471,11 @@ export default function Home() {
         title: '成功',
         description: '會議摘要產生完成！',
       });
+      setTimeout(() => {
+        if (summaryTextareaRef.current) {
+            summaryTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     } catch (error) {
       console.error('Error generating summary:', error);
       toast({
@@ -848,8 +860,6 @@ export default function Home() {
          table.PhotoTableStyle {
              mso-style-name:"Photo Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
-             /* mso-table-anchor-vertical:paragraph; Removed for better flow control */
-             /* mso-table-anchor-horizontal:margin; Removed for better flow control */
              margin-left:auto; margin-right:auto; /* Standard CSS for centering block elements */
              mso-table-lspace:0pt; mso-table-rspace:0pt; /* Ensure no extra MSO spacing */
              mso-table-left:center; /* MSO specific for centering */
@@ -1167,7 +1177,7 @@ export default function Home() {
 
     reportHtmlContent += `
         <table class="${forPrint ? 'photo-table' : 'photo-table PhotoTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin; mso-table-left:center; mso-table-right:center; mso-table-layout-alt:fixed;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid #e0e0e0 .75pt; mso-border-alt:solid #e0e0e0 .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-lspace:0pt; mso-table-rspace:0pt; mso-table-left:center; mso-table-right:center;'` : ''}
         >
          <tbody ${!forPrint ? "style='mso-yfti-irow:0; mso-yfti-firstrow:yes;'" : ""}>
     `;
@@ -1625,6 +1635,7 @@ export default function Home() {
                      <div className="flex flex-col items-center gap-4">
                         <Button
                             type="button"
+                            ref={generateDescriptionsButtonRef}
                             onClick={handleGenerateDescriptions}
                             disabled={isGenerateDescriptionsDisabled}
                             className="w-full md:w-auto min-w-[180px] transition-transform duration-200 hover:scale-105"
@@ -1689,6 +1700,7 @@ export default function Home() {
                   <div className="mt-4 p-4 md:p-6 border border-slate-600 rounded-lg bg-slate-800/30 shadow-inner">
                     <h3 className="text-xl font-semibold mb-3 text-slate-200">會議摘要：</h3>
                     <Textarea
+                       ref={summaryTextareaRef}
                        value={summary}
                        readOnly
                        className="w-full h-56 bg-slate-700/50 border-slate-600 text-base resize-y focus:border-primary transition-colors text-slate-100" 
@@ -1766,3 +1778,4 @@ export default function Home() {
       </TooltipProvider>
     );
 }
+
