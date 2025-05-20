@@ -500,7 +500,7 @@ export default function Home() {
 
   const generateReportContent = useCallback(async (forPrint = false): Promise<string> => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    const membersArray = communityMembers.split(',').map(name => name.trim()).filter(name => name.length > 0);
+    const membersArray = communityMembers.split(/[,，、]/).map(name => name.trim()).filter(name => name.length > 0);
 
 
     const photosWithDataUrls = await Promise.all(
@@ -873,19 +873,17 @@ export default function Home() {
          table.SignInTableStyle {
              mso-style-name:"Sign-In Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
-             /* mso-table-anchor-vertical:paragraph; */ /* Removed for testing flow */
-             /* mso-table-anchor-horizontal:margin; */ /* Removed for testing flow */
-             mso-table-lspace:0pt; mso-table-rspace:0pt; /* Ensure no extra space */
-             margin-left:auto; margin-right:auto; /* Try CSS auto margins for centering */
-             mso-table-left:center; /* Keep MSO centering as fallback */
-             mso-table-right:center; /* Keep MSO centering as fallback */
+             mso-table-lspace:0pt; mso-table-rspace:0pt; 
+             margin-left:auto; margin-right:auto; 
+             mso-table-left:center; 
+             mso-table-right:center; 
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-layout-alt:fixed;
-             mso-border-alt:solid windowtext .75pt; /* Thicker outer border */
+             mso-border-alt:solid windowtext .75pt; 
              mso-padding-alt:0cm 5.4pt 0cm 5.4pt;
-             mso-border-insideh:.5pt solid windowtext; /* Thinner inner horizontal border */
-             mso-border-insidev:.5pt solid windowtext; /* Thinner inner vertical border */
+             mso-border-insideh:.5pt solid windowtext; 
+             mso-border-insidev:.5pt solid windowtext; 
              mso-para-margin:0cm; mso-para-margin-bottom:.0001pt;
              mso-pagination:widow-orphan;
              font-size:11.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體";
@@ -894,24 +892,24 @@ export default function Home() {
          td.SignInHeaderCellStyle {
              mso-style-name:"Sign-In Header Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
              mso-border-alt:solid windowtext .75pt;
-             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; 
              text-align:center; vertical-align:middle;
              background:#E9ECEF; mso-shading:#E9ECEF;
              font-family:"Microsoft JhengHei",sans-serif; mso-fareast-font-family:"Microsoft JhengHei"; font-weight:bold;
          }
          td.SignInNameCellStyle {
              mso-style-name:"Sign-In Name Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
-             width:4.615cm; /* (18.46cm / 4) */
+             width:4.615cm; 
              mso-border-alt:solid windowtext .5pt;
-             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; 
              text-align:center; vertical-align:middle;
          }
          td.SignInSignatureCellStyle {
              mso-style-name:"Sign-In Signature Cell"; mso-style-priority:99; mso-style-unhide:no; mso-style-parent:"SignInTableStyle";
-             width:4.615cm; /* (18.46cm / 4) */
+             width:4.615cm; 
              height:2.2cm; mso-height-rule:exactly;
              mso-border-alt:solid windowtext .5pt;
-             padding:4.0pt 4.0pt 4.0pt 4.0pt; /* Adjusted padding */
+             padding:4.0pt 4.0pt 4.0pt 4.0pt; 
              text-align:center; vertical-align:middle;
          }
 
@@ -925,7 +923,7 @@ export default function Home() {
             color:#003F5C; font-weight:bold;
             border:none; mso-border-bottom-alt:solid #003F5C 2.0pt;
             padding:0cm; mso-padding-alt:0cm 0cm 10.0pt 0cm;
-            text-align:left; /* Left align Heading 1 */
+            text-align:left; 
          }
          p.MsoHeading2, li.MsoHeading2, div.MsoHeading2 {
             mso-style-priority:9; mso-style-unhide:no; mso-style-qformat:yes; mso-style-link:"Heading 2 Char";
@@ -935,39 +933,39 @@ export default function Home() {
             color:#0056B3; font-weight:bold;
             border:none; mso-border-bottom-alt:solid #DEE2E6 1.0pt;
             padding:0cm; mso-padding-alt:0cm 0cm 6.0pt 0cm;
-            text-align:left; /* Left align Heading 2 */
+            text-align:left; 
          }
          /* Normal Paragraph Style for Word */
          p.MsoNormal, li.MsoNormal, div.MsoNormal {
             mso-style-unhide:no; mso-style-qformat:yes; mso-style-parent:"";
-            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm; /* Default margin */
+            margin-top:0cm; margin-right:0cm; margin-bottom:8.0pt; margin-left:0cm; 
             line-height:150%; mso-pagination:widow-orphan;
             font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
             color:#333333;
-            text-align:left; /* Left align normal text */
-            mso-line-height-rule:exactly; /* More precise line height */
+            text-align:left; 
+            mso-line-height-rule:exactly; 
          }
          /* Info Section Styles for Word */
-         span.InfoLabelStyle { /* For styling the labels like "教學領域：" */
+         span.InfoLabelStyle { 
             mso-style-name:"Info Label"; mso-style-priority:99; mso-style-unhide:no;
             font-family:"Microsoft JhengHei",sans-serif; mso-ascii-font-family:"Microsoft JhengHei"; mso-hansi-font-family:"Microsoft JhengHei"; mso-fareast-font-family:"Microsoft JhengHei";
             font-weight:bold; color:#212529;
             mso-ansi-font-size:12.0pt; mso-bidi-font-size:12.0pt;
          }
-         div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal { /* Specific paragraph style for info section */
-             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt; /* Custom margins for info section paragraphs */
+         div.InfoSectionBlock p.MsoNormal, li.InfoSectionBlock p.MsoNormal, div.InfoSectionBlock p.MsoNormal { 
+             mso-margin-top-alt:0cm; mso-margin-bottom-alt:8.0pt; 
          }
 
          /* Summary Section Style for Word */
          p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
              mso-style-name:"Summary Text"; mso-style-priority:99; mso-style-unhide:no;
              margin:0cm; margin-bottom:.0001pt;
-             text-align:left; /* Left align summary text */
+             text-align:left; 
              line-height:170%; mso-pagination:widow-orphan;
-             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Padding for summary block */
-             mso-border-alt:solid #E0E0E0 .75pt; /* Border for summary block */
+             mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; 
+             mso-border-alt:solid #E0E0E0 .75pt; 
              font-size:12.0pt; font-family:"標楷體",serif; mso-fareast-font-family:"標楷體"; mso-bidi-font-family:"Times New Roman";
-             background:#F8F9FA; /* Background for summary block */
+             background:#F8F9FA; 
              mso-line-height-rule:exactly;
          }
          /* Character Styles for Headings (Word specific) */
@@ -1016,52 +1014,52 @@ export default function Home() {
            p.MsoHeading1, li.MsoHeading1, div.MsoHeading1,
            p.MsoHeading2, li.MsoHeading2, div.MsoHeading2,
            p.SummaryStyle, li.SummaryStyle, div.SummaryStyle {
-              text-align: left !important; /* Force left alignment for Word */
-              mso-text-align-alt: left !important; /* Alternative Word property for left alignment */
+              text-align: left !important; 
+              mso-text-align-alt: left !important; 
            }
            p.PhotoDescriptionStyle, li.PhotoDescriptionStyle, div.PhotoDescriptionStyle {
-              text-align: center !important; /* Center align photo descriptions */
+              text-align: center !important; 
            }
            td.PhotoCellStyle, td.SignInHeaderCellStyle, td.SignInNameCellStyle, td.SignInSignatureCellStyle {
-               text-align: center !important; /* Center align content in photo cells */
-               vertical-align: middle !important; /* Top align content in photo cells */
+               text-align: center !important; 
+               vertical-align: middle !important; 
            }
             td.PhotoCellStyle p.MsoNormal, 
             td.SignInHeaderCellStyle p.MsoNormal, 
             td.SignInNameCellStyle p.MsoNormal, 
-            td.SignInSignatureCellStyle p.MsoNormal { /* Paragraphs within cells */
-              text-align: center !important; /* Center align text within cells */
+            td.SignInSignatureCellStyle p.MsoNormal { 
+              text-align: center !important; 
               margin-bottom: 0pt !important;
               mso-para-margin-bottom:0 !important;
            }
            /* Styling for the Info Section block in Word */
            div.InfoSectionBlock {
-               mso-border-alt:solid #e0e0e0 .75pt; /* Border for the info block */
-               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; /* Padding for the info block */
-               background:#F8F9FA; /* Background color for the info block */
-               mso-shading:#F8F9FA; /* MSO specific background color */
-               mso-margin-top-alt:15pt; /* Top margin */
-               margin-bottom:30pt; /* Bottom margin */
+               mso-border-alt:solid #e0e0e0 .75pt; 
+               mso-padding-alt:15.0pt 15.0pt 15.0pt 15.0pt; 
+               background:#F8F9FA; 
+               mso-shading:#F8F9FA; 
+               mso-margin-top-alt:15pt; 
+               margin-bottom:30pt; 
            }
            /* Styling for H2 within the Info Section block in Word */
            div.InfoSectionBlock p.MsoHeading2 {
-               mso-margin-top-alt:0cm !important; /* Remove top margin for H2 */
-               mso-margin-bottom-alt:15pt !important; /* Bottom margin for H2 */
-               border:none; /* Remove default border */
-               mso-border-bottom-alt:solid #ced4da 1.0pt !important; /* Bottom border for H2 */
-               mso-padding-bottom-alt:6pt !important; /* Bottom padding for H2 */
+               mso-margin-top-alt:0cm !important; 
+               mso-margin-bottom-alt:15pt !important; 
+               border:none; 
+               mso-border-bottom-alt:solid #ced4da 1.0pt !important; 
+               mso-padding-bottom-alt:6pt !important; 
            }
            /* Styling for paragraphs within the Info Section block in Word */
            div.InfoSectionBlock p.MsoNormal {
-               margin-bottom:8.0pt !important; /* Bottom margin for paragraphs */
-               line-height:150% !important; /* Line height */
-               font-family:"標楷體",serif !important; /* Font family */
-               mso-fareast-font-family:"標楷體" !important; /* MSO specific font family */
+               margin-bottom:8.0pt !important; 
+               line-height:150% !important; 
+               font-family:"標楷體",serif !important; 
+               mso-fareast-font-family:"標楷體" !important; 
            }
            /* Styling for labels (strong tags) within Info Section paragraphs in Word */
            div.InfoSectionBlock p.MsoNormal span.InfoLabelStyle {
-              mso-spacerun:yes; /* Ensure space is rendered correctly */
-              margin-right:7.5pt; /* Right margin for labels */
+              mso-spacerun:yes; 
+              margin-right:7.5pt; 
            }
 
           <![endif]-->
@@ -1091,7 +1089,7 @@ export default function Home() {
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
         <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" align="center" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; mso-table-left:center; mso-table-right:center; margin-left:auto; margin-right:auto;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; mso-table-left:center; mso-table-right:center; margin-left:auto; margin-right:auto;'` : ''}
         >
           <thead>
             <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
@@ -1504,7 +1502,7 @@ export default function Home() {
                           <Input placeholder="王老師, 李老師..." {...field} className="text-base py-2.5 bg-slate-700/50 border-slate-600 focus:bg-slate-700 focus:border-primary text-slate-100 placeholder:text-slate-400" />
                         </FormControl>
                         <FormDescription className="text-sm text-slate-400">
-                          請用逗號分隔姓名。
+                          請用半形逗號 (,)、全形逗號 (，) 或頓號 (、) 分隔姓名。
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
