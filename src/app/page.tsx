@@ -71,6 +71,7 @@ export default function Home() {
   const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const [descriptionProgress, setDescriptionProgress] = useState<number | null>(null);
   const [isGeneratingAllDescriptions, setIsGeneratingAllDescriptions] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false); // State for date picker popover
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printIframeRef = useRef<HTMLIFrameElement>(null);
   const { toast } = useToast();
@@ -874,9 +875,10 @@ export default function Home() {
              mso-style-name:"Sign-In Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
              mso-table-lspace:0pt; mso-table-rspace:0pt; 
-             margin-left:auto; margin-right:auto; 
-             mso-table-left:center; 
-             mso-table-right:center; 
+             /* Removed mso-table-anchor-vertical and mso-table-anchor-horizontal */
+             margin-left:auto; margin-right:auto; /* Standard CSS for centering block elements */
+             mso-table-left:center; /* MSO specific for centering */
+             mso-table-right:center; /* MSO specific for centering */
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-layout-alt:fixed;
@@ -1089,7 +1091,7 @@ export default function Home() {
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
         <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; mso-table-left:center; mso-table-right:center; margin-left:auto; margin-right:auto;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-left:center; mso-table-right:center;'` : ''}
         >
           <thead>
             <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
@@ -1455,7 +1457,7 @@ export default function Home() {
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel className="text-lg font-medium mb-1 text-slate-200">會議日期</FormLabel>
-                         <Popover>
+                         <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                             <PopoverTrigger asChild>
                             <FormControl>
                                 <Button
@@ -1480,7 +1482,10 @@ export default function Home() {
                             <Calendar
                                 mode="single"
                                 selected={field.value}
-                                onSelect={field.onChange}
+                                onSelect={(date) => {
+                                  field.onChange(date);
+                                  setIsDatePickerOpen(false);
+                                }}
                                 disabled={(date) =>
                                 date > new Date() || date < new Date("1900-01-01")
                                 }
