@@ -71,9 +71,10 @@ export default function Home() {
   const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const [descriptionProgress, setDescriptionProgress] = useState<number | null>(null);
   const [isGeneratingAllDescriptions, setIsGeneratingAllDescriptions] = useState(false);
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false); // State for date picker popover
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printIframeRef = useRef<HTMLIFrameElement>(null);
+  const photoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -208,6 +209,10 @@ export default function Home() {
          setSummary('');
          setDescriptionProgress(null);
          setIsGeneratingAllDescriptions(false);
+         // Clean up ref for removed photo
+         if (photoRefs.current[id]) {
+            delete photoRefs.current[id];
+         }
          return remainingPhotos.map(p => ({ ...p, description: '', isGenerating: false }));
        }
        return remainingPhotos;
@@ -247,7 +252,7 @@ export default function Home() {
     const readResults = await Promise.all(readPromises);
 
     let allDataUrlsReadSuccessfully = true;
-    const updatedPhotos = photos.map(p => {
+    const updatedPhotosWithDataUrl = photos.map(p => {
         const result = readResults.find(r => r.id === p.id);
         if (result) {
             if (result.dataUrl) {
@@ -260,7 +265,7 @@ export default function Home() {
         return p;
     });
 
-    setPhotos(updatedPhotos);
+    setPhotos(updatedPhotosWithDataUrl);
 
     if (!allDataUrlsReadSuccessfully) {
         toast({
@@ -271,7 +276,7 @@ export default function Home() {
         return;
     }
 
-    const currentPhotos = updatedPhotos;
+    const currentPhotos = updatedPhotosWithDataUrl;
 
     setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: true })));
     setIsGeneratingAllDescriptions(true);
@@ -319,11 +324,19 @@ export default function Home() {
 
                  if (descriptionResult) {
                      setPhotos(prev => prev.map(p => p.id === descriptionResult!.id ? { ...p, description: descriptionResult!.description, isGenerating: false } : p));
+                     // Scroll to the photo that was just processed
+                     setTimeout(() => {
+                        const photoElement = photoRefs.current[descriptionResult!.id];
+                        if (photoElement) {
+                            photoElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                        }
+                     }, 100); // Small delay to allow DOM update
                  } else {
+                     // This case should ideally not be reached if descriptionResult is always set in try/catch
                      setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: '更新錯誤', isGenerating: false } : p));
                  }
             }
-            return descriptionResult || { id: photo.id, description: '未處理', success: false };
+            return descriptionResult || { id: photo.id, description: '未處理', success: false }; // Fallback, should not be hit
         });
 
         const results = await Promise.allSettled(descriptionPromises);
@@ -342,7 +355,7 @@ export default function Home() {
                         modelOverloadedDuringProcess = true;
                     }
                 }
-            } else { // status === 'rejected'
+            } else { 
                 failedCount++;
             }
         });
@@ -835,11 +848,14 @@ export default function Home() {
          table.PhotoTableStyle {
              mso-style-name:"Photo Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
-             mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:margin;
-             mso-table-left:center; mso-table-right:center;
+             /* mso-table-anchor-vertical:paragraph; Removed for better flow control */
+             /* mso-table-anchor-horizontal:margin; Removed for better flow control */
+             margin-left:auto; margin-right:auto; /* Standard CSS for centering block elements */
+             mso-table-lspace:0pt; mso-table-rspace:0pt; /* Ensure no extra MSO spacing */
+             mso-table-left:center; /* MSO specific for centering */
+             mso-table-right:center; /* MSO specific for centering */
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
-             mso-table-lspace:0cm; mso-table-rspace:0cm;
              mso-table-layout-alt:fixed; /* Fixed layout helps with consistency */
              mso-border-alt:solid #e0e0e0 .75pt;
              mso-padding-alt:0cm 0cm 0cm 0cm;
@@ -875,10 +891,9 @@ export default function Home() {
              mso-style-name:"Sign-In Table";
              mso-tstyle-rowband-size:0; mso-tstyle-colband-size:0; mso-style-priority:99; mso-style-unhide:no;
              mso-table-lspace:0pt; mso-table-rspace:0pt; 
-             /* Removed mso-table-anchor-vertical and mso-table-anchor-horizontal */
-             margin-left:auto; margin-right:auto; /* Standard CSS for centering block elements */
-             mso-table-left:center; /* MSO specific for centering */
-             mso-table-right:center; /* MSO specific for centering */
+             margin-left:auto; margin-right:auto; 
+             mso-table-left:center; 
+             mso-table-right:center; 
              mso-table-bspace:0cm; mso-table-vspace:0cm;
              mso-table-top:20pt; mso-table-bottom:auto;
              mso-table-layout-alt:fixed;
@@ -1091,7 +1106,7 @@ export default function Home() {
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
         <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-left:center; mso-table-right:center;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-lspace:0pt; mso-table-rspace:0pt; mso-table-left:center; mso-table-right:center;'` : ''}
         >
           <thead>
             <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
@@ -1145,11 +1160,10 @@ export default function Home() {
         </table>
       </div>
     `;
-
-    // Photo Record Section
+    
     reportHtmlContent += `
-        <div class="section photo-section">
-           <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
+      <div class="section photo-section">
+        <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>照片記錄</${forPrint ? 'h2' : 'p'}>`;
 
     reportHtmlContent += `
         <table class="${forPrint ? 'photo-table' : 'photo-table PhotoTableStyle'}" 
@@ -1366,7 +1380,8 @@ export default function Home() {
 
    useEffect(() => {
       const subscription = form.watch((value, { name, type }) => {
-         if (type === 'change' && name !== undefined) { 
+         const watchedFields: Array<keyof z.infer<typeof formSchema>> = ['teachingArea', 'meetingTopic', 'meetingDate', 'communityMembers'];
+         if (type === 'change' && name !== undefined && watchedFields.includes(name as any) ) { 
             setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
             setSummary('');
             setDescriptionProgress(null);
@@ -1562,8 +1577,14 @@ export default function Home() {
                 {photos.length > 0 && (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-                      {photos.map((photo) => (
-                        <div key={photo.id} className="relative border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
+                      {photos.map((photo, index) => (
+                        <div 
+                            key={photo.id}
+                            ref={(el) => {
+                                if (el) photoRefs.current[photo.id] = el;
+                                else delete photoRefs.current[photo.id];
+                            }}
+                            className="relative border border-slate-700 rounded-lg overflow-hidden shadow-md bg-slate-800/50 flex flex-col transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
                           <div className="aspect-video w-full relative flex items-center justify-center overflow-hidden">
                              <NextImage
                                 src={photo.previewUrl}
@@ -1745,4 +1766,3 @@ export default function Home() {
       </TooltipProvider>
     );
 }
-
