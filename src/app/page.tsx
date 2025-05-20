@@ -67,6 +67,7 @@ export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [summary, setSummary] = useState<string>('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryGenerationProgress, setSummaryGenerationProgress] = useState<number | null>(null);
   const [isExportingDoc, setIsExportingDoc] = useState(false);
   const [isPreparingPdf, setIsPreparingPdf] = useState(false);
   const [descriptionProgress, setDescriptionProgress] = useState<number | null>(null);
@@ -458,6 +459,7 @@ export default function Home() {
 
 
     setIsGeneratingSummary(true);
+    setSummaryGenerationProgress(0);
     try {
       const result = await generateMeetingSummary({
         teachingArea,
@@ -467,6 +469,7 @@ export default function Home() {
         photoDescriptions,
       });
       setSummary(result.summary);
+      setSummaryGenerationProgress(100);
       toast({
         title: '成功',
         description: '會議摘要產生完成！',
@@ -475,7 +478,9 @@ export default function Home() {
         if (summaryTextareaRef.current) {
             summaryTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-      }, 100);
+        setSummaryGenerationProgress(null);
+        setIsGeneratingSummary(false);
+      }, 500);
     } catch (error) {
       console.error('Error generating summary:', error);
       toast({
@@ -483,10 +488,24 @@ export default function Home() {
         description: '產生會議摘要時發生錯誤。',
         variant: 'destructive',
       });
-    } finally {
+      setSummaryGenerationProgress(null);
       setIsGeneratingSummary(false);
     }
   }, [form, photos, toast]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isGeneratingSummary && summaryGenerationProgress !== null && summaryGenerationProgress < 100) {
+      if (summaryGenerationProgress === 0) {
+        timer = setTimeout(() => { if (isGeneratingSummary) setSummaryGenerationProgress(30); }, 300);
+      } else if (summaryGenerationProgress === 30) {
+        timer = setTimeout(() => { if (isGeneratingSummary) setSummaryGenerationProgress(60); }, 700);
+      } else if (summaryGenerationProgress === 60) {
+        timer = setTimeout(() => { if (isGeneratingSummary) setSummaryGenerationProgress(85); }, 1000);
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [summaryGenerationProgress, isGeneratingSummary]);
 
 
     const generateImageCellMSO = (photo: Photo | undefined, altText: string): string => {
@@ -1395,7 +1414,9 @@ export default function Home() {
             setPhotos(prev => prev.map(p => ({ ...p, description: '', isGenerating: false })));
             setSummary('');
             setDescriptionProgress(null);
+            setSummaryGenerationProgress(null);
             setIsGeneratingAllDescriptions(false);
+            setIsGeneratingSummary(false);
          }
       });
       return () => subscription.unsubscribe();
@@ -1696,6 +1717,14 @@ export default function Home() {
                       '產生會議摘要'
                     )}
                   </Button>
+                  {summaryGenerationProgress !== null && (
+                  <div className="w-full max-w-md mx-auto mt-4">
+                      <Progress value={summaryGenerationProgress} className="w-full h-2.5 bg-slate-700" />
+                      <p className="text-sm text-slate-400 text-center mt-2">
+                          {summaryGenerationProgress < 100 ? `摘要產生中... ${summaryGenerationProgress}%` : '摘要產生完成！'}
+                      </p>
+                  </div>
+                  )}
                  {summary && (
                   <div className="mt-4 p-4 md:p-6 border border-slate-600 rounded-lg bg-slate-800/30 shadow-inner">
                     <h3 className="text-xl font-semibold mb-3 text-slate-200">會議摘要：</h3>
