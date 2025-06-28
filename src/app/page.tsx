@@ -1135,7 +1135,7 @@ export default function Home() {
       <div class="section signin-section">
         <${forPrint ? 'h2' : 'p class="MsoHeading2"'}>成員簽到表</${forPrint ? 'h2' : 'p'}>
         <table class="${forPrint ? 'signin-table' : 'SignInTableStyle'}" 
-               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-lspace:0pt; mso-table-rspace:0pt; mso-table-left:center; mso-table-right:center;'` : ''}
+               ${!forPrint ? `border="1" cellspacing="0" cellpadding="0" width="699" style='width:18.46cm; mso-cellspacing:0cm; border:solid windowtext .75pt; mso-border-alt:solid windowtext .75pt; mso-table-layout-alt:fixed; margin-left:auto; margin-right:auto; mso-table-lspace:0pt; mso-table-rspace:0pt; mso-table-left:center; mso-table-right:center; mso-table-anchor-vertical:paragraph; mso-table-anchor-horizontal:column; mso-table-top:20pt; mso-table-bottom:auto;'` : ''}
         >
           <thead>
             <tr ${!forPrint ? 'style="mso-yfti-irow:0; mso-yfti-firstrow:yes;"' : ''}>
@@ -1570,7 +1570,7 @@ export default function Home() {
                     <ImageIcon className="w-7 h-7 card-icon-step-2" />
                     第二步：上傳會議照片
                 </CardTitle>
-                 <CardDescription className="text-slate-300">請上傳 {MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; {MAX_FILE_SIZE / 1024 / 1024}MB)</CardDescription>
+                 <CardDescription className="text-slate-300">請上傳 ${MAX_PHOTOS} 張照片 (JPG, PNG, WEBP, &lt; ${MAX_FILE_SIZE / 1024 / 1024}MB)</CardDescription>
               </CardHeader>
               <CardContent className="p-6 md:p-8">
                 <div className="mb-6">
@@ -1803,8 +1803,29 @@ export default function Home() {
          </div>
         </footer>
       </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <a
+            href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 px-5 py-3 font-bold text-white shadow-xl transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-amber-300"
+            aria-label="點『石』成金(評語優化) - 開啟 LINE 好友連結"
+          >
+            <span className="hidden sm:inline whitespace-nowrap text-base">
+              點『石』成金<span className="text-xl mx-1" role="img" aria-label="bee emoji">🐝</span>(評語優化)
+            </span>
+            <span className="sm:hidden flex items-center gap-2 text-base">
+              <span className="text-2xl" role="img" aria-label="bee emoji">🐝</span>
+              <span>評語優化</span>
+            </span>
+          </a>
+        </TooltipTrigger>
+        <TooltipContent side="left" className="bg-slate-800 text-white border-slate-700">
+          <p>需要教學評語優化建議嗎？點我加入 LINE 好友！</p>
+        </TooltipContent>
+      </Tooltip>
        <Toaster /> 
       </TooltipProvider>
     );
 }
-
