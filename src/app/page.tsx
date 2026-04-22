@@ -265,75 +265,148 @@ export default function Home() {
     if (!summary) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
     
+    // 將成員字串轉為陣列（支援多種分隔符）
+    const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
+
     try {
+      // Helper: DataURL 轉 Uint8Array
+      const dataUrlToUint8Array = (dataUrl: string) => {
+        const base64 = dataUrl.split(',')[1];
+        const binaryString = window.atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+      };
+
+      const children: any[] = [
+        new Paragraph({
+          text: "領域共備GO - 教師社群會議報告",
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
+        }),
+        // 基本資訊表格
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({ width: { size: 20, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }),
+                new TableCell({ width: { size: 80, type: WidthType.PERCENTAGE }, children: [new Paragraph(teachingArea)] }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }),
+                new TableCell({ children: [new Paragraph(meetingTopic)] }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }),
+                new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }),
+                new TableCell({ children: [new Paragraph(communityMembers)] }),
+              ],
+            }),
+          ],
+        }),
+        // 簽到表區塊
+        new Paragraph({
+          text: "與會人員簽到表",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 400, after: 200 },
+        }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            // 每列兩個成員
+            ...Array.from({ length: Math.ceil(memberList.length / 2) }).map((_, i) => (
+              new TableRow({
+                children: [
+                  new TableCell({ 
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: `${memberList[i * 2]}：`, bold: true })], spacing: { before: 200, after: 800 } })] 
+                  }),
+                  memberList[i * 2 + 1] ? new TableCell({ 
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: `${memberList[i * 2 + 1]}：`, bold: true })], spacing: { before: 200, after: 800 } })] 
+                  }) : new TableCell({ children: [] }),
+                ],
+              })
+            )),
+          ],
+        }),
+        new Paragraph({
+          text: "照片紀錄",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 400, after: 200 },
+        }),
+      ];
+
+      // 迭代照片並插入（照片在上，描述在下）
+      for (const photo of photos) {
+        if (photo.dataUrl) {
+          children.push(
+            new Paragraph({
+              children: [
+                new ImageRun({
+                  data: dataUrlToUint8Array(photo.dataUrl),
+                  transformation: {
+                    width: 580, // A4 寬度大約 600pt，扣除邊距設為 580
+                    height: 320, // 保持約 16:9 或 4:3 的比例
+                  },
+                } as any),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200, after: 100 },
+            })
+          );
+        }
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({ text: `照片描述：`, bold: true, color: "666666" }),
+              new TextRun({ text: photo.description || '無描述' }),
+            ],
+            spacing: { before: 100, after: 400 },
+          })
+        );
+      }
+
+      // 會議總結
+      children.push(
+        new Paragraph({
+          text: "會議總結",
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 400, after: 200 },
+        }),
+        new Paragraph({
+          children: summary.split('\n').map((line, i) => new TextRun({ text: line, break: i > 0 ? 1 : 0 })),
+          spacing: { after: 400 },
+        })
+      );
+
       const doc = new Document({
         sections: [{
           properties: {},
-          children: [
-            new Paragraph({
-              text: "領域共備GO - 教師社群會議報告",
-              heading: HeadingLevel.HEADING_1,
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 400 },
-            }),
-            new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph(teachingArea)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph(meetingTopic)] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph(communityMembers)] }),
-                  ],
-                }),
-              ],
-            }),
-            new Paragraph({
-              text: "照片紀錄",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 },
-            }),
-            ...photos.map(photo => [
-              new Paragraph({
-                text: `照片描述：${photo.description || '無描述'}`,
-                spacing: { before: 200, after: 200 },
-              }),
-            ]).flat(),
-            new Paragraph({
-              text: "會議總結",
-              heading: HeadingLevel.HEADING_2,
-              spacing: { before: 400, after: 200 },
-            }),
-            new Paragraph({
-              children: summary.split('\n').map((line, i) => new TextRun({ text: line, break: i > 0 ? 1 : 0 })),
-            }),
-          ],
+          children: children,
         }],
       });
 
       const blob = await Packer.toBlob(doc);
       saveAs(blob, `會議報告_${meetingTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
-      toast({ title: '匯出成功', description: 'Word 檔案已開始下載。' });
+      toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
     } catch (error) {
       console.error(error);
-      toast({ title: '匯出失敗', description: '產生 Word 檔案時發生錯誤。', variant: 'destructive' });
+      toast({ title: '匯出失敗', description: '產生優化 Word 檔案時發生錯誤。', variant: 'destructive' });
     }
   }, [summary, photos, form, toast]);
 
