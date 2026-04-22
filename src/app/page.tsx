@@ -36,6 +36,25 @@ import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 
+// 匯出套件
+import { 
+  Document, 
+  Packer, 
+  Paragraph, 
+  TextRun, 
+  ImageRun, 
+  AlignmentType, 
+  HeadingLevel,
+  BorderStyle,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType
+} from 'docx';
+import { saveAs } from 'file-saver';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -240,9 +259,114 @@ export default function Home() {
     }
   }, [isGeneratingSummary, summaryGenerationProgress]);
 
+  // --- 匯出功能 -----------------------------------------
+  
+  const exportToWord = useCallback(async () => {
+    if (!summary) return;
+    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    
+    try {
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: "領域共備GO - 教師社群會議報告",
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 },
+            }),
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph(teachingArea)] }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph(meetingTopic)] }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] }),
+                  ],
+                }),
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph(communityMembers)] }),
+                  ],
+                }),
+              ],
+            }),
+            new Paragraph({
+              text: "照片紀錄",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 },
+            }),
+            ...photos.map(photo => [
+              new Paragraph({
+                text: `照片描述：${photo.description || '無描述'}`,
+                spacing: { before: 200, after: 200 },
+              }),
+            ]).flat(),
+            new Paragraph({
+              text: "會議總結",
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 400, after: 200 },
+            }),
+            new Paragraph({
+              children: summary.split('\n').map((line, i) => new TextRun({ text: line, break: i > 0 ? 1 : 0 })),
+            }),
+          ],
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `會議報告_${meetingTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
+      toast({ title: '匯出成功', description: 'Word 檔案已開始下載。' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: '匯出失敗', description: '產生 Word 檔案時發生錯誤。', variant: 'destructive' });
+    }
+  }, [summary, photos, form, toast]);
+
+  const exportToPDF = useCallback(async () => {
+    const reportElement = document.getElementById('report-content');
+    if (!reportElement) return;
+
+    try {
+      toast({ title: '準備中', description: '正在產生 PDF 快照...' });
+      const canvas = await html2canvas(reportElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#0f172a', // 配合深色主題
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`會議報告_${form.getValues().meetingTopic}_${format(new Date(), "yyyyMMdd")}.pdf`);
+      toast({ title: '匯出成功', description: 'PDF 檔案已開始下載。' });
+    } catch (error) {
+      console.error(error);
+      toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
+    }
+  }, [form, toast]);
+
   return (
     <TooltipProvider>
-      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen pb-24">
+      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen pb-24" id="report-content">
         <header className="mb-10 text-center">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400 py-4 drop-shadow-lg">
             領域共備GO
@@ -340,12 +464,17 @@ export default function Home() {
             </Card>
 
             {/* Step 4 */}
-            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-orange-500">
+            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-orange-500 no-print">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3"><Download className="text-orange-400" /> 第四步：匯出報告</CardTitle>
               </CardHeader>
-              <CardContent className="flex gap-4">
-                <Button type="button" disabled={!summary} className="flex-1 bg-sky-600 hover:bg-sky-500">匯出 Word (.doc)</Button>
+              <CardContent className="flex flex-col sm:flex-row gap-4">
+                <Button type="button" disabled={!summary} onClick={exportToWord} className="flex-1 bg-sky-600 hover:bg-sky-500">
+                  <Download className="mr-2 h-4 w-4" /> 匯出 Word (.docx)
+                </Button>
+                <Button type="button" disabled={!summary} onClick={exportToPDF} className="flex-1 bg-rose-600 hover:bg-rose-500">
+                  <Printer className="mr-2 h-4 w-4" /> 匯出 PDF 快照
+                </Button>
               </CardContent>
             </Card>
           </form>
