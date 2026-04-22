@@ -43,6 +43,8 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import confetti from 'canvas-confetti';
+import ReactMarkdown from 'react-markdown';
+
 
 
 // 匯出套件
@@ -350,195 +352,113 @@ export default function Home() {
     }
   }, [isGeneratingSummary, summaryGenerationProgress]);
 
-  // --- 匯出功能 -----------------------------------------
-  
   const exportToWord = useCallback(async () => {
     if (!summary) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    
     const displayTopic = meetingType === "其他" ? meetingTopic : `${meetingType} - ${meetingTopic}`;
-    
-    // 將成員字串轉為陣列（支援多種分隔符）
     const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
 
-    try {
-      // Helper: DataURL 轉 Uint8Array
-      const dataUrlToUint8Array = (dataUrl: string) => {
-        const base64 = dataUrl.split(',')[1];
-        const binaryString = window.atob(base64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+    const dataUrlToUint8Array = (dataUrl: string) => {
+      const base64 = dataUrl.split(',')[1];
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+      return bytes;
+    };
+
+    const parseMarkdownToDocx = (text: string) => {
+      const lines = text.split('\n');
+      const elements: any[] = [];
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) { elements.push(new Paragraph({ children: [new TextRun("")] })); return; }
+        if (trimmed.startsWith('### ')) {
+          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('### ', ''), bold: true, size: 28, color: "2c3e50" })], heading: HeadingLevel.HEADING_3, spacing: { before: 300, after: 150 } }));
+          return;
         }
-        return bytes;
-      };
-
-      const children: any[] = [
-        new Paragraph({
-          text: "領域共備GO - 教師社群會議報告",
-          heading: HeadingLevel.HEADING_1,
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 400 },
-        }),
-        // 基本資訊表格
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [
-            new TableRow({
-              children: [
-                new TableCell({ width: { size: 20, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }),
-                new TableCell({ width: { size: 80, type: WidthType.PERCENTAGE }, children: [new Paragraph(teachingArea)] }),
-              ],
-            }),
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }),
-                new TableCell({ children: [new Paragraph(displayTopic)] }),
-              ],
-            }),
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }),
-                new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] }),
-              ],
-            }),
-            new TableRow({
-              children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }),
-                new TableCell({ children: [new Paragraph(communityMembers)] }),
-              ],
-            }),
-          ],
-        }),
-        // 簽到表區塊
-        new Paragraph({
-          text: "與會人員簽到表",
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 200 },
-        }),
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [
-            // 表頭
-            new TableRow({
-              children: [
-                new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
-                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
-                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
-              ],
-            }),
-            // 成員列
-            ...memberList.map(member => (
-              new TableRow({
-                children: [
-                  new TableCell({ verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 400, after: 400 } })] }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 400, after: 400 } })] }),
-                ],
-              })
-            )),
-          ],
-        }),
-        new Paragraph({
-          text: "照片紀錄",
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 200 },
-        }),
-      ];
-
-      // 迭代照片並插入（照片在上，描述在下）
-      for (const photo of photos) {
-        if (photo.dataUrl) {
-          children.push(
-            new Paragraph({
-              children: [
-                new ImageRun({
-                  data: dataUrlToUint8Array(photo.dataUrl),
-                  transformation: {
-                    width: 580, // A4 寬度大約 600pt，扣除邊距設為 580
-                    height: 320, // 保持約 16:9 或 4:3 的比例
-                  },
-                } as any),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { before: 200, after: 100 },
-            })
-          );
+        if (trimmed.startsWith('## ')) {
+          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('## ', ''), bold: true, size: 32, color: "1a252f" })], heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));
+          return;
         }
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: `照片描述：`, bold: true, color: "666666" }),
-              new TextRun({ text: photo.description || '無描述' }),
-            ],
-            spacing: { before: 100, after: 400 },
-          })
-        );
-      }
-
-      // 會議總結
-      children.push(
-        new Paragraph({
-          text: "會議總結",
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 400, after: 200 },
-        }),
-        new Paragraph({
-          children: summary.split('\n').map((line, i) => new TextRun({ text: line, break: i > 0 ? 1 : 0 })),
-          spacing: { after: 400 },
-        })
-      );
-
-      const doc = new Document({
-        sections: [{
-          properties: {},
-          children: children,
-        }],
+        const isOrderedList = /^\d+\.\s/.test(trimmed);
+        const isUnorderedList = /^[*+-]\s/.test(trimmed);
+        if (isOrderedList || isUnorderedList) {
+          const content = trimmed.replace(/^(\d+\.|[*+-])\s/, '');
+          const parts = content.split(/(\*\*.*?\*\*)/);
+          const children = parts.map(part => part.startsWith('**') && part.endsWith('**') ? new TextRun({ text: part.slice(2, -2), bold: true }) : new TextRun(part));
+          elements.push(new Paragraph({ children: children, bullet: isUnorderedList ? { level: 0 } : undefined, indent: { left: 720 }, spacing: { before: 80, after: 80 } }));
+          return;
+        }
+        const parts = trimmed.split(/(\*\*.*?\*\*)/);
+        const children = parts.map(part => part.startsWith('**') && part.endsWith('**') ? new TextRun({ text: part.slice(2, -2), bold: true }) : new TextRun(part));
+        elements.push(new Paragraph({ children: children, spacing: { before: 120, after: 120 } }));
       });
+      return elements;
+    };
 
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
-      toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
-    } catch (error) {
-      console.error(error);
-      toast({ title: '匯出失敗', description: '產生優化 Word 檔案時發生錯誤。', variant: 'destructive' });
+    const wordPhotoParagraphs: any[] = [];
+    for (const photo of photos) {
+      if (photo.dataUrl) {
+        wordPhotoParagraphs.push(new Paragraph({ children: [new ImageRun({ data: dataUrlToUint8Array(photo.dataUrl), transformation: { width: 580, height: 320 } } as any)], alignment: AlignmentType.CENTER, spacing: { before: 200, after: 100 } }));
+      }
+      wordPhotoParagraphs.push(new Paragraph({ children: [new TextRun({ text: `照片描述：`, bold: true, color: "666666" }), new TextRun({ text: photo.description || '無描述' })], spacing: { before: 100, after: 400 } }));
     }
+
+    const doc = new Document({
+      sections: [{
+        properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
+        children: [
+          new Paragraph({ text: "領域共備GO - 教師社群會議報告", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }), new TableCell({ children: [new Paragraph(teachingArea)] })] }),
+              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }), new TableCell({ children: [new Paragraph(displayTopic)] })] }),
+              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }), new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] })] }),
+              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }), new TableCell({ children: [new Paragraph(communityMembers)] })] }),
+            ]
+          }),
+          new Paragraph({ text: "與會人員簽到表", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }), new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }), new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } })] }),
+              ...memberList.map(member => new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }), new TableCell({ children: [new Paragraph("")] }), new TableCell({ children: [new Paragraph("")] })] }))
+            ]
+          }),
+          new Paragraph({ text: "照片紀錄", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          ...wordPhotoParagraphs,
+          new Paragraph({ text: "會議總結", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          ...parseMarkdownToDocx(summary)
+        ]
+      }]
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
+    toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
   }, [summary, photos, form, toast]);
 
   const exportToPDF = useCallback(async () => {
     const reportElement = document.getElementById('printable-report');
     if (!reportElement) return;
-
     try {
       toast({ title: '準備中', description: '正在產生專業列印格式 PDF...' });
-      
-      // 暫時顯示它以便捕捉，但放在螢幕外
       reportElement.style.display = 'block';
       reportElement.style.position = 'absolute';
       reportElement.style.left = '-9999px';
-
-      const canvas = await html2canvas(reportElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
-      
-      // 隱藏回去
+      const canvas = await html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
       reportElement.style.display = 'none';
-
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`會議報告_${form.getValues().meetingTopic}_${format(new Date(), "yyyyMMdd")}.pdf`);
       toast({ title: '匯出成功', description: 'PDF 檔案已開始下載。' });
     } catch (error) {
-      console.error(error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     }
   }, [form, toast]);
@@ -547,32 +467,21 @@ export default function Home() {
     <TooltipProvider>
       <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen pb-24" id="report-content">
         <header className="mb-10 text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400 py-4 drop-shadow-lg">
-            領域共備GO
-          </h1>
+          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400 py-4 drop-shadow-lg">領域共備GO</h1>
           <p className="text-slate-300 text-lg mt-2">教師社群會議報告自動產出助手</p>
         </header>
 
         <Form {...form}>
           <form className="space-y-10">
-            {/* Step 1 */}
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-blue-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><Info className="text-blue-400" /> 第一步：輸入會議資訊</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-3"><Info className="text-blue-400" /> 第一步：輸入會議資訊</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="teachingArea" render={({ field }) => (
-                  <FormItem><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField control={form.control} name="teachingArea" render={({ field }) => (<FormItem><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="meetingType" render={({ field }) => (
                   <FormItem>
                     <FormLabel>會議類別</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="選擇主題類型" />
-                        </SelectTrigger>
-                      </FormControl>
+                      <FormControl><SelectTrigger><SelectValue placeholder="選擇主題類型" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="備課會議">備課會議</SelectItem>
                         <SelectItem value="觀課紀錄">觀課紀錄</SelectItem>
@@ -582,124 +491,65 @@ export default function Home() {
                         <SelectItem value="其他">其他 (自定義)</SelectItem>
                       </SelectContent>
                     </Select>
-                    <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="meetingTopic" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel>
-                    <FormControl>
-                      <Input placeholder={form.watch("meetingType") === "其他" ? "請輸入您的會議主題..." : "例如：公開觀課教學現場紀錄..."} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="meetingTopic" render={({ field }) => (<FormItem><FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel><FormControl><Input placeholder="例如：公開觀課教學現場紀錄..." {...field} /></FormControl></FormItem>)} />
                 <FormField control={form.control} name="meetingDate" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>會議日期</FormLabel>
                     <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "yyyy年MM月dd日") : <span>選擇日期</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus />
-                      </PopoverContent>
+                      <PopoverTrigger asChild><Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "yyyy年MM月dd日") : <span>選擇日期</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus /></PopoverContent>
                     </Popover>
-                    <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="communityMembers" render={({ field }) => (
-                  <FormItem className="md:col-span-2"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField control={form.control} name="communityMembers" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl></FormItem>)} />
               </CardContent>
             </Card>
 
-            {/* Step 2 */}
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-green-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><ImageIcon className="text-green-400" /> 第二步：上傳會議照片</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-3"><ImageIcon className="text-green-400" /> 第二步：上傳會議照片</CardTitle></CardHeader>
               <CardContent>
                 <label htmlFor="photo-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
                   <UploadCloud className="w-10 h-10 mb-2 text-green-400" />
                   <p className="text-sm text-slate-300">點擊或拖曳照片 (最多 {MAX_PHOTOS} 張)</p>
                   <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
                 </label>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                   {photos.map((photo) => (
-                    <div key={photo.id} ref={el => { photoRefs.current[photo.id] = el; }} className="relative border border-slate-700 rounded-lg overflow-hidden bg-slate-900/50 transition-all duration-500">
+                    <div key={photo.id} ref={el => { photoRefs.current[photo.id] = el; }} className="relative border border-slate-700 rounded-lg overflow-hidden bg-slate-900/50">
                       <div className="aspect-video relative overflow-hidden">
-                        <NextImage 
-                          src={photo.previewUrl} 
-                          alt="Preview" 
-                          fill 
-                          className={cn(
-                            "object-cover transition-all duration-700",
-                            (photo.isGenerating || !photo.description) ? "blur-md scale-110 grayscale-[0.3]" : "blur-0 scale-100 grayscale-0"
-                          )} 
-                        />
+                        <NextImage src={photo.previewUrl} alt="Preview" fill className={cn("object-cover transition-all duration-700", (photo.isGenerating || !photo.description) ? "blur-md scale-110 grayscale-[0.3]" : "blur-0 scale-100 grayscale-0")} />
                         <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 z-10" onClick={() => handlePhotoRemove(photo.id)}><X /></Button>
-                        
-                        {/* 單張重新產生按鈕 */}
-                        {!photo.isGenerating && (
-                          <Button 
-                            type="button" 
-                            variant="secondary" 
-                            size="icon" 
-                            className="absolute bottom-1 right-1 h-7 w-7 z-10 bg-black/40 hover:bg-black/60 text-white border-none backdrop-blur-sm" 
-                            onClick={() => handleGenerateSingleDescription(photo.id)}
-                            title="重新產生描述"
-                          >
-                            <RefreshCw className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-
-                        {photo.isGenerating && (
-                          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-20">
-                            <div className="flex flex-col items-center gap-2">
-                              <Loader2 className="animate-spin text-white h-8 w-8" />
-                              <span className="text-white text-xs font-bold drop-shadow-md">AI 分析中...</span>
-                            </div>
-                          </div>
-                        )}
+                        {!photo.isGenerating && (<Button type="button" variant="secondary" size="icon" className="absolute bottom-1 right-1 h-7 w-7 z-10 bg-black/40 hover:bg-black/60 text-white border-none backdrop-blur-sm" onClick={() => handleGenerateSingleDescription(photo.id)}><RefreshCw className="h-3.5 w-3.5" /></Button>)}
+                        {photo.isGenerating && (<div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-20"><Loader2 className="animate-spin text-white h-8 w-8" /></div>)}
                       </div>
-                      <div className={cn("p-2 text-xs text-center min-h-[40px] flex items-center justify-center transition-colors duration-500", (photo.description.includes('忙碌') || photo.description.includes('錯誤') || photo.description.includes('機制') || photo.description.includes('無法描述')) ? "text-red-400 font-medium" : "text-slate-200")}>
-                        {photo.description || '尚未產生描述'}
-                      </div>
+                      <div className="p-2 text-xs text-center text-slate-200">{photo.description || '尚未產生描述'}</div>
                     </div>
                   ))}
                 </div>
-
                 <div className="mt-6 flex flex-col items-center gap-3">
-                  <Button type="button" ref={generateDescriptionsButtonRef} onClick={handleGenerateDescriptions} disabled={isGeneratingAllDescriptions || photos.length === 0} className="w-full md:w-auto" variant="secondary">
-                    {isGeneratingAllDescriptions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 描述產生中... ({descriptionProgress}%)</> : '產生照片描述'}
-                  </Button>
+                  <Button type="button" ref={generateDescriptionsButtonRef} onClick={handleGenerateDescriptions} disabled={isGeneratingAllDescriptions || photos.length === 0} variant="secondary">{isGeneratingAllDescriptions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 描述產生中... ({descriptionProgress}%)</> : '產生照片描述'}</Button>
                   {descriptionProgress !== null && <Progress value={descriptionProgress} className="w-full max-w-xs h-2" />}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Step 3 */}
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-purple-500">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><FileText className="text-purple-400" /> 第三步：產生會議摘要</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-3"><FileText className="text-purple-400" /> 第三步：產生會議摘要</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} className="w-full md:w-auto" variant="secondary">
-                  {isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}
-                </Button>
+                <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} variant="secondary">{isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}</Button>
                 {summaryGenerationProgress !== null && <Progress value={summaryGenerationProgress} className="h-2" />}
-                {summary && <Textarea ref={summaryTextareaRef} value={summary} readOnly className="h-48 bg-slate-900/50" />}
+                {summary && (
+                  <div className="mt-4 p-6 rounded-xl bg-slate-900/40 border border-slate-700/50 shadow-inner">
+                    <div className="prose prose-invert prose-slate max-w-none prose-headings:text-purple-400 prose-strong:text-purple-300 prose-p:text-slate-300 prose-li:text-slate-300 leading-relaxed">
+                      <ReactMarkdown>{summary}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Step 4 */}
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-orange-500 no-print">
               <CardHeader>
                 <CardTitle className="flex items-center gap-3"><Download className="text-orange-400" /> 第四步：匯出報告</CardTitle>
@@ -789,9 +639,9 @@ export default function Home() {
         ))}
 
         {/* 會議總結 */}
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px', marginTop: '30px' }}>會議總結</h2>
-        <div style={{ fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
-          {summary}
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px', marginTop: '30px', color: '#1a252f', borderBottom: '2px solid #eee', paddingBottom: '8px' }}>會議總結</h2>
+        <div style={{ fontSize: '15.5px', lineHeight: '1.8', color: '#333' }} className="pdf-markdown-summary">
+          <ReactMarkdown>{summary}</ReactMarkdown>
         </div>
       </div>
     </TooltipProvider>
