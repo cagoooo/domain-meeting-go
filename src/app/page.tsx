@@ -168,6 +168,11 @@ export default function Home() {
 
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
+
+    // UX 優化：按下產生的瞬間，立即自動滾動到第一張照片的位置
+    if (photos.length > 0) {
+      photoRefs.current[photos[0].id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     
     // 循序處理以避開 429 頻率限制
     let index = 0;
@@ -411,17 +416,27 @@ export default function Home() {
   }, [summary, photos, form, toast]);
 
   const exportToPDF = useCallback(async () => {
-    const reportElement = document.getElementById('report-content');
+    const reportElement = document.getElementById('printable-report');
     if (!reportElement) return;
 
     try {
-      toast({ title: '準備中', description: '正在產生 PDF 快照...' });
+      toast({ title: '準備中', description: '正在產生專業列印格式 PDF...' });
+      
+      // 暫時顯示它以便捕捉，但放在螢幕外
+      reportElement.style.display = 'block';
+      reportElement.style.position = 'absolute';
+      reportElement.style.left = '-9999px';
+
       const canvas = await html2canvas(reportElement, {
         scale: 2,
         useCORS: true,
-        backgroundColor: '#0f172a', // 配合深色主題
+        backgroundColor: '#ffffff',
+        logging: false,
       });
       
+      // 隱藏回去
+      reportElement.style.display = 'none';
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
@@ -574,6 +589,58 @@ export default function Home() {
         </Tooltip>
       </div>
       <Toaster />
+
+      {/* --- 列印專用隱藏範本 (白底黑字正式版) --- */}
+      <div id="printable-report" style={{ display: 'none', width: '800px', backgroundColor: 'white', color: 'black', padding: '40px', fontFamily: 'sans-serif' }}>
+        <h1 style={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold', marginBottom: '30px' }}>領域共備GO - 教師社群會議報告</h1>
+        
+        {/* 基本資訊表 */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+          <tbody>
+            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold', width: '25%' }}>教學領域</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().teachingArea}</td></tr>
+            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議主題</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingTopic}</td></tr>
+            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議日期</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy年MM月dd日") : ""}</td></tr>
+            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>社群成員</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().communityMembers}</td></tr>
+          </tbody>
+        </table>
+
+        {/* 簽到表 */}
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>與會人員簽到表</h2>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+          <tbody>
+            {(() => {
+              const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
+              const rows = [];
+              for (let i = 0; i < members.length; i += 2) {
+                rows.push(
+                  <tr key={i}>
+                    <td style={{ border: '1px solid black', padding: '15px 10px 40px 10px', width: '50%' }}><b>{members[i]}：</b></td>
+                    <td style={{ border: '1px solid black', padding: '15px 10px 40px 10px', width: '50%' }}>{members[i+1] ? <b>{members[i+1]}：</b> : ""}</td>
+                  </tr>
+                );
+              }
+              return rows;
+            })()}
+          </tbody>
+        </table>
+
+        {/* 照片紀錄 */}
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>照片紀錄</h2>
+        {photos.map((photo, i) => (
+          <div key={i} style={{ marginBottom: '30px', pageBreakInside: 'avoid' }}>
+            {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', borderRadius: '5px', marginBottom: '10px' }} />}
+            <p style={{ fontSize: '14px', lineHeight: '1.6' }}>
+              <b style={{ color: '#555' }}>照片描述：</b>{photo.description || '無描述'}
+            </p>
+          </div>
+        ))}
+
+        {/* 會議總結 */}
+        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px', marginTop: '30px' }}>會議總結</h2>
+        <div style={{ fontSize: '15px', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>
+          {summary}
+        </div>
+      </div>
     </TooltipProvider>
   );
 }
