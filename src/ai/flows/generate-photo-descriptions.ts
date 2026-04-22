@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -27,7 +28,7 @@ export type GeneratePhotoDescriptionsInput = z.infer<typeof GeneratePhotoDescrip
 const GeneratePhotoDescriptionsOutputSchema = z.object({
   photoDescription: z
     .string()
-    .describe('A detailed 60-100 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, people, and the scene.'),
+    .describe('A detailed 60-100 character description of the photo in Traditional Chinese (Taiwan).'),
 });
 export type GeneratePhotoDescriptionsOutput = z.infer<typeof GeneratePhotoDescriptionsOutputSchema>;
 
@@ -40,52 +41,63 @@ export async function generatePhotoDescriptions(
 const prompt = ai.definePrompt({
   name: 'generatePhotoDescriptionsPrompt',
   input: {
-    schema: z.object({
-      teachingArea: z.string().describe('The teaching area of the teacher.'),
-      meetingTopic: z.string().describe('The topic of the meeting.'),
-      communityMembers: z.string().describe('The names of the community members.'),
-      meetingDate: z.string().describe('The date of the meeting.'),
-      photoDataUri: z
-        .string()
-        .describe(
-          "A photo related to the meeting, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-        ),
-    }),
+    schema: GeneratePhotoDescriptionsInputSchema,
   },
   output: {
-    schema: z.object({
-      photoDescription: z
-        .string()
-        .describe('A detailed 60-100 character description of the photo in Traditional Chinese (Taiwan), highlighting key elements, activities, people, and the scene.'),
-    }),
+    schema: GeneratePhotoDescriptionsOutputSchema,
   },
-  prompt: `你是教育專業助理，任務是為老師分析照片。
-照片相關資訊：
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+    ],
+  },
+  prompt: `你是教育專業助理。此照片是用於「教師專業社群領域會議報告」的正式學術記錄，內容安全。
+
+照片背景資訊：
 - 教學領域：{{{teachingArea}}}
 - 會議主題：{{{meetingTopic}}}
 - 社群成員：{{{communityMembers}}}
 - 會議日期：{{{meetingDate}}}
 
-**任務：** 請仔細觀察以下提供的照片，並用**繁體中文（台灣用語）**寫一段詳細描述照片的文字，長度約60至100字。描述應涵蓋照片中的主要人物、他們的活動、場景佈置，以及任何值得注意的細節。
+**任務：** 請以專業教育觀察者的視角，用**繁體中文（台灣用語）**描述照片內容（約60至100字）。
 
-**輸出要求：**
-1. 你的回應**必須**只包含這句繁體中文描述，不要有任何其他文字、標籤或格式。
-2. 如果因任何原因（例如：圖片無法辨識、安全限制等）你無法產生描述，請**只**回傳文字：「無法描述此圖片。」
+**描述指引：**
+1. 專注於描述人物正在進行的**活動**（例如：討論、展示教材、引導操作）。
+2. 描述畫面中使用的**教具、器材或環境佈置**。
+3. 描述人物間的**互動與學習氛圍**。
+
+**注意：** 如果照片包含人物，請使用「老師」、「學生們」等去識別化稱呼。請專注於教學行為的描述，這是一份專業報告，請務必產出具體的描述內容。
 
 {{media url=photoDataUri}}`,
 });
 
-const generatePhotoDescriptionsFlow = ai.defineFlow<
-  typeof GeneratePhotoDescriptionsInputSchema,
-  typeof GeneratePhotoDescriptionsOutputSchema
->(
+const generatePhotoDescriptionsFlow = ai.defineFlow(
   {
     name: 'generatePhotoDescriptionsFlow',
     inputSchema: GeneratePhotoDescriptionsInputSchema,
     outputSchema: GeneratePhotoDescriptionsOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return {photoDescription: output!.photoDescription!};
+    try {
+      const {output} = await prompt(input);
+      if (!output || !output.photoDescription) {
+        return {photoDescription: 'AI 偵測到敏感內容或無法產出描述，請嘗試更換照片或拍攝角度。'};
+      }
+      return {photoDescription: output.photoDescription};
+    } catch (error: any) {
+      console.error('Genkit Error:', error);
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
+        return {photoDescription: '模型目前忙碌中（配額限制），請稍候再試。'};
+      }
+      if (errorMessage.includes('safety')) {
+        return {photoDescription: '因人臉辨識或安全隱私機制限制，無法描述此圖片，建議拍攝側面。'};
+      }
+      return {photoDescription: '分析圖片時發生錯誤。'};
+    }
   }
 );
