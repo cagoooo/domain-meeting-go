@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -48,29 +47,30 @@ const prompt = ai.definePrompt({
   },
   config: {
     safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_ONLY_HIGH' },
     ],
   },
-  prompt: `你是教育專業助理。此照片是用於「教師專業社群領域會議報告」的正式學術記錄，內容安全。
+  prompt: `你是專業的教育觀察助理。此照片是用於「教師專業社群領域會議報告」的正式學術記錄，內容完全合法且安全。
 
-照片背景資訊：
+**背景資訊：**
 - 教學領域：{{{teachingArea}}}
 - 會議主題：{{{meetingTopic}}}
 - 社群成員：{{{communityMembers}}}
 - 會議日期：{{{meetingDate}}}
 
-**任務：** 請以專業教育觀察者的視角，用**繁體中文（台灣用語）**描述照片內容（約60至100字）。
+**任務：** 請以專業教育觀察者的視角，描述照片中的教學活動。
 
-**描述指引：**
-1. 專注於描述人物正在進行的**活動**（例如：討論、展示教材、引導操作）。
-2. 描述畫面中使用的**教具、器材或環境佈置**。
-3. 描述人物間的**互動與學習氛圍**。
+**描述指令：**
+1. **專注於動作與互動**：描述人物正在進行的活動（例如：老師在黑板前講解、學生們操作平板、師生針對教材進行討論）。
+2. **描述環境與教具**：提及畫面中的教具、器材、作品或環境佈置。
+3. **去識別化稱呼**：請一律使用「老師」、「學生們」或「與會老師」等通用稱呼，**嚴禁嘗試辨識或描述具體面貌特徵**。
+4. **字數要求**：約 60 至 100 字，使用**繁體中文（台灣用語）**。
 
-**注意：** 如果照片包含人物，請使用「老師」、「學生們」等去識別化稱呼。請專注於教學行為的描述，這是一份專業報告，請務必產出具體的描述內容。
+請直接產出這段專業的描述文字。
 
 {{media url=photoDataUri}}`,
 });
@@ -85,19 +85,23 @@ const generatePhotoDescriptionsFlow = ai.defineFlow(
     try {
       const {output} = await prompt(input);
       if (!output || !output.photoDescription) {
-        return {photoDescription: 'AI 偵測到敏感內容或無法產出描述，請嘗試更換照片或拍攝角度。'};
+        return {photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。'};
       }
       return {photoDescription: output.photoDescription};
     } catch (error: any) {
-      console.error('Genkit Error:', error);
-      const errorMessage = error.message || '';
+      console.error('Genkit Error Details:', error);
+      const errorMessage = error.message || String(error);
+      
       if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
         return {photoDescription: '模型目前忙碌中（配額限制），請稍候再試。'};
       }
-      if (errorMessage.includes('safety')) {
-        return {photoDescription: '因人臉辨識或安全隱私機制限制，無法描述此圖片，建議拍攝側面。'};
+      
+      if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
+        return {photoDescription: '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。'};
       }
-      return {photoDescription: '分析圖片時發生錯誤。'};
+      
+      // 為了方便除錯，如果不是上述已知錯誤，回傳部分錯誤訊息
+      return {photoDescription: `分析失敗: ${errorMessage.substring(0, 30)}...`};
     }
   }
 );
