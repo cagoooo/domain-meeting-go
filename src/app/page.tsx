@@ -25,7 +25,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NextImage from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -250,6 +250,56 @@ export default function Home() {
 
     setIsGeneratingAllDescriptions(false);
     toast({ title: '照片描述處理完畢', description: '所有圖片已處理完成。' });
+  }, [form, photos, toast]);
+
+  const handleGenerateSingleDescription = useCallback(async (photoId: string) => {
+    const photo = photos.find(p => p.id === photoId);
+    if (!photo || photo.isGenerating) return;
+
+    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers) {
+      toast({ title: '資訊未填寫', description: '請先填寫第一步的會議資訊。', variant: 'destructive' });
+      return;
+    }
+
+    setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isGenerating: true } : p));
+
+    try {
+      const generateDescriptionsFn = httpsCallable<any, { photoDescription: string }>(functions, 'generatePhotoDescriptions');
+      const response = await generateDescriptionsFn({
+        teachingArea,
+        meetingTopic,
+        communityMembers,
+        meetingDate: format(meetingDate, 'yyyy-MM-dd'),
+        photoDataUri: photo.dataUrl!,
+      });
+      const result = response.data;
+
+      const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
+      
+      setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: result.photoDescription, isGenerating: false } : p));
+      
+      if (!isError) {
+        // 成功時在照片位置放彩花
+        const element = photoRefs.current[photoId];
+        if (element) {
+          const rect = element.getBoundingClientRect();
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: {
+              x: (rect.left + rect.width / 2) / window.innerWidth,
+              y: (rect.top + rect.height / 2) / window.innerHeight
+            }
+          });
+        }
+      } else {
+        toast({ title: '處理異常', description: result.photoDescription, variant: 'destructive' });
+      }
+    } catch (error: any) {
+      setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: '產出失敗', isGenerating: false } : p));
+      toast({ title: '系統錯誤', description: '呼叫分析函式時發生錯誤。', variant: 'destructive' });
+    }
   }, [form, photos, toast]);
 
   const handleGenerateSummary = useCallback(async () => {
@@ -595,6 +645,21 @@ export default function Home() {
                           )} 
                         />
                         <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 z-10" onClick={() => handlePhotoRemove(photo.id)}><X /></Button>
+                        
+                        {/* 單張重新產生按鈕 */}
+                        {!photo.isGenerating && (
+                          <Button 
+                            type="button" 
+                            variant="secondary" 
+                            size="icon" 
+                            className="absolute bottom-1 right-1 h-7 w-7 z-10 bg-black/40 hover:bg-black/60 text-white border-none backdrop-blur-sm" 
+                            onClick={() => handleGenerateSingleDescription(photo.id)}
+                            title="重新產生描述"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+
                         {photo.isGenerating && (
                           <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-20">
                             <div className="flex flex-col items-center gap-2">
