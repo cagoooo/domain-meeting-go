@@ -97,7 +97,7 @@ export const generateMeetingSummary = onCall(
   async (request: any) => {
     try {
       const ai = getAiInstance();
-      const { meetingType, teachingArea, meetingTopic, meetingDate, communityMembers, photoDescriptions } = request.data;
+      const { meetingType } = request.data;
       
       // 根據會議類型調整提示導向
       let typeSpecificPrompt = "";

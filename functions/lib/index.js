@@ -89,7 +89,7 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey
 exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 }, async (request) => {
     try {
         const ai = getAiInstance();
-        const { meetingType, teachingArea, meetingTopic, meetingDate, communityMembers, photoDescriptions } = request.data;
+        const { meetingType } = request.data;
         // 根據會議類型調整提示導向
         let typeSpecificPrompt = "";
         switch (meetingType) {

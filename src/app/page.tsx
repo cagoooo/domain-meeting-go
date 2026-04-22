@@ -42,6 +42,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import confetti from 'canvas-confetti';
 
 
 // 匯出套件
@@ -209,6 +210,22 @@ export default function Home() {
         
         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: result.photoDescription, isGenerating: false } : p));
         
+        if (!isError) {
+          // 成功時在照片位置放彩花
+          const element = photoRefs.current[photo.id];
+          if (element) {
+            const rect = element.getBoundingClientRect();
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: {
+                x: (rect.left + rect.width / 2) / window.innerWidth,
+                y: (rect.top + rect.height / 2) / window.innerHeight
+              }
+            });
+          }
+        }
+        
         if (isError) {
           toast({ title: '處理異常', description: `照片 ${index}：${result.photoDescription}`, variant: 'destructive' });
         }
@@ -229,7 +246,7 @@ export default function Home() {
   }, [form, photos, toast]);
 
   const handleGenerateSummary = useCallback(async () => {
-    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
     const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.includes('失敗') && !d.includes('忙碌') && !d.includes('無法描述'));
 
     if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length === 0) {
@@ -559,13 +576,28 @@ export default function Home() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                   {photos.map((photo) => (
-                    <div key={photo.id} ref={el => { photoRefs.current[photo.id] = el; }} className="relative border border-slate-700 rounded-lg overflow-hidden bg-slate-900/50">
-                      <div className="aspect-video relative">
-                        <NextImage src={photo.previewUrl} alt="Preview" fill className="object-cover" />
-                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7" onClick={() => handlePhotoRemove(photo.id)}><X /></Button>
-                        {photo.isGenerating && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><Loader2 className="animate-spin text-white" /></div>}
+                    <div key={photo.id} ref={el => { photoRefs.current[photo.id] = el; }} className="relative border border-slate-700 rounded-lg overflow-hidden bg-slate-900/50 transition-all duration-500">
+                      <div className="aspect-video relative overflow-hidden">
+                        <NextImage 
+                          src={photo.previewUrl} 
+                          alt="Preview" 
+                          fill 
+                          className={cn(
+                            "object-cover transition-all duration-700",
+                            (photo.isGenerating || !photo.description) ? "blur-md scale-110 grayscale-[0.3]" : "blur-0 scale-100 grayscale-0"
+                          )} 
+                        />
+                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 z-10" onClick={() => handlePhotoRemove(photo.id)}><X /></Button>
+                        {photo.isGenerating && (
+                          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-20">
+                            <div className="flex flex-col items-center gap-2">
+                              <Loader2 className="animate-spin text-white h-8 w-8" />
+                              <span className="text-white text-xs font-bold drop-shadow-md">AI 分析中...</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className={cn("p-2 text-xs text-center min-h-[40px] flex items-center justify-center", (photo.description.includes('忙碌') || photo.description.includes('無法') || photo.description.includes('失敗')) ? "text-red-400 font-medium" : "text-slate-200")}>
+                      <div className={cn("p-2 text-xs text-center min-h-[40px] flex items-center justify-center transition-colors duration-500", (photo.description.includes('忙碌') || photo.description.includes('錯誤') || photo.description.includes('機制') || photo.description.includes('無法描述')) ? "text-red-400 font-medium" : "text-slate-200")}>
                         {photo.description || '尚未產生描述'}
                       </div>
                     </div>
