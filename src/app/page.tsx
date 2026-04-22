@@ -49,7 +49,8 @@ import {
   Table,
   TableRow,
   TableCell,
-  WidthType
+  WidthType,
+  VerticalAlign
 } from 'docx';
 import { saveAs } from 'file-saver';
 import jsPDF from 'jspdf';
@@ -332,18 +333,21 @@ export default function Home() {
         new Table({
           width: { size: 100, type: WidthType.PERCENTAGE },
           rows: [
-            // 每列兩個成員
-            ...Array.from({ length: Math.ceil(memberList.length / 2) }).map((_, i) => (
+            // 表頭
+            new TableRow({
+              children: [
+                new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
+                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
+                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }),
+              ],
+            }),
+            // 成員列
+            ...memberList.map(member => (
               new TableRow({
                 children: [
-                  new TableCell({ 
-                    width: { size: 50, type: WidthType.PERCENTAGE },
-                    children: [new Paragraph({ children: [new TextRun({ text: `${memberList[i * 2]}：`, bold: true })], spacing: { before: 200, after: 800 } })] 
-                  }),
-                  memberList[i * 2 + 1] ? new TableCell({ 
-                    width: { size: 50, type: WidthType.PERCENTAGE },
-                    children: [new Paragraph({ children: [new TextRun({ text: `${memberList[i * 2 + 1]}：`, bold: true })], spacing: { before: 200, after: 800 } })] 
-                  }) : new TableCell({ children: [] }),
+                  new TableCell({ verticalAlign: VerticalAlign.CENTER, children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 400, after: 400 } })] }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 400, after: 400 } })] }),
                 ],
               })
             )),
@@ -607,19 +611,23 @@ export default function Home() {
         {/* 簽到表 */}
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>與會人員簽到表</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f2f2f2' }}>
+              <th style={{ border: '1px solid black', padding: '10px', width: '30%', textAlign: 'center' }}>姓名</th>
+              <th style={{ border: '1px solid black', padding: '10px', width: '35%', textAlign: 'center' }}>簽到</th>
+              <th style={{ border: '1px solid black', padding: '10px', width: '35%', textAlign: 'center' }}>簽退</th>
+            </tr>
+          </thead>
           <tbody>
             {(() => {
               const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
-              const rows = [];
-              for (let i = 0; i < members.length; i += 2) {
-                rows.push(
-                  <tr key={i}>
-                    <td style={{ border: '1px solid black', padding: '15px 10px 40px 10px', width: '50%' }}><b>{members[i]}：</b></td>
-                    <td style={{ border: '1px solid black', padding: '15px 10px 40px 10px', width: '50%' }}>{members[i+1] ? <b>{members[i+1]}：</b> : ""}</td>
-                  </tr>
-                );
-              }
-              return rows;
+              return members.map((member, i) => (
+                <tr key={i}>
+                  <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>{member}</td>
+                  <td style={{ border: '1px solid black', padding: '20px' }}></td>
+                  <td style={{ border: '1px solid black', padding: '20px' }}></td>
+                </tr>
+              ));
             })()}
           </tbody>
         </table>
