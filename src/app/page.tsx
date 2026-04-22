@@ -182,8 +182,15 @@ export default function Home() {
     setDescriptionProgress(0);
 
     // UX 優化：按下產生的瞬間，立即自動滾動到第一張照片的位置
+    // 使用 setTimeout 確保 UI 渲染與模糊效果套用後再進行精細滾動
     if (photos.length > 0) {
-      photoRefs.current[photos[0].id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        const firstPhotoId = photos[0].id;
+        const element = photoRefs.current[firstPhotoId];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
     
     // 循序處理以避開 429 頻率限制
