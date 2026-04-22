@@ -86,13 +86,36 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey
 // ------------------------------------
 // 2. 生成會議摘要 (generateMeetingSummary)
 // ------------------------------------
-exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 60 }, async (request) => {
+exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 }, async (request) => {
     try {
         const ai = getAiInstance();
+        const { meetingType, teachingArea, meetingTopic, meetingDate, communityMembers, photoDescriptions } = request.data;
+        // 根據會議類型調整提示導向
+        let typeSpecificPrompt = "";
+        switch (meetingType) {
+            case "備課會議":
+                typeSpecificPrompt = "請著重於「教學目標設定」、「教材選擇與編排」以及「教學流程設計」。分析與會老師如何針對課程內容進行專業對話。";
+                break;
+            case "觀課紀錄":
+                typeSpecificPrompt = "請著重於「課堂氛圍觀察」、「學生學習反應」以及「教學策略的執行成效」。描述教學現場的實務脈動。";
+                break;
+            case "議課總整理":
+                typeSpecificPrompt = "請著重於「建設性成果回饋」、「具體改善建議」以及「同儕共學紀錄」。總結與會者對該堂課的深度反思與洞察。";
+                break;
+            case "講座研討報告":
+                typeSpecificPrompt = "請著重於「核心知能獲取」、「理論與實務的連結」以及「未來的應用規劃」。記錄專業發展的關鍵精華。";
+                break;
+            case "社群會議紀錄":
+                typeSpecificPrompt = "請著重於「任務分工進度」、「行政事務協調」以及「社群成長動能」。總結社群運作的具體進度與共識。";
+                break;
+            default:
+                typeSpecificPrompt = "請全面且深入地總結會議要點、討論亮點、達成共識以及未來決策事項。";
+        }
         const prompt = ai.definePrompt({
             name: 'generateMeetingSummaryPrompt',
             input: {
                 schema: genkit_1.z.object({
+                    meetingType: genkit_1.z.string(),
                     teachingArea: genkit_1.z.string(),
                     meetingTopic: genkit_1.z.string(),
                     meetingDate: genkit_1.z.string(),
@@ -105,19 +128,26 @@ exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], 
                     summary: genkit_1.z.string(),
                 }),
             },
-            prompt: `你是教育專業助理，你的任務是基於老師提供的資訊和照片描述，產生一份300-500字的會議總結。
+            prompt: `你是專業的教育行政與教學研究助手，你的任務是基於老師提供的資訊和一系列的照片觀察記錄，撰寫一份極具專業水準的「{{{meetingType}}}」正式報告。
+        
+        **寫作要求：**
+        1. **字數要求**：請產出約 **600 至 1000 個繁體中文字**。內容應詳實、全面且具備深度，避免空洞的套話。
+        2. **專業語氣**：使用正式的教育學術語彙（台灣用語）。
+        3. **深度整合**：請將照片描述中的具體細節（如具體教具、師生互動行為）有機地織入總結內容中。
+        4. **場景導向**：${typeSpecificPrompt}
 
-以下是相關資訊：
-- 教學領域：{{teachingArea}}
-- 會議主題：{{meetingTopic}}
-- 會議日期：{{meetingDate}}
-- 社群成員：{{communityMembers}}
-- 照片描述：
-{{#each photoDescriptions}}
-  - {{this}}
-{{/each}}
+        **報告背景資訊：**
+        - 會議類型：{{{meetingType}}}
+        - 教學領域：{{{teachingArea}}}
+        - 會議主題：{{{meetingTopic}}}
+        - 會議日期：{{{meetingDate}}}
+        - 與會成員：{{{communityMembers}}}
+        - 觀察細節 (照片描述)：
+        {{#each photoDescriptions}}
+          - {{this}}
+        {{/each}}
 
-請用**繁體中文（台灣用語）**撰寫一份詳細的會議總結。總結應涵蓋會議的主要討論內容、達成的共識以及任何重要的決策。`,
+        請直接開始撰寫這份內容詳盡、排版分明（可使用條列式輔助說明）的會議總結記錄。`,
         });
         const { output } = await prompt(request.data);
         if (!output || !output.summary) {

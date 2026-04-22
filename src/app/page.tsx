@@ -35,6 +35,14 @@ import { httpsCallable } from 'firebase/functions';
 import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+
 
 // 匯出套件
 import { 
@@ -62,6 +70,7 @@ const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const formSchema = z.object({
   teachingArea: z.string().min(1, '教學領域不能為空'),
+  meetingType: z.string().min(1, '請選擇會議類別'),
   meetingTopic: z.string().min(1, '會議主題不能為空'),
   meetingDate: z.date({ required_error: '請選擇會議日期' }),
   communityMembers: z.string().min(1, '社群成員不能為空'),
@@ -94,6 +103,7 @@ export default function Home() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       teachingArea: '',
+      meetingType: '社群會議紀錄',
       meetingTopic: '',
       communityMembers: '',
     },
@@ -233,6 +243,7 @@ export default function Home() {
     try {
       const generateSummaryFn = httpsCallable<any, { summary: string }>(functions, 'generateMeetingSummary');
       const response = await generateSummaryFn({
+        meetingType,
         teachingArea,
         meetingTopic,
         meetingDate: format(meetingDate, 'yyyy-MM-dd'),
@@ -269,7 +280,9 @@ export default function Home() {
   
   const exportToWord = useCallback(async () => {
     if (!summary) return;
-    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    
+    const displayTopic = meetingType === "其他" ? meetingTopic : `${meetingType} - ${meetingTopic}`;
     
     // 將成員字串轉為陣列（支援多種分隔符）
     const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
@@ -307,7 +320,7 @@ export default function Home() {
             new TableRow({
               children: [
                 new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }),
-                new TableCell({ children: [new Paragraph(meetingTopic)] }),
+                new TableCell({ children: [new Paragraph(displayTopic)] }),
               ],
             }),
             new TableRow({
@@ -411,7 +424,7 @@ export default function Home() {
       });
 
       const blob = await Packer.toBlob(doc);
-      saveAs(blob, `會議報告_${meetingTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
+      saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
       toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
     } catch (error) {
       console.error(error);
@@ -477,8 +490,35 @@ export default function Home() {
                 <FormField control={form.control} name="teachingArea" render={({ field }) => (
                   <FormItem><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField control={form.control} name="meetingType" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>會議類別</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="選擇主題類型" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="備課會議">備課會議</SelectItem>
+                        <SelectItem value="觀課紀錄">觀課紀錄</SelectItem>
+                        <SelectItem value="議課總整理">議課總整理</SelectItem>
+                        <SelectItem value="講座研討報告">講座研討報告</SelectItem>
+                        <SelectItem value="社群會議紀錄">社群會議紀錄</SelectItem>
+                        <SelectItem value="其他">其他 (自定義)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="meetingTopic" render={({ field }) => (
-                  <FormItem><FormLabel>會議主題</FormLabel><FormControl><Input placeholder="教學策略分享..." {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel>
+                    <FormControl>
+                      <Input placeholder={form.watch("meetingType") === "其他" ? "請輸入您的會議主題..." : "例如：公開觀課教學現場紀錄..."} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
                 <FormField control={form.control} name="meetingDate" render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -500,7 +540,7 @@ export default function Home() {
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="communityMembers" render={({ field }) => (
-                  <FormItem><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem className="md:col-span-2"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </CardContent>
             </Card>
@@ -602,6 +642,7 @@ export default function Home() {
         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
           <tbody>
             <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold', width: '25%' }}>教學領域</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().teachingArea}</td></tr>
+            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議類別</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingType}</td></tr>
             <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議主題</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingTopic}</td></tr>
             <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議日期</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy年MM月dd日") : ""}</td></tr>
             <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>社群成員</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().communityMembers}</td></tr>
