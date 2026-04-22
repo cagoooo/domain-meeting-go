@@ -7,7 +7,11 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  output: 'export',
+  basePath: '/domain-meeting-go',
+  assetPrefix: '/domain-meeting-go/',
   images: {
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -17,11 +21,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '50mb',
-    },
-  },
+  // experimental: { serverActions: { ... } } can be removed.
 };
 
 export default nextConfig;

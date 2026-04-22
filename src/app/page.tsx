@@ -30,8 +30,8 @@ import { cn } from '@/lib/utils';
 import NextImage from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { generatePhotoDescriptions, type GeneratePhotoDescriptionsOutput } from '@/ai/flows/generate-photo-descriptions';
-import { generateMeetingSummary } from '@/ai/flows/generate-meeting-summary';
+import { functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -160,13 +160,15 @@ export default function Home() {
       photoRefs.current[photo.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
       try {
-        const result = await generatePhotoDescriptions({
+        const generateDescriptionsFn = httpsCallable<any, { photoDescription: string }>(functions, 'generatePhotoDescriptions');
+        const response = await generateDescriptionsFn({
           teachingArea,
           meetingTopic,
           communityMembers,
           meetingDate: format(meetingDate, 'yyyy-MM-dd'),
           photoDataUri: photo.dataUrl!,
         });
+        const result = response.data;
 
         const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
         
@@ -204,14 +206,15 @@ export default function Home() {
     setSummaryGenerationProgress(0);
 
     try {
-      const result = await generateMeetingSummary({
+      const generateSummaryFn = httpsCallable<any, { summary: string }>(functions, 'generateMeetingSummary');
+      const response = await generateSummaryFn({
         teachingArea,
         meetingTopic,
         meetingDate: format(meetingDate, 'yyyy-MM-dd'),
         communityMembers,
         photoDescriptions,
       });
-      setSummary(result.summary);
+      setSummary(response.data.summary);
       setSummaryGenerationProgress(100);
       
       // 自動滾動到摘要內容
