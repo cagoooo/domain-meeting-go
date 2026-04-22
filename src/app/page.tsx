@@ -355,6 +355,9 @@ export default function Home() {
   const exportToWord = useCallback(async () => {
     if (!summary) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    
+    // 動態標題邏輯
+    const dynamicTitle = meetingType === "其他" ? "教師會議研究報告" : `${meetingType}成果報告`;
     const displayTopic = meetingType === "其他" ? meetingTopic : `${meetingType} - ${meetingTopic}`;
     const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
 
@@ -409,22 +412,60 @@ export default function Home() {
       sections: [{
         properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
         children: [
-          new Paragraph({ text: "領域共備GO - 教師社群會議報告", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+          new Paragraph({ 
+            text: `領域共備GO - ${dynamicTitle}`, 
+            heading: HeadingLevel.TITLE, 
+            alignment: AlignmentType.CENTER, 
+            spacing: { after: 500 } 
+          }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
+            margins: { top: 100, bottom: 100, left: 100, right: 100 },
             rows: [
-              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true })] })] }), new TableCell({ children: [new Paragraph(teachingArea)] })] }),
-              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true })] })] }), new TableCell({ children: [new Paragraph(displayTopic)] })] }),
-              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true })] })] }), new TableCell({ children: [new Paragraph(format(meetingDate, "yyyy年MM月dd日"))] })] }),
-              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true })] })] }), new TableCell({ children: [new Paragraph(communityMembers)] })] }),
+              new TableRow({ 
+                children: [
+                  new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ width: { size: 75, type: WidthType.PERCENTAGE }, children: [new Paragraph({ text: teachingArea, alignment: AlignmentType.LEFT })] })
+                ] 
+              }),
+              new TableRow({ 
+                children: [
+                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: displayTopic, alignment: AlignmentType.LEFT })] })
+                ] 
+              }),
+              new TableRow({ 
+                children: [
+                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: format(meetingDate, "yyyy年MM月dd日"), alignment: AlignmentType.LEFT })] })
+                ] 
+              }),
+              new TableRow({ 
+                children: [
+                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: communityMembers, alignment: AlignmentType.LEFT })] })
+                ] 
+              }),
             ]
           }),
-          new Paragraph({ text: "與會人員簽到表", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          new Paragraph({ text: "與會人員簽到表", heading: HeadingLevel.HEADING_2, spacing: { before: 600, after: 300 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
-              new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }), new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } }), new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })], shading: { fill: "f2f2f2" } })] }),
-              ...memberList.map(member => new TableRow({ children: [new TableCell({ children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }), new TableCell({ children: [new Paragraph("")] }), new TableCell({ children: [new Paragraph("")] })] }))
+              new TableRow({ 
+                children: [
+                  new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })] })
+                ] 
+              }),
+              ...memberList.map(member => new TableRow({ 
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 300, after: 300 } })] }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 300, after: 300 } })] })
+                ] 
+              }))
             ]
           }),
           new Paragraph({ text: "照片紀錄", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
@@ -590,18 +631,29 @@ export default function Home() {
 
       {/* --- 列印專用隱藏範本 (白底黑字正式版) --- */}
       <div id="printable-report" style={{ display: 'none', width: '800px', backgroundColor: 'white', color: 'black', padding: '40px', fontFamily: 'sans-serif' }}>
-        <h1 style={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold', marginBottom: '30px' }}>領域共備GO - 教師社群會議報告</h1>
+        <h1 style={{ textAlign: 'center', fontSize: '26px', fontWeight: '800', marginBottom: '10px', color: '#2c3e50' }}>領域共備GO</h1>
+        <h2 style={{ textAlign: 'center', fontSize: '18px', fontWeight: '600', marginBottom: '30px', color: '#7f8c8d' }}>
+          {form.getValues().meetingType === "其他" ? "教師會議研究報告" : `${form.getValues().meetingType}成果報告`}
+        </h2>
         
-        {/* 基本資訊表 */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
-          <tbody>
-            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold', width: '25%' }}>教學領域</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().teachingArea}</td></tr>
-            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議類別</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingType}</td></tr>
-            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議主題</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingTopic}</td></tr>
-            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>會議日期</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy年MM月dd日") : ""}</td></tr>
-            <tr><td style={{ border: '1px solid black', padding: '8px', fontWeight: 'bold' }}>社群成員</td><td style={{ border: '1px solid black', padding: '8px' }}>{form.getValues().communityMembers}</td></tr>
-          </tbody>
-        </table>
+        {/* 基本資訊表 - 現代化設計 */}
+        <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #e1e8ed', marginBottom: '30px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              {[
+                { label: '教學領域', value: form.getValues().teachingArea },
+                { label: '會議主題', value: form.getValues().meetingType === "其他" ? form.getValues().meetingTopic : `${form.getValues().meetingType} - ${form.getValues().meetingTopic}` },
+                { label: '會議日期', value: form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy年MM月dd日") : "" },
+                { label: '社群成員', value: form.getValues().communityMembers },
+              ].map((item, idx) => (
+                <tr key={idx} style={{ borderBottom: idx === 3 ? 'none' : '1px solid #e1e8ed' }}>
+                  <td style={{ backgroundColor: '#f8fbfc', padding: '12px 20px', fontWeight: 'bold', width: '22%', color: '#34495e', fontSize: '14px' }}>{item.label}</td>
+                  <td style={{ padding: '12px 20px', color: '#2c3e50', fontSize: '14px', lineHeight: '1.5' }}>{item.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         {/* 簽到表 */}
         <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>與會人員簽到表</h2>
