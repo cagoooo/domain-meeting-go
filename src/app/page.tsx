@@ -472,16 +472,23 @@ export default function Home() {
             rows: [
               new TableRow({ 
                 children: [
-                  new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true })], alignment: AlignmentType.CENTER })] })
+                  new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] })
                 ] 
               }),
               ...memberList.map(member => new TableRow({ 
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: member, alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 300, after: 300 } })] }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 300, after: 300 } })] })
+                  new TableCell({ 
+                    verticalAlign: VerticalAlign.CENTER,
+                    children: [new Paragraph({ 
+                      children: [new TextRun({ text: member, size: 32, bold: true })], 
+                      alignment: AlignmentType.CENTER,
+                      spacing: { before: 200, after: 200 }
+                    })] 
+                  }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] }),
+                  new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] })
                 ] 
               }))
             ]
@@ -703,9 +710,9 @@ export default function Home() {
               const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
               return members.map((member, i) => (
                 <tr key={i}>
-                  <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>{member}</td>
-                  <td style={{ border: '1px solid black', padding: '20px' }}></td>
-                  <td style={{ border: '1px solid black', padding: '20px' }}></td>
+                  <td style={{ border: '1px solid #000', padding: '15px 10px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}>{member}</td>
+                  <td style={{ border: '1px solid #000', padding: '30px' }}></td>
+                  <td style={{ border: '1px solid #000', padding: '30px' }}></td>
                 </tr>
               ));
             })()}
