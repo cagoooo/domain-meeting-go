@@ -7,17 +7,20 @@ const genkit_1 = require("genkit");
 const google_genai_1 = require("@genkit-ai/google-genai");
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
-// 為避免 cold start 時取不到 Secret，我們利用函式封裝 Genkit 的實例化
+let _aiInstance = null;
 function getAiInstance() {
-    return (0, genkit_1.genkit)({
-        plugins: [(0, google_genai_1.googleAI)({ apiKey: geminiApiKey.value() })],
-        model: 'googleai/gemini-2.5-flash-lite',
-    });
+    if (!_aiInstance) {
+        _aiInstance = (0, genkit_1.genkit)({
+            plugins: [(0, google_genai_1.googleAI)({ apiKey: geminiApiKey.value() })],
+            model: 'googleai/gemini-2.5-flash-lite',
+        });
+    }
+    return _aiInstance;
 }
 // ------------------------------------
 // 1. 生成照片描述 (generatePhotoDescriptions)
 // ------------------------------------
-exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1" }, async (request) => {
+exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 }, async (request) => {
     try {
         const ai = getAiInstance();
         const prompt = ai.definePrompt({

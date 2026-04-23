@@ -173,6 +173,26 @@ export default function Home() {
     });
   }, []);
 
+  const callWithRetry = async (fnName: string, data: any, maxRetries = 2) => {
+    let lastError;
+    const callableFn = httpsCallable<any, any>(functions, fnName);
+    
+    for (let i = 0; i <= maxRetries; i++) {
+      try {
+        const result = await callableFn(data);
+        return result;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Function ${fnName} failed (attempt ${i + 1}/${maxRetries + 1}). Retrying...`, error);
+        if (i < maxRetries) {
+          // 指數退避延遲
+          await new Promise(resolve => setTimeout(resolve, 1500 * (i + 1)));
+        }
+      }
+    }
+    throw lastError;
+  };
+
   const handleGenerateDescriptions = useCallback(async () => {
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
     if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length === 0) {
@@ -205,8 +225,7 @@ export default function Home() {
       photoRefs.current[photo.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
       try {
-        const generateDescriptionsFn = httpsCallable<any, { photoDescription: string }>(functions, 'generatePhotoDescriptions');
-        const response = await generateDescriptionsFn({
+        const response = await callWithRetry('generatePhotoDescriptions', {
           teachingArea,
           meetingTopic,
           communityMembers,
@@ -267,8 +286,7 @@ export default function Home() {
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isGenerating: true } : p));
 
     try {
-      const generateDescriptionsFn = httpsCallable<any, { photoDescription: string }>(functions, 'generatePhotoDescriptions');
-      const response = await generateDescriptionsFn({
+      const response = await callWithRetry('generatePhotoDescriptions', {
         teachingArea,
         meetingTopic,
         communityMembers,
