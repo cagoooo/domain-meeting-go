@@ -517,12 +517,30 @@ export default function Home() {
       const canvas = await html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
       reportElement.style.display = 'none';
       const imgData = canvas.toDataURL('image/png');
+      
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgProps = pdf.getImageProperties(imgData);
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`會議報告_${form.getValues().meetingTopic}_${format(new Date(), "yyyyMMdd")}.pdf`);
+      
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      // 第一頁
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      // 如果還有高度，則新增分頁
+      while (heightLeft > 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const displayTopic = form.getValues().meetingTopic || "領域會議";
+      pdf.save(`會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`);
       toast({ title: '匯出成功', description: 'PDF 檔案已開始下載。' });
     } catch (error) {
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
