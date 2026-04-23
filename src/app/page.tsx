@@ -582,9 +582,24 @@ export default function Home() {
                 <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} variant="secondary">{isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}</Button>
                 {summaryGenerationProgress !== null && <Progress value={summaryGenerationProgress} className="h-2" />}
                 {summary && (
-                  <div className="mt-4 p-6 rounded-xl bg-slate-900/40 border border-slate-700/50 shadow-inner">
-                    <div className="prose prose-invert prose-slate max-w-none prose-headings:text-purple-400 prose-strong:text-purple-300 prose-p:text-slate-300 prose-li:text-slate-300 leading-relaxed">
+                  <div className="mt-4 p-6 rounded-xl bg-slate-900/60 border border-purple-500/30 shadow-2xl backdrop-blur-md transition-all duration-500">
+                    <div className="flex items-center gap-2 mb-6 pb-4 border-b border-white/10">
+                      <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+                        <FileText size={18} />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-200 tracking-wider">會議紀錄摘要預覽</h3>
+                    </div>
+                    <div className="prose prose-invert prose-slate max-w-none 
+                      prose-headings:text-purple-400 prose-headings:font-bold prose-headings:mt-8 prose-headings:mb-4
+                      prose-strong:text-purple-300 prose-strong:font-bold
+                      prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
+                      prose-li:text-slate-300 prose-li:my-2
+                      prose-ul:list-disc prose-ol:list-decimal
+                      leading-relaxed font-sans">
                       <ReactMarkdown>{summary}</ReactMarkdown>
+                    </div>
+                    <div className="mt-8 pt-4 border-t border-white/5 flex justify-end">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-tighter italic">AI Generated Professional Report • Confidential</span>
                     </div>
                   </div>
                 )}
