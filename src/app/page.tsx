@@ -507,61 +507,38 @@ export default function Home() {
   }, [summary, photos, form, toast]);
 
   const exportToPDF = useCallback(async () => {
-    const reportElement = document.getElementById('printable-report');
-    if (!reportElement) return;
     try {
-      toast({ title: '準備中', description: '正在產生專業列印格式 PDF...' });
+      const html2pdf = (await import('html2pdf.js')).default;
+      const reportElement = document.getElementById('printable-report');
+      if (!reportElement) return;
+
+      toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
+
+      // 暫時顯示以進行處理
       reportElement.style.display = 'block';
-      reportElement.style.position = 'absolute';
-      reportElement.style.left = '-9999px';
-      const canvas = await html2canvas(reportElement, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-      reportElement.style.display = 'none';
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
       
-      // 計算畫布上一頁高度對應的像素值
-      const pageHeightInCanvas = (canvas.width / pdfWidth) * pdfHeight;
-      let heightLeft = canvas.height;
-      let position = 0;
-
-      while (heightLeft > 0) {
-        // 建立一個分頁專用的臨時畫布
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = canvas.width;
-        // 如果剩餘高度不足一頁，則使用剩餘高度
-        const currentSliceHeight = Math.min(heightLeft, pageHeightInCanvas);
-        pageCanvas.height = currentSliceHeight;
-        
-        const ctx = pageCanvas.getContext('2d');
-        if (ctx) {
-          // 從原始大畫布中切割出當前頁面的內容
-          ctx.drawImage(
-            canvas, 
-            0, position, canvas.width, currentSliceHeight, 
-            0, 0, canvas.width, currentSliceHeight
-          );
-          
-          const pageImgData = pageCanvas.toDataURL('image/png', 1.0);
-          // 在 PDF 中計算當前切片應佔的寬度與高度 (mm)
-          const sliceWidthInPdf = pdfWidth;
-          const sliceHeightInPdf = (currentSliceHeight * pdfWidth) / canvas.width;
-          
-          pdf.addImage(pageImgData, 'PNG', 0, 0, sliceWidthInPdf, sliceHeightInPdf);
-        }
-
-        heightLeft -= pageHeightInCanvas;
-        position += pageHeightInCanvas;
-
-        if (heightLeft > 0) {
-          pdf.addPage();
-        }
-      }
-
       const displayTopic = form.getValues().meetingTopic || "領域會議";
-      pdf.save(`會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`);
-      toast({ title: '匯出成功', description: '高畫質分頁 PDF 檔案已下載。' });
+      const opt = {
+        margin: [15, 12, 15, 12], // 增加邊距
+        filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true,
+          backgroundColor: '#ffffff',
+          logging: false
+        },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['h3', 'table', 'tr', '.photo-card'] }
+      };
+
+      await html2pdf().from(reportElement).set(opt).save();
+      
+      reportElement.style.display = 'none';
+      toast({ title: '匯出成功', description: '高質感分頁 PDF 檔案已下載。' });
     } catch (error) {
+      console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     }
   }, [form, toast]);
