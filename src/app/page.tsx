@@ -667,23 +667,37 @@ export default function Home() {
       </div>
 
       {/* Floating Buttons */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <a href="https://document-ai-companion-ipad4.replit.app" target="_blank" className="flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 px-5 py-3 font-bold text-white shadow-xl hover:scale-105 transition-transform">
-              <span>創建專屬助手🦄</span>
-            </a>
-          </TooltipTrigger>
-          <TooltipContent side="left"><p>打造自己的 AI 小幫手</p></TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <a href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012" target="_blank" className="flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-400 to-red-500 px-5 py-3 font-bold text-white shadow-xl hover:scale-105 transition-transform">
-              <span>點『石』成金🐝(評語優化)</span>
-            </a>
-          </TooltipTrigger>
-          <TooltipContent side="left"><p>LINE 教學評語優化建議</p></TooltipContent>
-        </Tooltip>
+      {/* Floating Buttons - Modern RWD Floating Action Group */}
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 no-print">
+        <TooltipProvider delayDuration={100}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a 
+                href="https://document-ai-companion-ipad4.replit.app" 
+                target="_blank" 
+                className="group flex items-center justify-center gap-0 md:gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 w-14 h-14 md:w-auto md:h-auto md:px-6 md:py-3.5 text-white shadow-lg shadow-purple-900/20 border border-white/10 hover:shadow-purple-500/40 hover:scale-105 active:scale-95 transition-all duration-300 ease-out"
+              >
+                <span className="text-xl shrink-0">🦄</span>
+                <span className="hidden md:inline text-sm font-bold tracking-wide whitespace-nowrap">創建專屬助手</span>
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="md:hidden"><p>創建專屬助手🦄</p></TooltipContent>
+          </Tooltip>
+          
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a 
+                href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012" 
+                target="_blank" 
+                className="group flex items-center justify-center gap-0 md:gap-2 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 w-14 h-14 md:w-auto md:h-auto md:px-6 md:py-3.5 text-white shadow-lg shadow-orange-900/20 border border-white/10 hover:shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all duration-300 ease-out"
+              >
+                <span className="text-xl shrink-0">🐝</span>
+                <span className="hidden md:inline text-sm font-bold tracking-wide whitespace-nowrap">點『石』成金 (評語優化)</span>
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="md:hidden"><p>點『石』成金🐝 (評語優化)</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <Toaster />
 
