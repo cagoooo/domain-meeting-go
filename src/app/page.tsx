@@ -701,71 +701,118 @@ export default function Home() {
       </div>
       <Toaster />
 
-      {/* --- 列印專用隱藏範本 (白底黑字正式版) --- */}
-      <div id="printable-report" style={{ display: 'none', width: '800px', backgroundColor: 'white', color: 'black', padding: '40px', fontFamily: 'sans-serif' }}>
-        <h1 style={{ textAlign: 'center', fontSize: '26px', fontWeight: '800', marginBottom: '10px', color: '#2c3e50' }}>領域共備GO</h1>
-        <h2 style={{ textAlign: 'center', fontSize: '18px', fontWeight: '600', marginBottom: '30px', color: '#7f8c8d' }}>
-          {form.getValues().meetingType === "其他" ? "教師會議研究報告" : `${form.getValues().meetingType}成果報告`}
-        </h2>
+      {/* --- 列印專用隱藏範本 (專業文書白底版) --- */}
+      <div id="printable-report" style={{ 
+        display: 'none', 
+        width: '900px', 
+        backgroundColor: 'white', 
+        color: 'black', 
+        padding: '60px 80px', 
+        fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif',
+        lineHeight: '1.6'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px', borderBottom: '3px solid #3b82f6', paddingBottom: '20px' }}>
+          <h1 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '8px', color: '#1e3a8a', letterSpacing: '2px' }}>領 域 共 備 G O</h1>
+          <div style={{ fontSize: '18px', color: '#64748b', fontWeight: '500' }}>教師專業社群協力發展成果報告</div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '5px' }}>
+            {form.getValues().meetingType === "其他" ? "教師會議研究報告" : `${form.getValues().meetingType}成果報告`}
+          </h2>
+          <div style={{ width: '60px', h: '4px', backgroundColor: '#3b82f6', margin: '15px auto' }}></div>
+        </div>
         
-        {/* 基本資訊表 - 現代化設計 */}
-        <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid #e1e8ed', marginBottom: '30px' }}>
+        {/* 基本資訊區塊卡片 */}
+        <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #3b82f6', paddingLeft: '15px' }}>基本資訊 Basic Information</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
               {[
                 { label: '教學領域', value: form.getValues().teachingArea },
-                { label: '會議主題', value: form.getValues().meetingType === "其他" ? form.getValues().meetingTopic : `${form.getValues().meetingType} - ${form.getValues().meetingTopic}` },
-                { label: '會議日期', value: form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy年MM月dd日") : "" },
+                { label: '會議主題', value: form.getValues().meetingTopic },
+                { label: '會議日期', value: form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy 年 MM 月 dd 日") : "" },
                 { label: '社群成員', value: form.getValues().communityMembers },
               ].map((item, idx) => (
-                <tr key={idx} style={{ borderBottom: idx === 3 ? 'none' : '1px solid #e1e8ed' }}>
-                  <td style={{ backgroundColor: '#f8fbfc', padding: '12px 20px', fontWeight: 'bold', width: '22%', color: '#34495e', fontSize: '14px' }}>{item.label}</td>
-                  <td style={{ padding: '12px 20px', color: '#2c3e50', fontSize: '14px', lineHeight: '1.5' }}>{item.value}</td>
+                <tr key={idx}>
+                  <td style={{ padding: '12px 10px', fontWeight: 'bold', width: '25%', color: '#475569', fontSize: '15px', verticalAlign: 'top' }}>{item.label}：</td>
+                  <td style={{ padding: '12px 10px', color: '#1e293b', fontSize: '15px', lineHeight: '1.6' }}>{item.value}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* 簽到表 */}
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '10px' }}>與會人員簽到表</h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
-          <thead>
-            <tr style={{ backgroundColor: '#f2f2f2' }}>
-              <th style={{ border: '1px solid black', padding: '10px', width: '30%', textAlign: 'center' }}>姓名</th>
-              <th style={{ border: '1px solid black', padding: '10px', width: '35%', textAlign: 'center' }}>簽到</th>
-              <th style={{ border: '1px solid black', padding: '10px', width: '35%', textAlign: 'center' }}>簽退</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(() => {
-              const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
-              return members.map((member, i) => (
-                <tr key={i}>
-                  <td style={{ border: '1px solid #000', padding: '15px 10px', textAlign: 'center', fontSize: '20px', fontWeight: 'bold' }}>{member}</td>
-                  <td style={{ border: '1px solid #000', padding: '30px' }}></td>
-                  <td style={{ border: '1px solid #000', padding: '30px' }}></td>
-                </tr>
-              ));
-            })()}
-          </tbody>
-        </table>
+        {/* 簽到表區塊卡片 */}
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #10b981', paddingLeft: '15px' }}>與會人員簽到表 Attendance</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '12px', width: '30%', textAlign: 'center', color: '#475569' }}>姓名</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '12px', width: '35%', textAlign: 'center', color: '#475569' }}>簽到 Sign In</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '12px', width: '35%', textAlign: 'center', color: '#475569' }}>簽退 Sign Out</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
+                return members.map((member, i) => (
+                  <tr key={i}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '20px 10px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{member}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '35px' }}></td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '35px' }}></td>
+                  </tr>
+                ));
+              })()}
+            </tbody>
+          </table>
+        </div>
 
-        {/* 照片紀錄 */}
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px' }}>照片紀錄</h2>
-        {photos.map((photo, i) => (
-          <div key={i} style={{ marginBottom: '30px', pageBreakInside: 'avoid' }}>
-            {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', borderRadius: '5px', marginBottom: '10px' }} />}
-            <p style={{ fontSize: '14px', lineHeight: '1.6' }}>
-              <b style={{ color: '#555' }}>照片描述：</b>{photo.description || '無描述'}
-            </p>
+        {/* 照片紀錄區塊 */}
+        <div style={{ marginBottom: '40px' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px' }}>活動照片記錄 Field Gallery</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
+            {photos.map((photo, i) => (
+              <div key={i} style={{ 
+                pageBreakInside: 'avoid', 
+                backgroundColor: 'white', 
+                borderRadius: '12px', 
+                border: '1px solid #e2e8f0', 
+                padding: '15px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+              }}>
+                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', borderRadius: '8px', marginBottom: '15px', display: 'block' }} />}
+                <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9' }}>
+                  <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', margin: 0 }}>
+                    <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '13px', display: 'block', marginBottom: '5px' }}>觀察描述 Snapshot Description:</span>
+                    {photo.description || '無描述'}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
 
-        {/* 會議總結 */}
-        <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '15px', marginTop: '30px', color: '#1a252f', borderBottom: '2px solid #eee', paddingBottom: '8px' }}>會議總結</h2>
-        <div style={{ fontSize: '15.5px', lineHeight: '1.8', color: '#333' }} className="pdf-markdown-summary">
-          <ReactMarkdown>{summary}</ReactMarkdown>
+        {/* 會議總結區塊 */}
+        <div style={{ 
+          pageBreakInside: 'avoid', 
+          backgroundColor: 'white', 
+          borderRadius: '12px', 
+          border: '1px solid #e2e8f0', 
+          padding: '30px', 
+          marginBottom: '40px',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px' }}>會議深度總結 Meeting Synopsis</h3>
+          <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#1e293b' }} className="pdf-markdown-summary prose prose-slate max-w-none">
+            <ReactMarkdown>{summary}</ReactMarkdown>
+          </div>
+        </div>
+
+        {/* 頁尾 */}
+        <div style={{ textAlign: 'center', marginTop: '60px', borderTop: '1px solid #f1f5f9', paddingTop: '20px', fontSize: '12px', color: '#94a3b8' }}>
+          本報告由「領域共備GO」AI 助手自動生成 • 僅供教育研究與內部紀錄使用
         </div>
       </div>
     </TooltipProvider>
