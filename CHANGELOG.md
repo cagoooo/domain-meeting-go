@@ -4,6 +4,21 @@
 
 ---
 
+## [0.2.2] — 2026-04-24 🚨 緊急修復
+
+### 🐛 修正 Bug Fixes
+- **v0.2.1 造成 PDF 下載後完全空白**：上一版嘗試用 `position: fixed; zIndex: -9999` 解決偏右問題，但該定位方式會讓 html2canvas 無法正確截取內容，產生空白 PDF。此版回滾所有臨時定位技巧，改用最精簡方案：
+  - 回到 v0.1.x 原本的 `reportElement.style.display = 'block'` 單一步驟
+  - **唯一真正有效的偏右修正**：不設 `html2canvas.windowWidth`（v0.2.0 設 `900` 才是原本偏右的真因）
+  - margin 回到對稱安全值 `[15, 12, 15, 12]`
+  - 保留 `try/finally` 確保 display 一定會還原
+
+### 💡 經驗記錄
+- `html2canvas.windowWidth` 一旦與 element 固定寬度同值，會造成 canvas 座標計算偏移——此參數在絕大多數情境應保留預設值。
+- `position: fixed` + 負 z-index 的「隱形截圖」技巧在 html2pdf.js + html2canvas 組合下不可行，會導致截圖空白。
+
+---
+
 ## [0.2.1] — 2026-04-24
 
 ### 🐛 修正 Bug Fixes

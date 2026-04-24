@@ -510,33 +510,18 @@ export default function Home() {
     const reportElement = document.getElementById('printable-report');
     if (!reportElement) return;
 
-    // 保存原始樣式，確保匯出後能完整還原
-    const originalStyles = {
-      display: reportElement.style.display,
-      position: reportElement.style.position,
-      left: reportElement.style.left,
-      top: reportElement.style.top,
-      margin: reportElement.style.margin,
-      zIndex: reportElement.style.zIndex,
-    };
-
     try {
       const html2pdf = (await import('html2pdf.js')).default;
 
       toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
 
-      // 關鍵：讓 element 在截圖時從 viewport (0,0) 定位，避免受父層 container / body 漸層佈局影響
-      // 這樣 html2canvas 的座標計算就不會因為 parent flex/padding 產生偏移
+      // 極簡：只需要讓 element 可見，html2canvas 就能正確截取內容
+      // 試過 position: fixed / zIndex: -9999 會導致 html2canvas 截不到內容，切勿再加
       reportElement.style.display = 'block';
-      reportElement.style.position = 'fixed';
-      reportElement.style.left = '0';
-      reportElement.style.top = '0';
-      reportElement.style.margin = '0';
-      reportElement.style.zIndex = '-9999';
 
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
-        margin: [18, 14, 20, 14], // 對稱左右邊距（mm）：上 18 / 右 14 / 下 20 / 左 14
+        margin: [15, 12, 15, 12], // 上/右/下/左 邊距（mm），對稱
         filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -545,12 +530,10 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          x: 0,
-          y: 0,
-          // 不再設 windowWidth——v0.2.0 發現設了反而會讓 canvas 座標產生偏移
+          // 不設 windowWidth——實測發現會讓 canvas 座標偏移、造成內容偏右
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        // avoid-all 讓 html2pdf 自動對所有元素嘗試避免切割；搭配 avoid 選擇器涵蓋段落/清單/圖片
+        // avoid-all + 擴充 avoid 選擇器：避免段落、照片、表格被水平切半
         pagebreak: {
           mode: ['avoid-all', 'css', 'legacy'],
           avoid: [
@@ -572,13 +555,8 @@ export default function Home() {
       console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     } finally {
-      // 無論成功或失敗都還原樣式
-      reportElement.style.display = originalStyles.display || 'none';
-      reportElement.style.position = originalStyles.position;
-      reportElement.style.left = originalStyles.left;
-      reportElement.style.top = originalStyles.top;
-      reportElement.style.margin = originalStyles.margin;
-      reportElement.style.zIndex = originalStyles.zIndex;
+      // 無論成功或失敗都還原 display，避免 UI 被撐開
+      reportElement.style.display = 'none';
     }
   }, [form, toast]);
 

@@ -2,7 +2,7 @@
 
 > 教師社群會議報告自動產出助手。上傳會議照片、填寫會議資訊，AI 自動生成每張照片的觀察描述與整場會議的深度總結，一鍵匯出高質感 Word 與 PDF 報告。
 
-![Version](https://img.shields.io/badge/version-0.2.1-blue)
+![Version](https://img.shields.io/badge/version-0.2.2-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-15.2.3-black)
 ![Firebase](https://img.shields.io/badge/Firebase-Functions%20v2-orange)
 ![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash%20Lite-green)
