@@ -4,6 +4,31 @@
 
 ---
 
+## [0.2.3] — 2026-04-24 🔐 資安加固
+
+### 🛡️ Security Hardening
+- 處理 GitHub Secret Scanning 對 Firebase Web API Key 的 Public leak 誤報：
+  - **自動化套用** GCP API Key HTTP Referrer 限制（透過 `gcloud services api-keys update`），將該 key 限制為只能從本專案相關網域呼叫：
+    - `https://cagoooo.github.io/*`
+    - `https://cagoooo.github.io/domain-meeting-go/*`
+    - `https://teacher-c571b.web.app/*`
+    - `https://teacher-c571b.firebaseapp.com/*`
+    - `http://localhost:9002/*`（dev）
+    - `http://localhost/*`
+  - 確認 API Restrictions 未勾選任何收費 API（Maps / Places / Translate / Vision 等）
+  - 受影響的 key：`projects/82691545657/locations/global/keys/058d381b-1f8f-455c-9eb8-9adc181bed29`（teacher-c571b 專案的 Firebase Browser Key）
+
+### 📚 文件 Documentation
+- 新增 `SECURITY.md`，記錄本專案的資安政策與 Firebase Web API Key 公開的官方依據，作為未來同類警告的一勞永逸應對文件。
+- 更新 `README.md` 加入 SECURITY 連結。
+
+### 💡 經驗記錄
+- Firebase Web API Key 出現在前端 bundle 是官方設計（[Firebase 文件](https://firebase.google.com/docs/projects/api-keys)），GitHub Secret Scanning 此類 alert 屬誤報範疇
+- 真正的保護靠 GCP Console 的 HTTP Referrer + API Restrictions，而非保密
+- 後續處理此類 alert 的標準流程已寫入 `SECURITY.md`
+
+---
+
 ## [0.2.2] — 2026-04-24 🚨 緊急修復
 
 ### 🐛 修正 Bug Fixes
