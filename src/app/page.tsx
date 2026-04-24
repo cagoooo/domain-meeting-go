@@ -519,18 +519,31 @@ export default function Home() {
       
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
-        margin: [15, 12, 15, 12], // 增加邊距
+        margin: [18, 14, 20, 14], // 上 / 右 / 下 / 左 邊距（mm）——下邊距加大，避免底部文字貼邊被切
         filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
           letterRendering: true,
           backgroundColor: '#ffffff',
-          logging: false
+          logging: false,
+          windowWidth: 900,
         },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'], avoid: ['h3', 'table', 'tr', '.photo-card'] }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        // avoid-all 讓 html2pdf 自動對所有元素嘗試避免切割；搭配 avoid 選擇器涵蓋段落/清單/圖片
+        pagebreak: {
+          mode: ['avoid-all', 'css', 'legacy'],
+          avoid: [
+            'h1', 'h2', 'h3', 'h4',
+            'table', 'tr', 'thead', 'tbody',
+            'img',
+            'p', 'li',
+            '.pdf-section',
+            '.photo-card',
+            '.pdf-avoid',
+          ],
+        },
       };
 
       await html2pdf().from(reportElement).set(opt).save();
@@ -720,7 +733,7 @@ export default function Home() {
         </div>
         
         {/* 基本資訊區塊卡片 */}
-        <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+        <div className="pdf-section" style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #3b82f6', paddingLeft: '15px' }}>基本資訊 Basic Information</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <tbody>
@@ -740,7 +753,7 @@ export default function Home() {
         </div>
 
         {/* 簽到表區塊卡片 */}
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px' }}>
+        <div className="pdf-section" style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #10b981', paddingLeft: '15px' }}>與會人員簽到表 Attendance</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
@@ -770,16 +783,17 @@ export default function Home() {
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px' }}>活動照片記錄 Field Gallery</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {photos.map((photo, i) => (
-              <div key={i} style={{ 
-                pageBreakInside: 'avoid', 
-                backgroundColor: 'white', 
-                borderRadius: '12px', 
-                border: '1px solid #e2e8f0', 
+              <div key={i} className="photo-card" style={{
+                pageBreakInside: 'avoid',
+                breakInside: 'avoid',
+                backgroundColor: 'white',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
                 padding: '15px',
                 boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
               }}>
-                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', borderRadius: '8px', marginBottom: '15px', display: 'block' }} />}
-                <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9' }}>
+                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', maxHeight: '380px', objectFit: 'contain', borderRadius: '8px', marginBottom: '15px', display: 'block', pageBreakInside: 'avoid', breakInside: 'avoid' }} />}
+                <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', margin: 0 }}>
                     <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '13px', display: 'block', marginBottom: '5px' }}>觀察描述 Snapshot Description:</span>
                     {photo.description || '無描述'}
@@ -790,17 +804,16 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 會議總結區塊 */}
-        <div style={{ 
-          pageBreakInside: 'avoid', 
-          backgroundColor: 'white', 
-          borderRadius: '12px', 
-          border: '1px solid #e2e8f0', 
-          padding: '30px', 
+        {/* 會議總結區塊 —— 區塊本身可能超過一頁，因此改用內部段落級別 avoid（見 globals.css） */}
+        <div className="pdf-summary-wrapper" style={{
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          padding: '30px',
           marginBottom: '40px',
           boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
         }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px' }}>會議深度總結 Meeting Synopsis</h3>
+          <h3 className="pdf-avoid" style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>會議深度總結 Meeting Synopsis</h3>
           <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#1e293b' }} className="pdf-markdown-summary prose prose-slate max-w-none">
             <ReactMarkdown>{summary}</ReactMarkdown>
           </div>

@@ -140,3 +140,53 @@ html {
 .text-shadow {
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }
+
+/* ===== PDF 匯出分頁規則 =====
+ * html2pdf.js 會讀取 page-break-* / break-* 屬性決定分頁位置。
+ * 目的：避免段落、圖片、表格被「水平切半」出現在兩頁之間。
+ */
+#printable-report .pdf-section,
+#printable-report .photo-card,
+#printable-report .pdf-avoid {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* 會議總結區塊的 Markdown 內容——段落級別 avoid，避免字被切半 */
+#printable-report .pdf-markdown-summary p,
+#printable-report .pdf-markdown-summary li,
+#printable-report .pdf-markdown-summary h1,
+#printable-report .pdf-markdown-summary h2,
+#printable-report .pdf-markdown-summary h3,
+#printable-report .pdf-markdown-summary h4,
+#printable-report .pdf-markdown-summary h5,
+#printable-report .pdf-markdown-summary h6,
+#printable-report .pdf-markdown-summary blockquote {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  orphans: 3;
+  widows: 3;
+}
+
+/* 標題後不要緊接分頁 */
+#printable-report h1,
+#printable-report h2,
+#printable-report h3,
+#printable-report h4 {
+  page-break-after: avoid;
+  break-after: avoid;
+}
+
+/* 圖片永遠不被切 */
+#printable-report img {
+  page-break-inside: avoid;
+  break-inside: avoid;
+  max-width: 100%;
+  height: auto;
+}
+
+/* 表格列不被切 */
+#printable-report tr {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
