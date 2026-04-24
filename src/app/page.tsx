@@ -530,15 +530,18 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          // 關鍵：在 html2canvas 內部的 DOM 副本中，把 reportElement 移到 body 根並重置佈局。
-          // 這讓截圖的座標系統完全不受 TooltipProvider / container / body 漸層等祖先影響，
-          // 徹底解決「PDF 內容偏右未置中」的問題。真實 DOM 不受影響。
+          // 🔑 真正的根因：html2canvas 用當前瀏覽器視窗寬度作為 viewport 渲染 DOM。
+          // 若使用者瀏覽器視窗寬度 < 900px (element 寬度)，canvas 右半會被裁切，
+          // 導致 PDF 看起來「偏右」——實際上是右側內容被截掉、左側的 padding
+          // 保留，視覺上就像內容向左縮、右邊沒東西。
+          // 明確指定 windowWidth 1100px 確保 viewport 夠寬放得下 900px element。
+          windowWidth: 1100,
+          // 在 html2canvas 內部的 DOM 副本中，把 reportElement 移到 body 根並重置佈局，
+          // 避免 TooltipProvider / container / body 漸層等祖先影響座標系。
           onclone: (clonedDoc: Document) => {
             const clonedEl = clonedDoc.getElementById('printable-report');
             if (!clonedEl) return;
-            // 1) 搬到 body 根，脫離所有祖先
             clonedDoc.body.appendChild(clonedEl);
-            // 2) 清除可能的定位/外距干擾
             clonedEl.style.display = 'block';
             clonedEl.style.position = 'static';
             clonedEl.style.margin = '0';
@@ -546,7 +549,6 @@ export default function Home() {
             clonedEl.style.top = 'auto';
             clonedEl.style.transform = 'none';
             clonedEl.style.boxSizing = 'border-box';
-            // 3) body 自身也重置（避免 body 漸層/padding 干擾 canvas 座標）
             clonedDoc.body.style.margin = '0';
             clonedDoc.body.style.padding = '0';
             clonedDoc.body.style.background = '#ffffff';

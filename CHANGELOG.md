@@ -4,6 +4,36 @@
 
 ---
 
+## [0.2.5] — 2026-04-24 🎯 PDF 偏右根本原因定位 + 修復
+
+### 🔬 根因分析（終於找到真兇）
+前四版（0.2.0~0.2.4）都以為偏右是「座標計算問題」，一再改 margin、`position: fixed`、`onclone`，都沒命中根因。
+
+此版用 `pypdf` 解析 PDF 內容後才發現實情：
+1. **PDF 層面完全置中**（image 在 A4 上左右各 12mm，偏移 0mm）
+2. **但 image 本身被裁切**：html2canvas 產出的 PNG 是 **1406×2018**，而 `#printable-report` 寬 900px × scale 2 **應該是 1800px**，**394px 被截掉在右邊**
+3. 於是視覺上看起來像「整體內容偏左、右邊留白」——其實是右半內容掉了
+
+### 🐛 真正的 Bug Fix
+- 加回 `html2canvas.windowWidth: 1100`：明確告訴 html2canvas 用 1100px 視窗寬度渲染 DOM，確保 900px 的 `#printable-report` 能完整顯示、不被右側裁切。
+  - 之前 v0.2.0 用 `windowWidth: 900`（和 element 同寬）會邊界效應，引發誤判以為 windowWidth 本身有問題。實際只要 `windowWidth > element width` 就不會偏移。
+- 保留 v0.2.4 的 `onclone` hook（避免父層 container / body 漸層干擾）。
+- 保留 v0.2.3 的 `['css', 'legacy']` 分頁模式（不再用 avoid-all，改靠 CSS rules）。
+
+### 🛠️ 新增開發工具（未 commit 進 repo）
+為診斷此問題寫了兩個 Python script（本地保留，不加入 repo）：
+- `scripts/analyze_pdf.py`：解析 PDF 內的 image content stream，量化 image 在 A4 上的位置與偏移
+- `scripts/extract_pdf_image.py`：把 PDF 裡的 image 物件 dump 出來，直接檢查 html2canvas 截的 PNG 是否完整
+
+### 💡 經驗記錄
+- **診斷 PDF 視覺問題時，先看「PDF 結構層」與「canvas 圖像層」分別的狀態**，不要混為一談：
+  - PDF 結構錯（image 在頁面上位置錯）→ 調 `margin` / `jsPDF` 選項
+  - Canvas 圖錯（image 內容被裁切或縮放錯）→ 調 `html2canvas.windowWidth` / `scale` / `onclone`
+- `pypdf` + 讀取 content stream 的 `cm` 矩陣，是診斷 html2pdf 輸出的利器
+- `html2canvas.windowWidth` 必須 **大於** element 寬度，同值會有邊界效應
+
+---
+
 ## [0.2.4] — 2026-04-24 📄 PDF 置中徹底修正
 
 ### 🐛 修正 Bug Fixes
