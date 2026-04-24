@@ -4,6 +4,21 @@
 
 ---
 
+## [0.2.4] — 2026-04-24 📄 PDF 置中徹底修正
+
+### 🐛 修正 Bug Fixes
+- **PDF 內容依舊偏右未置中**（v0.2.2 試過移除 `windowWidth` 仍無效）：真正根因是 `#printable-report` 位於 `TooltipProvider > container` 等多層父層結構中，加上 body 的 `bg-gradient` 漸層背景，html2canvas 的座標系統被這些祖先影響；外加 `pagebreak.mode` 的 `avoid-all` 會干擾尺寸計算。
+- **雙管齊下解法**：
+  - **html2canvas `onclone` hook**：在 html2canvas 內部克隆的 DOM 副本中，把 `#printable-report` 搬到 body 根、清除 margin/position/transform、重設 body 為白底無邊距。這讓截圖的座標系統完全乾淨，但使用者真實頁面完全不受影響。
+  - 移除 `pagebreak.mode` 中的 `'avoid-all'`，改回 `['css', 'legacy']`，依靠 `globals.css` 的 `page-break-inside: avoid` rules + 區塊類別 (`.pdf-section`, `.photo-card`, `.pdf-avoid`) 來處理分頁避切割。
+- `pagebreak.avoid` 也移除 `p, li`（避免被 legacy 模式當作切片單位，造成額外位移）。
+
+### 💡 經驗記錄
+- 當 PDF 匯出偏移時，**onclone** 是最乾淨的調整手法——改副本 DOM 而非真實 DOM，比 `position: fixed` / `margin: 0 auto` hack 都可靠。
+- `html2pdf.js` 的 `avoid-all` 模式雖然方便但有副作用，小心用；優先以 CSS `page-break-inside: avoid` 規則替代。
+
+---
+
 ## [0.2.3] — 2026-04-24 🔐 資安加固
 
 ### 🛡️ Security Hardening

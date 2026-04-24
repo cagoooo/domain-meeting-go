@@ -530,17 +530,37 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          // 不設 windowWidth——實測發現會讓 canvas 座標偏移、造成內容偏右
+          // 關鍵：在 html2canvas 內部的 DOM 副本中，把 reportElement 移到 body 根並重置佈局。
+          // 這讓截圖的座標系統完全不受 TooltipProvider / container / body 漸層等祖先影響，
+          // 徹底解決「PDF 內容偏右未置中」的問題。真實 DOM 不受影響。
+          onclone: (clonedDoc: Document) => {
+            const clonedEl = clonedDoc.getElementById('printable-report');
+            if (!clonedEl) return;
+            // 1) 搬到 body 根，脫離所有祖先
+            clonedDoc.body.appendChild(clonedEl);
+            // 2) 清除可能的定位/外距干擾
+            clonedEl.style.display = 'block';
+            clonedEl.style.position = 'static';
+            clonedEl.style.margin = '0';
+            clonedEl.style.left = 'auto';
+            clonedEl.style.top = 'auto';
+            clonedEl.style.transform = 'none';
+            clonedEl.style.boxSizing = 'border-box';
+            // 3) body 自身也重置（避免 body 漸層/padding 干擾 canvas 座標）
+            clonedDoc.body.style.margin = '0';
+            clonedDoc.body.style.padding = '0';
+            clonedDoc.body.style.background = '#ffffff';
+          },
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        // avoid-all + 擴充 avoid 選擇器：避免段落、照片、表格被水平切半
+        // 改回 ['css', 'legacy']——實測發現 avoid-all 會干擾尺寸計算造成偏移。
+        // 分頁避切割已由 globals.css 的 page-break-inside rules 與 .pdf-section/.photo-card 類別處理。
         pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
+          mode: ['css', 'legacy'],
           avoid: [
             'h1', 'h2', 'h3', 'h4',
             'table', 'tr', 'thead', 'tbody',
             'img',
-            'p', 'li',
             '.pdf-section',
             '.photo-card',
             '.pdf-avoid',
