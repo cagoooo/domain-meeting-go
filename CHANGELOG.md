@@ -4,6 +4,16 @@
 
 ---
 
+## [0.2.1] — 2026-04-24
+
+### 🐛 修正 Bug Fixes
+- **PDF 內容整體偏右未置中**：v0.2.0 加的 `windowWidth: 900` 會讓 html2canvas 的座標計算與 parent 佈局產生偏移（實測約 7mm）。此版：
+  - 移除 `windowWidth: 900`
+  - 加入 `x: 0, y: 0` 讓 html2canvas 從 element 左上角精準截取
+  - 在匯出期間把 `#printable-report` 臨時 `position: fixed; left: 0; top: 0; margin: 0`，完全脫離父層 container / body 漸層佈局，截圖完成後用 `try/finally` 還原樣式
+
+---
+
 ## [0.2.0] — 2026-04-24
 
 ### 🐛 修正 Bug Fixes

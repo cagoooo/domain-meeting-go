@@ -507,19 +507,36 @@ export default function Home() {
   }, [summary, photos, form, toast]);
 
   const exportToPDF = useCallback(async () => {
+    const reportElement = document.getElementById('printable-report');
+    if (!reportElement) return;
+
+    // 保存原始樣式，確保匯出後能完整還原
+    const originalStyles = {
+      display: reportElement.style.display,
+      position: reportElement.style.position,
+      left: reportElement.style.left,
+      top: reportElement.style.top,
+      margin: reportElement.style.margin,
+      zIndex: reportElement.style.zIndex,
+    };
+
     try {
       const html2pdf = (await import('html2pdf.js')).default;
-      const reportElement = document.getElementById('printable-report');
-      if (!reportElement) return;
 
       toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
 
-      // 暫時顯示以進行處理
+      // 關鍵：讓 element 在截圖時從 viewport (0,0) 定位，避免受父層 container / body 漸層佈局影響
+      // 這樣 html2canvas 的座標計算就不會因為 parent flex/padding 產生偏移
       reportElement.style.display = 'block';
-      
+      reportElement.style.position = 'fixed';
+      reportElement.style.left = '0';
+      reportElement.style.top = '0';
+      reportElement.style.margin = '0';
+      reportElement.style.zIndex = '-9999';
+
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
-        margin: [18, 14, 20, 14], // 上 / 右 / 下 / 左 邊距（mm）——下邊距加大，避免底部文字貼邊被切
+        margin: [18, 14, 20, 14], // 對稱左右邊距（mm）：上 18 / 右 14 / 下 20 / 左 14
         filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -528,7 +545,9 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          windowWidth: 900,
+          x: 0,
+          y: 0,
+          // 不再設 windowWidth——v0.2.0 發現設了反而會讓 canvas 座標產生偏移
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         // avoid-all 讓 html2pdf 自動對所有元素嘗試避免切割；搭配 avoid 選擇器涵蓋段落/清單/圖片
@@ -547,12 +566,19 @@ export default function Home() {
       };
 
       await html2pdf().from(reportElement).set(opt).save();
-      
-      reportElement.style.display = 'none';
+
       toast({ title: '匯出成功', description: '高質感分頁 PDF 檔案已下載。' });
     } catch (error) {
       console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
+    } finally {
+      // 無論成功或失敗都還原樣式
+      reportElement.style.display = originalStyles.display || 'none';
+      reportElement.style.position = originalStyles.position;
+      reportElement.style.left = originalStyles.left;
+      reportElement.style.top = originalStyles.top;
+      reportElement.style.margin = originalStyles.margin;
+      reportElement.style.zIndex = originalStyles.zIndex;
     }
   }, [form, toast]);
 
