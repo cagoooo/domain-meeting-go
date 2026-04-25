@@ -50,6 +50,52 @@ export function ServiceWorkerRegister() {
       .catch((err) => console.warn('[SW] 註冊失敗:', err?.message || err));
   }, []);
 
+  // ==== ChunkLoadError 自動恢復 ====
+  // 部署新版後，使用者開著舊頁面點功能時，動態 import 會 fetch 已被新版取代的舊 chunk hash → 404 → ChunkLoadError。
+  // 偵測到此錯誤時自動清快取 + reload，使用者下次互動就會拿到新版。
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let recovering = false;
+    const recover = async (errMsg: string) => {
+      if (recovering) return;
+      recovering = true;
+      console.warn('[SW] 偵測到 ChunkLoadError，自動清快取並重載：', errMsg);
+      try {
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          reg?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+        }
+      } finally {
+        window.location.reload();
+      }
+    };
+
+    const isChunkErr = (msg: string) =>
+      /ChunkLoadError|Loading chunk \d+ failed|Failed to fetch dynamically imported module/i.test(msg);
+
+    const onError = (e: ErrorEvent) => {
+      const msg = `${e.message || ''} ${e.error?.message || ''} ${e.error?.name || ''}`;
+      if (isChunkErr(msg)) recover(msg);
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason: any = e.reason;
+      const msg = `${reason?.message || ''} ${reason?.name || ''} ${String(reason || '')}`;
+      if (isChunkErr(msg)) recover(msg);
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
   // ==== 檢查版本（共用函式） ====
   const checkVersion = useCallback(async (silent = false) => {
     if (!silent) setStatus('checking');

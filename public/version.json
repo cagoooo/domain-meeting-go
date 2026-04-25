@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
-  "releasedAt": "2026-04-25T02:55:46.357Z",
-  "notes": "PDF 匯出徹底重做：放棄 html2pdf.js 改用瀏覽器原生 window.print() + @media print CSS"
+  "version": "0.4.1",
+  "releasedAt": "2026-04-25T03:03:09.313Z",
+  "notes": "全域偵測 ChunkLoadError，自動清快取重載恢復"
 }

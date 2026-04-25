@@ -4,6 +4,32 @@
 
 ---
 
+## [0.4.1] — 2026-04-25 🛡️ ChunkLoadError 自動恢復
+
+### 🐛 修正 Bug Fixes
+v0.4.0 部署後使用者回報 PDF 匯出失敗，Console 看到：
+```
+PDF Export Error: ChunkLoadError: Loading chunk 316 failed.
+.../ad2866b8.ba41a4c2c4874824.js → 404
+```
+
+**根因**：使用者瀏覽器還跑著 v0.3.x 舊頁面，舊版 `exportToPDF` 透過 `await import('html2pdf.js')` 動態載入 chunk，但新版部署後該 chunk hash 已不存在於 GitHub Pages → 404。
+
+### 修法：全域 ChunkLoadError 攔截器
+在 `ServiceWorkerRegister` 加 `error` 與 `unhandledrejection` 事件監聽：
+- 偵測 `ChunkLoadError` / `Loading chunk N failed` / `Failed to fetch dynamically imported module`
+- 自動清所有 caches
+- 通知 SW skipWaiting
+- `window.location.reload()`
+
+使用者下次互動或重新開頁面就會無感拿到最新版，不再看到匯出失敗 toast。
+
+### 對 v0.4.0 升級的影響
+- v0.4.0 已不再 dynamic import html2pdf，理論上不會有這個錯誤
+- 但 v0.3.x 舊頁面在 v0.4.0 部署後會中招——v0.4.1 的攔截器讓他們自動恢復
+
+---
+
 ## [0.4.0] — 2026-04-25 🖨️ PDF 引擎徹底重做（window.print() + @media print）
 
 ### 💥 重大架構變更
