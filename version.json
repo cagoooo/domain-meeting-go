@@ -1,5 +1,5 @@
 {
-  "version": "0.3.9",
-  "releasedAt": "2026-04-25T02:52:04.404Z",
-  "notes": "會議摘要產生中自動捲動到進度條，產出後自動捲動到預覽區"
+  "version": "0.4.0",
+  "releasedAt": "2026-04-25T02:55:46.357Z",
+  "notes": "PDF 匯出徹底重做：放棄 html2pdf.js 改用瀏覽器原生 window.print() + @media print CSS"
 }
