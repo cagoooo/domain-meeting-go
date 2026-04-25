@@ -271,12 +271,51 @@ export default function Home() {
     throw lastError;
   };
 
-  const handleGenerateDescriptions = useCallback(async () => {
-    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length === 0) {
-      toast({ title: '請先完成資訊輸入', description: '請填寫所有欄位並上傳照片。', variant: 'destructive' });
-      return;
+  /**
+   * 找出第一個未填寫的欄位，自動捲動到該位置並高亮。
+   * 回傳 true 代表全部填寫完整、可繼續執行；false 代表已彈出錯誤、應 return。
+   */
+  const validateAndFocusFirstMissing = useCallback((): boolean => {
+    const values = form.getValues();
+    let target: { id: string; name?: 'teachingArea' | 'meetingType' | 'meetingTopic' | 'meetingDate' | 'communityMembers'; label: string } | null = null;
+
+    if (!values.teachingArea) target = { id: 'field-teachingArea', name: 'teachingArea', label: '教學領域' };
+    else if (!values.meetingType) target = { id: 'field-meetingType', name: 'meetingType', label: '會議類別' };
+    else if (!values.meetingTopic) target = { id: 'field-meetingTopic', name: 'meetingTopic', label: '會議主題' };
+    else if (!values.meetingDate) target = { id: 'field-meetingDate', name: 'meetingDate', label: '會議日期' };
+    else if (!values.communityMembers) target = { id: 'field-communityMembers', name: 'communityMembers', label: '社群成員' };
+    else if (photos.length === 0) target = { id: 'field-photos', label: '會議照片' };
+
+    if (!target) return true;
+
+    const el = document.getElementById(target.id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 紅光閃爍
+      el.classList.add('animate-field-highlight');
+      setTimeout(() => el.classList.remove('animate-field-highlight'), 2500);
+      // 觸發 react-hook-form 錯誤訊息（讓 FormMessage 顯示）
+      if (target.name) {
+        form.setError(target.name, { type: 'manual', message: `請輸入${target.label}` });
+        // focus 到欄位內的可聚焦元素
+        setTimeout(() => {
+          const focusable = el.querySelector('input, textarea, button[role="combobox"], button[type="button"]') as HTMLElement | null;
+          focusable?.focus();
+        }, 600);
+      }
     }
+
+    toast({
+      title: `尚未填寫：${target.label}`,
+      description: '已自動捲動到該欄位，請補齊後再試。',
+      variant: 'destructive',
+    });
+    return false;
+  }, [form, photos, toast]);
+
+  const handleGenerateDescriptions = useCallback(async () => {
+    if (!validateAndFocusFirstMissing()) return;
+    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
 
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
@@ -355,11 +394,8 @@ export default function Home() {
     const photo = photos.find(p => p.id === photoId);
     if (!photo || photo.isGenerating) return;
 
+    if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers) {
-      toast({ title: '資訊未填寫', description: '請先填寫第一步的會議資訊。', variant: 'destructive' });
-      return;
-    }
 
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isGenerating: true } : p));
 
@@ -401,13 +437,9 @@ export default function Home() {
   }, [form, photos, toast]);
 
   const handleGenerateSummary = useCallback(async () => {
+    if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
     const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.includes('失敗') && !d.includes('忙碌') && !d.includes('無法描述'));
-
-    if (!teachingArea || !meetingTopic || !meetingDate || !communityMembers || photos.length === 0) {
-      toast({ title: '條件未滿足', description: '請填寫資訊並上傳照片。', variant: 'destructive' });
-      return;
-    }
 
     setIsGeneratingSummary(true);
     setSummaryGenerationProgress(0);
@@ -672,9 +704,9 @@ export default function Home() {
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-blue-500">
               <CardHeader><CardTitle className="flex items-center gap-3"><Info className="text-blue-400" /> 第一步：輸入會議資訊</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="teachingArea" render={({ field }) => (<FormItem><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="teachingArea" render={({ field }) => (<FormItem id="field-teachingArea" className="rounded-lg p-1 -m-1 transition-shadow"><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="meetingType" render={({ field }) => (
-                  <FormItem>
+                  <FormItem id="field-meetingType" className="rounded-lg p-1 -m-1 transition-shadow">
                     <FormLabel>會議類別</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue placeholder="選擇主題類型" /></SelectTrigger></FormControl>
@@ -687,26 +719,28 @@ export default function Home() {
                         <SelectItem value="其他">其他 (自定義)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="meetingTopic" render={({ field }) => (<FormItem><FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel><FormControl><Input placeholder="例如：公開觀課教學現場紀錄..." {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="meetingTopic" render={({ field }) => (<FormItem id="field-meetingTopic" className="rounded-lg p-1 -m-1 transition-shadow"><FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel><FormControl><Input placeholder="例如：公開觀課教學現場紀錄..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="meetingDate" render={({ field }) => (
-                  <FormItem className="flex flex-col">
+                  <FormItem id="field-meetingDate" className="flex flex-col rounded-lg p-1 -m-1 transition-shadow">
                     <FormLabel>會議日期</FormLabel>
                     <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                       <PopoverTrigger asChild><Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "yyyy年MM月dd日") : <span>選擇日期</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus /></PopoverContent>
                     </Popover>
+                    <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="communityMembers" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl></FormItem>)} />
+                <FormField control={form.control} name="communityMembers" render={({ field }) => (<FormItem id="field-communityMembers" className="md:col-span-2 rounded-lg p-1 -m-1 transition-shadow"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl><FormMessage /></FormItem>)} />
               </CardContent>
             </Card>
 
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-green-500">
               <CardHeader><CardTitle className="flex items-center gap-3"><ImageIcon className="text-green-400" /> 第二步：上傳會議照片</CardTitle></CardHeader>
               <CardContent>
-                <label htmlFor="photo-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
+                <label id="field-photos" htmlFor="photo-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
                   <UploadCloud className="w-10 h-10 mb-2 text-green-400" />
                   <p className="text-sm text-slate-300">點擊或拖曳照片 (最多 {MAX_PHOTOS} 張)</p>
                   <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -881,9 +915,9 @@ export default function Home() {
           </table>
         </div>
 
-        {/* 照片紀錄區塊：強制整個區塊從新頁開始，標題與第一張照片絕不分離 */}
-        <div style={{ marginBottom: '40px', pageBreakBefore: 'always', breakBefore: 'page' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>活動照片記錄 Field Gallery</h3>
+        {/* 照片紀錄區塊：每張 photo-card 自己強制 pageBreakBefore: always
+            （含第一張），標題塞進第一張卡片內部，避免「整個區塊前留白頁」的副作用 */}
+        <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {photos.map((photo, i) => (
               <div
@@ -892,9 +926,9 @@ export default function Home() {
                 style={{
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
-                  // 第二張之後強制從新頁開始，徹底避免被切；第一張接續「活動照片記錄」標題
-                  pageBreakBefore: i > 0 ? 'always' : 'auto',
-                  breakBefore: i > 0 ? 'page' : 'auto',
+                  // 每張照片都強制從新頁開始（含第一張），徹底擺脫頁尾擠壓
+                  pageBreakBefore: 'always',
+                  breakBefore: 'page',
                   backgroundColor: 'white',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
@@ -902,6 +936,12 @@ export default function Home() {
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
                 }}
               >
+                {/* 把「活動照片記錄」標題塞進第一張卡片，避免標題單獨佔頁或與卡片分離 */}
+                {i === 0 && (
+                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '15px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>
+                    活動照片記錄 Field Gallery
+                  </h3>
+                )}
                 {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: '8px', marginBottom: '15px', display: 'block', pageBreakInside: 'avoid', breakInside: 'avoid' }} />}
                 <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', margin: 0 }}>
@@ -925,7 +965,33 @@ export default function Home() {
         }}>
           <h3 className="pdf-avoid" style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>會議深度總結 Meeting Synopsis</h3>
           <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#1e293b' }} className="pdf-markdown-summary prose prose-slate max-w-none">
-            <ReactMarkdown>{summary}</ReactMarkdown>
+            {/* 用 components 對每個 Markdown 元素加 inline page-break-inside: avoid。
+                這比 globals.css 的 class 規則可靠——html2pdf 對 inline style 解析最穩定。 */}
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => (
+                  <p style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '12px' }}>{children}</p>
+                ),
+                li: ({ children }) => (
+                  <li style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '6px' }}>{children}</li>
+                ),
+                h1: ({ children }) => (
+                  <h1 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '20px', marginBottom: '12px' }}>{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '18px', marginBottom: '10px' }}>{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '16px', marginBottom: '8px' }}>{children}</h3>
+                ),
+                h4: ({ children }) => (
+                  <h4 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '14px', marginBottom: '6px' }}>{children}</h4>
+                ),
+                blockquote: ({ children }) => (
+                  <blockquote style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>{children}</blockquote>
+                ),
+              }}
+            >{summary}</ReactMarkdown>
           </div>
         </div>
 

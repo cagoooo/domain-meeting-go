@@ -4,6 +4,29 @@
 
 ---
 
+## [0.3.8] — 2026-04-25 🎯 多項 UX 與 PDF 修正
+
+### ✨ 新增 Features：驗證錯誤自動跳轉 + 紅光高亮
+之前點「產生照片描述/摘要」時若有欄位未填，只會彈紅色 Toast 「請先完成資訊輸入」，使用者要自己找哪裡沒填。現在：
+- 自動 scroll 到第一個未填寫的欄位（教學領域 → 會議類別 → 主題 → 日期 → 社群成員 → 照片）
+- 該欄位**紅光閃爍 2.5 次**（CSS keyframes `field-highlight-pulse`）
+- 同時觸發 react-hook-form 的 FormMessage 顯示具體錯誤
+- Toast 訊息升級為「尚未填寫：教學領域 / 已自動捲動到該欄位」
+- 三個動作（產照片描述、單張重產、產摘要）共用 `validateAndFocusFirstMissing` helper，DRY
+
+### 🐛 修正 Bug Fixes
+**A. PDF 照片區塊上方大段空白**（v0.3.7 副作用）：
+- v0.3.7 加的 `pageBreakBefore: 'always'` 給整個照片區塊的父 div，使 html2pdf 在區塊前留下整頁空白
+- **修法**：改為「每張 photo-card 自己強制 `pageBreakBefore: always`（含第一張）」+「把『活動照片記錄』標題塞進第一張卡片內部」
+- 視覺結果：第 1 頁基本資訊+簽到，每張照片獨佔一頁（第一張卡片內含標題）
+
+**B. 會議深度總結內容被切**（globals.css 規則沒生效）：
+- 之前在 globals.css 寫 `#printable-report .pdf-markdown-summary p { page-break-inside: avoid; }`，但 html2pdf 處理 ReactMarkdown 渲染的 `<p>` 時不可靠
+- **修法**：用 `<ReactMarkdown components={...}>` 對每個 p / li / h1~h4 / blockquote 加 inline `pageBreakInside: 'avoid'` 與 `orphans/widows: 3`
+- 加 `pageBreakAfter: 'avoid'` 給標題，避免「標題在頁底、內文在下頁」
+
+---
+
 ## [0.3.7] — 2026-04-25 📷 照片區塊整個強制新頁
 
 ### 🐛 修正 Bug Fixes
