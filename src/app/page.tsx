@@ -805,16 +805,23 @@ export default function Home() {
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px' }}>活動照片記錄 Field Gallery</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {photos.map((photo, i) => (
-              <div key={i} className="photo-card" style={{
-                pageBreakInside: 'avoid',
-                breakInside: 'avoid',
-                backgroundColor: 'white',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                padding: '15px',
-                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
-              }}>
-                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', maxHeight: '380px', objectFit: 'contain', borderRadius: '8px', marginBottom: '15px', display: 'block', pageBreakInside: 'avoid', breakInside: 'avoid' }} />}
+              <div
+                key={i}
+                className="photo-card"
+                style={{
+                  pageBreakInside: 'avoid',
+                  breakInside: 'avoid',
+                  // 第二張之後強制從新頁開始，徹底避免被切；第一張接續「活動照片記錄」標題
+                  pageBreakBefore: i > 0 ? 'always' : 'auto',
+                  breakBefore: i > 0 ? 'page' : 'auto',
+                  backgroundColor: 'white',
+                  borderRadius: '12px',
+                  border: '1px solid #e2e8f0',
+                  padding: '15px',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                }}
+              >
+                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: '8px', marginBottom: '15px', display: 'block', pageBreakInside: 'avoid', breakInside: 'avoid' }} />}
                 <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                   <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', margin: 0 }}>
                     <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '13px', display: 'block', marginBottom: '5px' }}>觀察描述 Snapshot Description:</span>

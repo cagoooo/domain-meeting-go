@@ -4,6 +4,26 @@
 
 ---
 
+## [0.3.4] — 2026-04-25 📷 照片強制獨佔新頁（雙保險）
+
+### 🐛 修正 Bug Fixes
+v0.3.3 的 `pagebreak.mode: ['avoid-all', 'css', 'legacy']` 加 `'img'` 到 avoid 清單後，照片**仍被切成兩半**——第一張上半在頁底、下半在下頁頂部。
+
+根因：html2pdf.js 對「橫跨頁面切割線」的元素，avoid 機制有時失效。即使 `pageBreakInside: 'avoid'` 都標好了，當該元素剛好碰到分頁線時，html2pdf 仍會切。
+
+修法（雙保險）：
+1. **第二張之後強制新頁**：`pageBreakBefore: i > 0 ? 'always' : 'auto'`——`break-before` 比 `break-inside` 在 html2pdf 中更可靠
+2. **縮小圖片高度**：`maxHeight: 380px → 320px`，讓單張卡片更容易完整 fit 一頁
+
+第一張仍接續「活動照片記錄」標題，靠 `pageBreakInside: avoid` 在剩餘空間不夠時自動推到下頁。
+
+### 💡 經驗
+- html2pdf.js 的 `break-inside: avoid` 在「跨頁切割線」邊緣情境不穩定
+- 靠 `break-before: always` 強制換頁是更可靠的策略
+- 若內容是「N 個獨立區塊」（如照片列表），用 `break-before` 強制每個獨佔一頁是最穩做法
+
+---
+
 ## [0.3.3] — 2026-04-25 📷 照片不再被切成兩半
 
 ### 🐛 修正 Bug Fixes
