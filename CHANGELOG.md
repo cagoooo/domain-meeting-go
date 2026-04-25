@@ -4,6 +4,44 @@
 
 ---
 
+## [0.3.2] — 2026-04-25 🎯 PDF 偏右真正根因（pypdf 實證）+ 強制寬度修復
+
+### 🔬 鐵證根因（用 pypdf 解析）
+v0.3.1 的「v0.1.x baseline」測試結果：
+- ✅ PDF 結構層完美置中（image 在 A4 上左右各 12mm，偏移 0mm）
+- ❌ Image PNG 像素 **1406×2018**，非預期 1800×N
+- ❌ 圖片中間行掃白邊：**左 160px / 右 0px** → 右邊內容貼邊或被切
+
+**結論：使用者環境中 `element.offsetWidth` 實際只有 703 CSS px，不是 inline 設的 900px。**
+推測使用者瀏覽器視窗 < 900px（可能 iPad / 縮小視窗 / DevTools 開著），即使 inline `width: 900px` 也被某種機制壓縮。
+
+> 我之前看 v0.1.x 第一張截圖時誤判成「置中」，其實一直都偏右——只是程度比 v0.2.0+ 輕微所以沒被察覺。
+
+### 🐛 修正 Bug Fixes
+**雙重保險強制寬度**（不再嘗試 position hack，避免重蹈 v0.2.1 / v0.3.0 空白 PDF 覆轍）：
+
+```js
+// A) 用 setProperty important 強制 element 真的 900px 寬
+reportElement.style.setProperty('width', '900px', 'important');
+reportElement.style.setProperty('min-width', '900px', 'important');
+reportElement.style.setProperty('max-width', '900px', 'important');
+
+// B) 顯式傳 html2canvas 的 width + windowWidth
+html2canvas: {
+  width: 900,           // 截圖寬度不依賴 offsetWidth
+  windowWidth: 1100,    // viewport 留 200px 安全邊界
+}
+```
+
+### 🛠️ 開發者工具
+新增 `console.log('[PDF] element.offsetWidth=..., window.innerWidth=...')`，下次再有問題可以從 Console 直接看到使用者環境的實際數值。
+
+### 💡 經驗記錄
+- **inline `width: 900px` 不一定夠**——某些行動裝置 / 縮放情境會壓縮 element。要 100% 確保寬度，必須用 `setProperty('width', '900px', 'important')` + html2canvas `width` 雙重指定。
+- **不要用 position hack**（已兩次驗證會弄空 PDF：v0.2.1 + v0.3.0）。
+
+---
+
 ## [0.3.1] — 2026-04-25 🚨 PDF 緊急回滾至 v0.1.x baseline
 
 ### 🐛 修正 Bug Fixes

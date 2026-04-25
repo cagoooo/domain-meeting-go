@@ -1,5 +1,5 @@
 {
-  "version": "0.3.1",
-  "releasedAt": "2026-04-25T01:56:48.885Z",
-  "notes": "緊急回滾 PDF 匯出至 v0.1.x baseline 簡單做法（前版位置 hack 造成空白 PDF）"
+  "version": "0.3.2",
+  "releasedAt": "2026-04-25T02:05:25.301Z",
+  "notes": "強制 element 900px important + 明確指定 html2canvas width/windowWidth"
 }

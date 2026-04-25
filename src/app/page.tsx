@@ -514,10 +514,32 @@ export default function Home() {
       const html2pdf = (await import('html2pdf.js')).default;
       toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
 
-      // ✅ 回到 v0.1.x 簡單 baseline——這是唯一驗證過會置中的版本。
-      // 任何 windowWidth / onclone / position hack 都會破壞置中（v0.2.0~v0.3.0 反覆驗證過）。
-      // 字被切半的問題改靠 globals.css 的 page-break-inside CSS rules 和 .pdf-section/.photo-card 類別解決。
+      // 🎯 真正的修法（v0.3.2，pypdf 實證後得出）
+      //
+      // 鐵證：使用者環境中 element offsetWidth = 703px（不是 inline 設的 900px）。
+      // 推論：使用者瀏覽器視窗 < 900px（可能是 iPad / 縮小視窗 / DevTools 開著）。
+      // 雖然 inline `width: 900px` 應該強制寬度，但在某些行動裝置 / 縮放情境下
+      // viewport 會壓縮 element。
+      //
+      // 雙重保險:
+      //   A) 用 setProperty('important') 強制 element 真的 900px 寬
+      //   B) 顯式傳 html2canvas.width: 900 + windowWidth: 1100，
+      //      讓 canvas 截圖區域與 viewport 都明確大於 element
       reportElement.style.display = 'block';
+      reportElement.style.setProperty('width', '900px', 'important');
+      reportElement.style.setProperty('min-width', '900px', 'important');
+      reportElement.style.setProperty('max-width', '900px', 'important');
+
+      // 等一個 frame 讓 layout flush
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
+
+      // Debug：log 實際寬度，方便日後診斷
+      console.log(
+        `[PDF] element.offsetWidth=${reportElement.offsetWidth}, ` +
+        `window.innerWidth=${window.innerWidth}`
+      );
 
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
@@ -530,7 +552,8 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          // 故意不設 windowWidth、onclone、x、y 等任何選項——v0.1.x 證明預設就會置中。
+          width: 900,           // ← 明確告訴 html2canvas 截圖寬度（不依賴 offsetWidth）
+          windowWidth: 1100,    // ← viewport 至少 1100，留 200px 安全邊界
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak: {
@@ -545,6 +568,10 @@ export default function Home() {
       console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     } finally {
+      // 清除 important 設定，還原 display: none
+      reportElement.style.removeProperty('width');
+      reportElement.style.removeProperty('min-width');
+      reportElement.style.removeProperty('max-width');
       reportElement.style.display = 'none';
     }
   }, [form, toast]);
