@@ -1,5 +1,5 @@
 {
-  "version": "0.3.8",
-  "releasedAt": "2026-04-25T02:44:35.782Z",
-  "notes": "驗證錯誤自動跳轉+紅光高亮 + 照片每張獨佔頁 + 總結用 ReactMarkdown components inline style 防切"
+  "version": "0.3.9",
+  "releasedAt": "2026-04-25T02:52:04.404Z",
+  "notes": "會議摘要產生中自動捲動到進度條，產出後自動捲動到預覽區"
 }

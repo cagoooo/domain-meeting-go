@@ -177,7 +177,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const generateDescriptionsButtonRef = useRef<HTMLButtonElement>(null);
-  const summaryTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const summaryPreviewRef = useRef<HTMLDivElement>(null);    // 摘要預覽區塊（產出後 scroll 到此）
+  const summaryProgressRef = useRef<HTMLDivElement>(null);   // 進度條區塊（產生中 scroll 到此）
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -444,6 +445,11 @@ export default function Home() {
     setIsGeneratingSummary(true);
     setSummaryGenerationProgress(0);
 
+    // 🎯 UX：開始產生時立刻捲動到進度條區，讓使用者看見進度
+    setTimeout(() => {
+      summaryProgressRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+
     try {
       const generateSummaryFn = httpsCallable<any, { summary: string }>(functions, 'generateMeetingSummary');
       const response = await generateSummaryFn({
@@ -460,12 +466,12 @@ export default function Home() {
       // 🎉 巨大彩花特效——四波連環爆發慶祝會議摘要產出
       fireMassiveConfetti();
 
-      // 自動滾動到摘要內容
+      // 🎯 UX：產出後自動捲動到摘要預覽區（等 React 渲染 summary 後再 scroll，故 600ms 延遲）
       setTimeout(() => {
-        summaryTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        summaryPreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setIsGeneratingSummary(false);
         setSummaryGenerationProgress(null);
-      }, 500);
+      }, 600);
     } catch (error) {
       setIsGeneratingSummary(false);
       setSummaryGenerationProgress(null);
@@ -768,10 +774,12 @@ export default function Home() {
             <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-purple-500">
               <CardHeader><CardTitle className="flex items-center gap-3"><FileText className="text-purple-400" /> 第三步：產生會議摘要</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} variant="secondary">{isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}</Button>
-                {summaryGenerationProgress !== null && <Progress value={summaryGenerationProgress} className="h-2" />}
+                <div ref={summaryProgressRef} className="space-y-4">
+                  <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} variant="secondary">{isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}</Button>
+                  {summaryGenerationProgress !== null && <Progress value={summaryGenerationProgress} className="h-2" />}
+                </div>
                 {summary && (
-                  <div className="mt-4 p-6 rounded-xl bg-slate-900/60 border border-purple-500/30 shadow-2xl backdrop-blur-md transition-all duration-500">
+                  <div ref={summaryPreviewRef} className="mt-4 p-6 rounded-xl bg-slate-900/60 border border-purple-500/30 shadow-2xl backdrop-blur-md transition-all duration-500">
                     <div className="flex items-center gap-2 mb-6 pb-4 border-b border-white/10">
                       <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
                         <FileText size={18} />
