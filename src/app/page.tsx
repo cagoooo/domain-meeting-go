@@ -881,9 +881,9 @@ export default function Home() {
           </table>
         </div>
 
-        {/* 照片紀錄區塊 */}
-        <div style={{ marginBottom: '40px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px' }}>活動照片記錄 Field Gallery</h3>
+        {/* 照片紀錄區塊：強制整個區塊從新頁開始，標題與第一張照片絕不分離 */}
+        <div style={{ marginBottom: '40px', pageBreakBefore: 'always', breakBefore: 'page' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>活動照片記錄 Field Gallery</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {photos.map((photo, i) => (
               <div
