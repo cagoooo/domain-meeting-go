@@ -88,6 +88,84 @@ type Photo = {
   dataUrl?: string;
 };
 
+/**
+ * 🎉 巨大彩花特效——四波連環爆發
+ *
+ * Wave 1（即時）：中央巨型爆發，200 顆放射粒子（scalar 1.5 加大）
+ * Wave 2（+250ms）：左右兩側同時對射，兩個 150 顆粒子流
+ * Wave 3（+500ms）：頂部往下灑彩帶，100 顆 + 大角度散布
+ * Wave 4（+750ms ~ 3s）：每 200ms 隨機位置補充小爆發，營造持續慶祝氛圍
+ */
+const fireMassiveConfetti = () => {
+  const colors = ['#a855f7', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
+
+  // Wave 1: 中央巨型爆發
+  confetti({
+    particleCount: 200,
+    spread: 100,
+    origin: { x: 0.5, y: 0.5 },
+    colors,
+    startVelocity: 50,
+    scalar: 1.5,
+    ticks: 250,
+  });
+
+  // Wave 2: 左右兩側對射
+  setTimeout(() => {
+    confetti({
+      particleCount: 150,
+      angle: 60,
+      spread: 70,
+      origin: { x: 0, y: 0.65 },
+      colors,
+      startVelocity: 60,
+      scalar: 1.2,
+    });
+    confetti({
+      particleCount: 150,
+      angle: 120,
+      spread: 70,
+      origin: { x: 1, y: 0.65 },
+      colors,
+      startVelocity: 60,
+      scalar: 1.2,
+    });
+  }, 250);
+
+  // Wave 3: 頂部往下灑
+  setTimeout(() => {
+    confetti({
+      particleCount: 100,
+      angle: 270,
+      spread: 180,
+      origin: { x: 0.5, y: 0 },
+      colors,
+      startVelocity: 40,
+      scalar: 1.3,
+      gravity: 0.8,
+      ticks: 300,
+    });
+  }, 500);
+
+  // Wave 4: 持續飄灑 3 秒
+  const end = Date.now() + 3000;
+  const flutter = setInterval(() => {
+    if (Date.now() > end) {
+      clearInterval(flutter);
+      return;
+    }
+    confetti({
+      particleCount: 30,
+      startVelocity: 30,
+      spread: 360,
+      ticks: 150,
+      origin: { x: Math.random(), y: Math.random() * 0.5 },
+      colors,
+      scalar: 0.8 + Math.random() * 0.6,
+    });
+  }, 200);
+};
+
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [summary, setSummary] = useState<string>('');
@@ -346,7 +424,10 @@ export default function Home() {
       });
       setSummary(response.data.summary);
       setSummaryGenerationProgress(100);
-      
+
+      // 🎉 巨大彩花特效——四波連環爆發慶祝會議摘要產出
+      fireMassiveConfetti();
+
       // 自動滾動到摘要內容
       setTimeout(() => {
         summaryTextareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
