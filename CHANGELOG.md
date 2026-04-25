@@ -4,6 +4,23 @@
 
 ---
 
+## [0.3.3] — 2026-04-25 📷 照片不再被切成兩半
+
+### 🐛 修正 Bug Fixes
+v0.3.2 終於把 PDF 修到置中（Console 確認 `element.offsetWidth=900`），但照片被切成兩半（一張卡片的上半部在第 N 頁底部、下半部跨到 N+1 頁頂部）。
+
+根因：`pagebreak.mode: ['css', 'legacy']` 對「邊緣情境」處理不夠主動。當 `.photo-card` 從某頁中段開始且剩餘空間不足時，html2pdf 沒主動把整張卡片往下個頁面推。
+
+修法：
+- `pagebreak.mode` 加回 `'avoid-all'`（之前以為它會破壞置中，其實偏右的真因是 element 寬度問題，不是 avoid-all——v0.3.2 確認過）
+- `pagebreak.avoid` 加上 `'img'`，多重保險
+
+### 💡 經驗
+- 「PDF 置中」與「分頁不切元素」可以**同時用 avoid-all**，前提是 element 寬度已用 `setProperty('width', 'important')` + `html2canvas.width` 雙重鎖死
+- v0.2.0 ~ v0.2.5 之所以「avoid-all 看似破壞置中」，其實是寬度問題、誤判
+
+---
+
 ## [0.3.2] — 2026-04-25 🎯 PDF 偏右真正根因（pypdf 實證）+ 強制寬度修復
 
 ### 🔬 鐵證根因（用 pypdf 解析）

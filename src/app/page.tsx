@@ -556,9 +556,11 @@ export default function Home() {
           windowWidth: 1100,    // ← viewport 至少 1100，留 200px 安全邊界
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+        // avoid-all 主動嘗試避免所有元素被切割，配合 .photo-card / .pdf-section 的明確標記
+        // v0.3.2 已用 width 雙重鎖固定 element 寬度，avoid-all 不會再影響置中
         pagebreak: {
-          mode: ['css', 'legacy'],
-          avoid: ['h1', 'h2', 'h3', 'h4', 'table', 'tr', '.pdf-section', '.photo-card', '.pdf-avoid'],
+          mode: ['avoid-all', 'css', 'legacy'],
+          avoid: ['h1', 'h2', 'h3', 'h4', 'table', 'tr', 'img', '.pdf-section', '.photo-card', '.pdf-avoid'],
         },
       };
 
