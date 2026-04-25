@@ -1,5 +1,5 @@
 {
-  "version": "0.3.3",
-  "releasedAt": "2026-04-25T02:11:01.288Z",
-  "notes": "加回 pagebreak avoid-all 模式 + img 加入 avoid 清單，修正照片被切成兩半"
+  "version": "0.3.4",
+  "releasedAt": "2026-04-25T02:17:50.430Z",
+  "notes": "照片從第二張起強制換頁，避免任何切割可能"
 }
