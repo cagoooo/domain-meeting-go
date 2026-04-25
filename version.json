@@ -1,5 +1,5 @@
 {
-  "version": "0.3.6",
-  "releasedAt": "2026-04-25T02:26:54.876Z",
-  "notes": "會議摘要產出加入四波連環巨大彩花特效"
+  "version": "0.3.7",
+  "releasedAt": "2026-04-25T02:28:30.910Z",
+  "notes": "照片區塊整個強制新頁開始 + 標題 page-break-after avoid，徹底避免照片與描述分離"
 }
