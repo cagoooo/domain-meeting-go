@@ -1,5 +1,5 @@
 {
-  "version": "0.3.2",
-  "releasedAt": "2026-04-25T02:05:25.301Z",
-  "notes": "強制 element 900px important + 明確指定 html2canvas width/windowWidth"
+  "version": "0.3.3",
+  "releasedAt": "2026-04-25T02:11:01.288Z",
+  "notes": "加回 pagebreak avoid-all 模式 + img 加入 avoid 清單，修正照片被切成兩半"
 }
