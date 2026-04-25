@@ -4,6 +4,37 @@
 
 ---
 
+## [0.3.1] — 2026-04-25 🚨 PDF 緊急回滾至 v0.1.x baseline
+
+### 🐛 修正 Bug Fixes
+v0.3.0 的「`position: absolute; left: -99999px` + 三重寬度鎖」修法導致 **PDF 下載後只有 3KB、完全空白**——元素被移到 viewport 外，html2canvas 截不到任何內容（這跟 v0.2.1 的 `position: fixed; zIndex: -9999` 失敗模式完全一樣，我又踩了第二次）。
+
+### 📋 完整失敗實驗紀錄（5 次嘗試的教訓）
+
+| 版本 | 動作 | 結果 |
+|---|---|---|
+| **v0.1.x** | 純 `display: block`，零 hack | ✅ **置中**，但字會被切半 |
+| v0.2.0 | + `windowWidth: 900` | ❌ 偏右 |
+| v0.2.1 | + `position: fixed; zIndex: -9999` | ❌ PDF 空白 |
+| v0.2.4 | + `onclone` hook | ❌ 仍偏右 |
+| v0.2.5 | + `windowWidth: 1100` | ❌ 仍偏右 |
+| v0.3.0 | + `position: absolute; left: -99999px` | ❌ PDF 空白 (3KB) |
+| **v0.3.1** | **回到 v0.1.x baseline，完全不動 html2canvas 選項** | ✅ **應該重新置中** |
+
+### 💡 終極經驗（請寫進記憶）
+- **v0.1.x baseline 是唯一驗證過會置中的版本**——任何 `windowWidth` / `onclone` / `position` hack 都會打破置中或弄空 PDF
+- **「字被切半」與「置中」是兩個獨立問題**，不能用同一招解決：
+  - **字被切半** → CSS `page-break-inside: avoid` rules + `.pdf-section`/`.photo-card` className 標記（已在 globals.css 實裝）
+  - **置中** → 不要動 html2canvas 任何選項（`scale` / `useCORS` / `letterRendering` / `backgroundColor` / `logging` 是安全的，其他都不要碰）
+- **位置 hack 兩次失敗已成模式**：`position: fixed/absolute` + 負位置 / 負 zIndex 在 html2canvas 環境下都會造成空白截圖
+
+### v0.3.0 保留的好東西
+- ✅ Service Worker 自動更新機制（不變動）
+- ✅ `version.json` 輪詢 + 浮動 banner（不變動）
+- ✅ `scripts/bump-version.mjs` + `npm run bump` script（不變動）
+
+---
+
 ## [0.3.0] — 2026-04-25 🚀 SW 更新機制 + PDF 偏右終極修復
 
 ### ✨ 新增 Features：Service Worker 自動更新機制

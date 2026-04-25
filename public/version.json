@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
-  "releasedAt": "2026-04-25T01:21:21.063Z",
-  "notes": "加入 Service Worker 自動更新機制 + PDF 偏右終極修復"
+  "version": "0.3.1",
+  "releasedAt": "2026-04-25T01:56:48.885Z",
+  "notes": "緊急回滾 PDF 匯出至 v0.1.x baseline 簡單做法（前版位置 hack 造成空白 PDF）"
 }

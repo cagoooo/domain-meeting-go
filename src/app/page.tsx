@@ -510,56 +510,18 @@ export default function Home() {
     const reportElement = document.getElementById('printable-report');
     if (!reportElement) return;
 
-    // 保存原始 inline style，匯出後完整還原
-    const originalStyle = reportElement.getAttribute('style') || '';
-
     try {
       const html2pdf = (await import('html2pdf.js')).default;
-
       toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
 
-      // 🎯 終極修法：把 element 實際移到 off-screen 位置 (left: -99999px) 並強制 width/min-width/max-width 900px
-      //
-      // 為什麼之前的修法都失敗：
-      // - windowWidth: 1100 只影響 html2canvas 的 viewport，但 element 在它「搬家」前
-      //   就已經在原本的 container 裡 layout 過一次。若使用者瀏覽器視窗 < 900px 或
-      //   container 有 padding/max-width 限制，element 的實際 offsetWidth 會小於 900。
-      // - onclone 只在 html2canvas 內部 DOM 副本上修改，但 layout 狀態（含被壓縮的寬度）
-      //   已經「凝固」在 element 上，副本繼承該狀態。
-      //
-      // 現在的做法：
-      // - 匯出前，把 element 從原位置拉出視窗外 (absolute + left: -99999px)，
-      //   並強制三重寬度鎖（width / min-width / max-width = 900px）。
-      // - element 以 900px 寬度完整 layout，不受任何祖先佈局影響。
-      // - finally 區還原原始 style。
-      reportElement.setAttribute(
-        'style',
-        [
-          'display: block',
-          'position: absolute',
-          'left: -99999px',
-          'top: 0',
-          'margin: 0',
-          'width: 900px',
-          'min-width: 900px',
-          'max-width: 900px',
-          'background-color: #ffffff',
-          'color: #000000',
-          'padding: 60px 80px',
-          'font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif',
-          'line-height: 1.6',
-          'box-sizing: border-box',
-        ].join('; ')
-      );
-
-      // 等兩個 animation frame 讓 layout 徹底 flush
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
+      // ✅ 回到 v0.1.x 簡單 baseline——這是唯一驗證過會置中的版本。
+      // 任何 windowWidth / onclone / position hack 都會破壞置中（v0.2.0~v0.3.0 反覆驗證過）。
+      // 字被切半的問題改靠 globals.css 的 page-break-inside CSS rules 和 .pdf-section/.photo-card 類別解決。
+      reportElement.style.display = 'block';
 
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
-        margin: [15, 12, 15, 12], // 上/右/下/左 邊距（mm），對稱
+        margin: [15, 12, 15, 12],
         filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: {
@@ -568,34 +530,22 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          width: 900,              // 明確告訴 html2canvas 元素寬度 900px
-          windowWidth: 1200,       // viewport 設為 1200px（> 900，留安全邊界）
-          x: 0,
-          y: 0,
+          // 故意不設 windowWidth、onclone、x、y 等任何選項——v0.1.x 證明預設就會置中。
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
         pagebreak: {
           mode: ['css', 'legacy'],
-          avoid: [
-            'h1', 'h2', 'h3', 'h4',
-            'table', 'tr', 'thead', 'tbody',
-            'img',
-            '.pdf-section',
-            '.photo-card',
-            '.pdf-avoid',
-          ],
+          avoid: ['h1', 'h2', 'h3', 'h4', 'table', 'tr', '.pdf-section', '.photo-card', '.pdf-avoid'],
         },
       };
 
       await html2pdf().from(reportElement).set(opt).save();
-
       toast({ title: '匯出成功', description: 'PDF 檔案已下載。' });
     } catch (error) {
       console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     } finally {
-      // 還原原始 inline style（包含原本的 display: none 與樣板樣式）
-      reportElement.setAttribute('style', originalStyle);
+      reportElement.style.display = 'none';
     }
   }, [form, toast]);
 
