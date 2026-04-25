@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "bump": "node scripts/bump-version.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

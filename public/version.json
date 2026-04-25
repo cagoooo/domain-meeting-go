@@ -1,0 +1,5 @@
+{
+  "version": "0.3.0",
+  "releasedAt": "2026-04-25T01:21:21.063Z",
+  "notes": "加入 Service Worker 自動更新機制 + PDF 偏右終極修復"
+}

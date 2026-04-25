@@ -4,6 +4,41 @@
 
 ---
 
+## [0.3.0] — 2026-04-25 🚀 SW 更新機制 + PDF 偏右終極修復
+
+### ✨ 新增 Features：Service Worker 自動更新機制
+解決使用者「程式碼改了但還看舊版」的經典坑——這個專案部署在 GitHub Pages，瀏覽器 / SW 快取常讓使用者測不到新版（剛才連續 5 次 PDF 修復就被快取困擾）。
+
+| 元件 | 角色 |
+|---|---|
+| `public/sw.js` | Service Worker：HTML network-first、Next.js `_next/static/*` cache-first（檔名已含 hash 安全）、`version.json` network-only、其他 stale-while-revalidate |
+| `public/version.json` | 版本中央資料源，前端定期輪詢比對 |
+| `src/components/sw-register.tsx` | 客戶端元件：註冊 SW + 每 5 分鐘檢查版本 + 新版浮動 banner（含「立即更新」按鈕，會 `skipWaiting` + 清 caches + reload）|
+| `scripts/bump-version.mjs` | 一鍵同步 `package.json` / `version.json` / `sw.js` / `README.md` 的版本號 |
+| `npm run bump 0.3.1` | 對應 npm script |
+
+**只在 production 啟用 SW**（dev 不會干擾 HMR）。
+
+### 🐛 修正 Bug Fixes：PDF 偏右終極修復
+v0.2.5 的 `windowWidth: 1100` 仍然失效——使用者 v0.3.0 重新測試還是偏右且表格被切。實證原因：
+
+> **element 在 html2canvas 處理之前，就已經在原本 container 裡 layout 過一次。** 若使用者瀏覽器視窗 < 900px 或 container 有 padding/max-width 限制，element 的實際 `offsetWidth` 在被搬到 onclone 副本前就已經 < 900px。`windowWidth` 與 `onclone` 都修不了「已凝固的 layout 狀態」。
+
+**真正的解法**——在匯出**前**，先把 element 在實際 DOM 上：
+- 移到 off-screen (`position: absolute; left: -99999px`)
+- 三重寬度鎖：`width / min-width / max-width = 900px`
+- 等兩個 animation frame 讓 layout flush
+- 再交給 html2canvas 截圖
+- 完成後 `try/finally` 還原原始 inline style
+
+這樣 element 完全脫離 viewport / container 約束，以乾淨的 900px 寬度 layout 一次，使用者瀏覽器視窗大小不再影響截圖。
+
+### 💡 經驗記錄
+- **html2canvas 截圖前的 element layout 才是關鍵**——`windowWidth` / `onclone` 只影響截圖階段，無法改寫 element 在 DOM 上已經完成的 layout。要強制特定寬度，必須在實際 DOM 上預先「凍結」layout。
+- **GitHub Pages 部署的 PWA 需要 SW 更新機制**，不然 bug 修了使用者也測不到。`version.json` + 5 分鐘輪詢 + banner 是輕量可靠的模式。
+
+---
+
 ## [0.2.5] — 2026-04-24 🎯 PDF 偏右根本原因定位 + 修復
 
 ### 🔬 根因分析（終於找到真兇）

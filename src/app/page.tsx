@@ -510,14 +510,52 @@ export default function Home() {
     const reportElement = document.getElementById('printable-report');
     if (!reportElement) return;
 
+    // 保存原始 inline style，匯出後完整還原
+    const originalStyle = reportElement.getAttribute('style') || '';
+
     try {
       const html2pdf = (await import('html2pdf.js')).default;
 
       toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
 
-      // 極簡：只需要讓 element 可見，html2canvas 就能正確截取內容
-      // 試過 position: fixed / zIndex: -9999 會導致 html2canvas 截不到內容，切勿再加
-      reportElement.style.display = 'block';
+      // 🎯 終極修法：把 element 實際移到 off-screen 位置 (left: -99999px) 並強制 width/min-width/max-width 900px
+      //
+      // 為什麼之前的修法都失敗：
+      // - windowWidth: 1100 只影響 html2canvas 的 viewport，但 element 在它「搬家」前
+      //   就已經在原本的 container 裡 layout 過一次。若使用者瀏覽器視窗 < 900px 或
+      //   container 有 padding/max-width 限制，element 的實際 offsetWidth 會小於 900。
+      // - onclone 只在 html2canvas 內部 DOM 副本上修改，但 layout 狀態（含被壓縮的寬度）
+      //   已經「凝固」在 element 上，副本繼承該狀態。
+      //
+      // 現在的做法：
+      // - 匯出前，把 element 從原位置拉出視窗外 (absolute + left: -99999px)，
+      //   並強制三重寬度鎖（width / min-width / max-width = 900px）。
+      // - element 以 900px 寬度完整 layout，不受任何祖先佈局影響。
+      // - finally 區還原原始 style。
+      reportElement.setAttribute(
+        'style',
+        [
+          'display: block',
+          'position: absolute',
+          'left: -99999px',
+          'top: 0',
+          'margin: 0',
+          'width: 900px',
+          'min-width: 900px',
+          'max-width: 900px',
+          'background-color: #ffffff',
+          'color: #000000',
+          'padding: 60px 80px',
+          'font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif',
+          'line-height: 1.6',
+          'box-sizing: border-box',
+        ].join('; ')
+      );
+
+      // 等兩個 animation frame 讓 layout 徹底 flush
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
 
       const displayTopic = form.getValues().meetingTopic || "領域會議";
       const opt = {
@@ -530,33 +568,12 @@ export default function Home() {
           letterRendering: true,
           backgroundColor: '#ffffff',
           logging: false,
-          // 🔑 真正的根因：html2canvas 用當前瀏覽器視窗寬度作為 viewport 渲染 DOM。
-          // 若使用者瀏覽器視窗寬度 < 900px (element 寬度)，canvas 右半會被裁切，
-          // 導致 PDF 看起來「偏右」——實際上是右側內容被截掉、左側的 padding
-          // 保留，視覺上就像內容向左縮、右邊沒東西。
-          // 明確指定 windowWidth 1100px 確保 viewport 夠寬放得下 900px element。
-          windowWidth: 1100,
-          // 在 html2canvas 內部的 DOM 副本中，把 reportElement 移到 body 根並重置佈局，
-          // 避免 TooltipProvider / container / body 漸層等祖先影響座標系。
-          onclone: (clonedDoc: Document) => {
-            const clonedEl = clonedDoc.getElementById('printable-report');
-            if (!clonedEl) return;
-            clonedDoc.body.appendChild(clonedEl);
-            clonedEl.style.display = 'block';
-            clonedEl.style.position = 'static';
-            clonedEl.style.margin = '0';
-            clonedEl.style.left = 'auto';
-            clonedEl.style.top = 'auto';
-            clonedEl.style.transform = 'none';
-            clonedEl.style.boxSizing = 'border-box';
-            clonedDoc.body.style.margin = '0';
-            clonedDoc.body.style.padding = '0';
-            clonedDoc.body.style.background = '#ffffff';
-          },
+          width: 900,              // 明確告訴 html2canvas 元素寬度 900px
+          windowWidth: 1200,       // viewport 設為 1200px（> 900，留安全邊界）
+          x: 0,
+          y: 0,
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        // 改回 ['css', 'legacy']——實測發現 avoid-all 會干擾尺寸計算造成偏移。
-        // 分頁避切割已由 globals.css 的 page-break-inside rules 與 .pdf-section/.photo-card 類別處理。
         pagebreak: {
           mode: ['css', 'legacy'],
           avoid: [
@@ -572,13 +589,13 @@ export default function Home() {
 
       await html2pdf().from(reportElement).set(opt).save();
 
-      toast({ title: '匯出成功', description: '高質感分頁 PDF 檔案已下載。' });
+      toast({ title: '匯出成功', description: 'PDF 檔案已下載。' });
     } catch (error) {
       console.error('PDF Export Error:', error);
       toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
     } finally {
-      // 無論成功或失敗都還原 display，避免 UI 被撐開
-      reportElement.style.display = 'none';
+      // 還原原始 inline style（包含原本的 display: none 與樣板樣式）
+      reportElement.setAttribute('style', originalStyle);
     }
   }, [form, toast]);
 

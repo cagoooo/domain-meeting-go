@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'; // Using Inter as a fallback/alternati
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 import { cn } from '@/lib/utils'; // Import cn utility
+import { ServiceWorkerRegister } from '@/components/sw-register';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' }); // Define Inter font
 
@@ -52,6 +53,7 @@ export default function RootLayout({
         )}>
         {children}
         <Toaster /> {/* Add Toaster here */}
+        <ServiceWorkerRegister /> {/* PWA SW 註冊 + 新版 banner */}
       </body>
     </html>
   );
