@@ -141,6 +141,107 @@ html {
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }
 
+/* ============================================================
+ * 🖨️ 列印 / 儲存為 PDF：完整 @media print 規則（v0.4.0 核心）
+ *
+ * 思路：放棄 html2pdf.js，改用瀏覽器原生 PDF 引擎。
+ * 使用者點「匯出 PDF」→ window.print() → 在對話框選「另存為 PDF」
+ *
+ * 優點：
+ *   - 中文字型完美、圖片不模糊、表格不亂切、座標永不偏移
+ *   - 所有 page-break-* 都遵循標準 CSS spec
+ * ============================================================ */
+@media print {
+  /* ① 頁面設定：A4、四邊邊距 */
+  @page {
+    size: A4;
+    margin: 15mm 12mm 18mm 12mm;
+  }
+
+  /* ② 隱藏所有 body 直系子元素，只保留 #printable-report */
+  body > *:not(#printable-report) {
+    display: none !important;
+  }
+
+  /* ③ 強制顯示報告主體（覆蓋 inline display: none） */
+  html, body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #printable-report {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif !important;
+  }
+
+  /* ④ 分頁規則：區塊不被切 */
+  #printable-report .pdf-section,
+  #printable-report .pdf-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ⑤ 照片每張獨佔一頁（第一張接續標題不強制） */
+  #printable-report .photo-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-before: always;
+    break-before: page;
+  }
+  #printable-report .photo-card:first-of-type {
+    page-break-before: auto;
+    break-before: auto;
+  }
+
+  /* ⑥ 圖片永不切割 */
+  #printable-report img {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* ⑦ 表格列不被切 */
+  #printable-report tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ⑧ Markdown 渲染段落 / 清單 / 標題不切 */
+  #printable-report .pdf-markdown-summary p,
+  #printable-report .pdf-markdown-summary li,
+  #printable-report .pdf-markdown-summary blockquote {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    orphans: 3;
+    widows: 3;
+  }
+
+  #printable-report h1,
+  #printable-report h2,
+  #printable-report h3,
+  #printable-report h4 {
+    page-break-after: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ⑨ 隱藏所有標記為 no-print 的元素（floating buttons, banner 等） */
+  .no-print {
+    display: none !important;
+  }
+}
+
 /* ===== 未填欄位紅光高亮動畫（驗證錯誤時使用） ===== */
 @keyframes field-highlight-pulse {
   0%, 100% {

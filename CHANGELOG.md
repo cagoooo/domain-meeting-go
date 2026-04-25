@@ -4,6 +4,55 @@
 
 ---
 
+## [0.4.0] — 2026-04-25 🖨️ PDF 引擎徹底重做（window.print() + @media print）
+
+### 💥 重大架構變更
+徹底**放棄 html2pdf.js / html2canvas / jsPDF**，改用瀏覽器原生 PDF 引擎。
+
+從 v0.2.0 到 v0.3.9 共 10 個版本反覆嘗試修補 html2pdf.js 的：
+- 偏右問題（windowWidth、onclone、setProperty）
+- 圖片切割（pageBreakBefore、avoid-all、img maxHeight）
+- 文字切半（globals.css avoid、ReactMarkdown components）
+- 大段留白（pageBreakBefore 副作用）
+
+→ 每修一個就引發兩個。html2canvas 的「整頁截圖再切片」模型本質上不適合複雜長文件。
+
+### ✨ 新方案：window.print()
+**為什麼業界 Notion / Google Docs / GitHub 都這樣做：**
+
+| 維度 | 舊（html2pdf.js） | 新（window.print）|
+|---|---|---|
+| 引擎 | JS 模擬截圖切片 | **瀏覽器原生 PDF 引擎** |
+| 中文字 | 需配字體、可能模糊 | 完美 |
+| 圖片 | JPEG 壓縮、座標偏移 | 向量保留、原圖品質 |
+| 表格切割 | 經常切壞 | 標準 spec 處理 |
+| 大段留白 | 多種 hack 都修不好 | 不存在 |
+| 分頁規則 | html2pdf 自家邏輯 | W3C 標準 `page-break-*` |
+| 維護 | 每版本踩新坑 | 純 CSS，極穩 |
+
+### 操作流程
+1. 點「列印 / 儲存為 PDF」按鈕
+2. Toast 提示「即將開啟列印對話框」
+3. 瀏覽器原生對話框彈出
+4. 選「另存為 PDF」目的地 → 儲存
+
+比舊版多一步點擊，但結果**完美無瑕**。
+
+### 變動檔案
+- `src/app/page.tsx`：
+  - 移除 `import jsPDF`、`import html2canvas`
+  - 改寫 `exportToPDF`：從 80+ 行縮成 8 行 `window.print()`
+  - 按鈕文字「匯出 PDF 快照」→「列印 / 儲存為 PDF」
+- `src/app/globals.css`：
+  - 新增完整 `@media print` 規則（A4 size、margin、隱藏 UI、分頁規則、photo-card 獨佔頁、Markdown 段落 avoid 等）
+
+### 保留
+- 所有 `#printable-report` 內部結構（不用改）
+- 所有 inline `pageBreakInside: avoid` 等 style（@media print 也會應用）
+- ReactMarkdown components inline style（同上）
+
+---
+
 ## [0.3.9] — 2026-04-25 ✨ 摘要產生過程的 UX 自動跟隨
 
 ### ✨ 新增 Features

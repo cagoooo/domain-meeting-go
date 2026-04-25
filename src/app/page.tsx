@@ -64,8 +64,7 @@ import {
   VerticalAlign
 } from 'docx';
 import { saveAs } from 'file-saver';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+// 注意：v0.4.0 起 PDF 改用 window.print()，不再需要 jsPDF / html2canvas / html2pdf.js
 
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -625,77 +624,33 @@ export default function Home() {
     toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
   }, [summary, photos, form, toast]);
 
-  const exportToPDF = useCallback(async () => {
-    const reportElement = document.getElementById('printable-report');
-    if (!reportElement) return;
-
-    try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      toast({ title: '正在產生 PDF', description: '正在優化分頁排版中，請稍候...' });
-
-      // 🎯 真正的修法（v0.3.2，pypdf 實證後得出）
-      //
-      // 鐵證：使用者環境中 element offsetWidth = 703px（不是 inline 設的 900px）。
-      // 推論：使用者瀏覽器視窗 < 900px（可能是 iPad / 縮小視窗 / DevTools 開著）。
-      // 雖然 inline `width: 900px` 應該強制寬度，但在某些行動裝置 / 縮放情境下
-      // viewport 會壓縮 element。
-      //
-      // 雙重保險:
-      //   A) 用 setProperty('important') 強制 element 真的 900px 寬
-      //   B) 顯式傳 html2canvas.width: 900 + windowWidth: 1100，
-      //      讓 canvas 截圖區域與 viewport 都明確大於 element
-      reportElement.style.display = 'block';
-      reportElement.style.setProperty('width', '900px', 'important');
-      reportElement.style.setProperty('min-width', '900px', 'important');
-      reportElement.style.setProperty('max-width', '900px', 'important');
-
-      // 等一個 frame 讓 layout flush
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve())
-      );
-
-      // Debug：log 實際寬度，方便日後診斷
-      console.log(
-        `[PDF] element.offsetWidth=${reportElement.offsetWidth}, ` +
-        `window.innerWidth=${window.innerWidth}`
-      );
-
-      const displayTopic = form.getValues().meetingTopic || "領域會議";
-      const opt = {
-        margin: [15, 12, 15, 12],
-        filename: `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-          width: 900,           // ← 明確告訴 html2canvas 截圖寬度（不依賴 offsetWidth）
-          windowWidth: 1100,    // ← viewport 至少 1100，留 200px 安全邊界
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
-        // avoid-all 主動嘗試避免所有元素被切割，配合 .photo-card / .pdf-section 的明確標記
-        // v0.3.2 已用 width 雙重鎖固定 element 寬度，avoid-all 不會再影響置中
-        pagebreak: {
-          mode: ['avoid-all', 'css', 'legacy'],
-          avoid: ['h1', 'h2', 'h3', 'h4', 'table', 'tr', 'img', '.pdf-section', '.photo-card', '.pdf-avoid'],
-        },
-      };
-
-      await html2pdf().from(reportElement).set(opt).save();
-      toast({ title: '匯出成功', description: 'PDF 檔案已下載。' });
-    } catch (error) {
-      console.error('PDF Export Error:', error);
-      toast({ title: '匯出失敗', description: '產生 PDF 時發生錯誤。', variant: 'destructive' });
-    } finally {
-      // 清除 important 設定，還原 display: none
-      reportElement.style.removeProperty('width');
-      reportElement.style.removeProperty('min-width');
-      reportElement.style.removeProperty('max-width');
-      reportElement.style.display = 'none';
-    }
-  }, [form, toast]);
+  /**
+   * 🖨️ PDF 匯出（v0.4.0 全新架構）
+   *
+   * 徹底放棄 html2pdf.js / html2canvas / jsPDF，改用瀏覽器原生 PDF 引擎。
+   * 流程：
+   *   1. 顯示「即將開啟列印對話框」toast 引導使用者
+   *   2. 透過 window.print() 開啟瀏覽器原生列印對話框
+   *   3. @media print CSS 規則自動處理：
+   *      - 隱藏所有 UI（按鈕 / 表單 / banner / 浮動工具）
+   *      - 只顯示 #printable-report
+   *      - 套用標準 CSS 分頁規則（page-break-*）
+   *   4. 使用者在對話框選「另存為 PDF」即可下載
+   *
+   * 優點：
+   *   - 中文字型完美、圖片不模糊、表格不切、座標不偏移
+   *   - 所有分頁邏輯遵循 W3C 標準 spec
+   *   - 維護簡單：未來調整版面只需改 CSS @media print 段
+   */
+  const exportToPDF = useCallback(() => {
+    if (!summary) return;
+    toast({
+      title: '🖨️ 即將開啟列印對話框',
+      description: '請在對話框中選擇「另存為 PDF」並按下儲存即可下載報告。',
+    });
+    // 短暫延遲讓 toast 浮現，再觸發 window.print()
+    setTimeout(() => window.print(), 400);
+  }, [summary, toast]);
 
   return (
     <TooltipProvider>
@@ -812,7 +767,7 @@ export default function Home() {
                   <Download className="mr-2 h-4 w-4" /> 匯出 Word (.docx)
                 </Button>
                 <Button type="button" disabled={!summary} onClick={exportToPDF} className="flex-1 bg-rose-600 hover:bg-rose-500">
-                  <Printer className="mr-2 h-4 w-4" /> 匯出 PDF 快照
+                  <Printer className="mr-2 h-4 w-4" /> 列印 / 儲存為 PDF
                 </Button>
               </CardContent>
             </Card>
