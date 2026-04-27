@@ -622,6 +622,15 @@ export default function Home() {
     const blob = await Packer.toBlob(doc);
     saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
     toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
+
+    // 🔔 LINE 通知管理員（fire-and-forget，失敗不影響主功能）
+    httpsCallable(functions, 'notifyExport')({
+      exportType: 'word',
+      teachingArea,
+      meetingTopic,
+      meetingDate: format(meetingDate, 'yyyy-MM-dd'),
+      communityMembers,
+    }).catch(() => { /* 通知失敗忽略 */ });
   }, [summary, photos, form, toast]);
 
   /**
@@ -648,9 +657,20 @@ export default function Home() {
       title: '🖨️ 即將開啟列印對話框',
       description: '請在對話框中選擇「另存為 PDF」並按下儲存即可下載報告。',
     });
+
+    // 🔔 LINE 通知管理員（fire-and-forget，failure swallowed）
+    const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    httpsCallable(functions, 'notifyExport')({
+      exportType: 'pdf',
+      teachingArea,
+      meetingTopic,
+      meetingDate: meetingDate ? format(meetingDate, 'yyyy-MM-dd') : '',
+      communityMembers,
+    }).catch(() => { /* 通知失敗忽略 */ });
+
     // 短暫延遲讓 toast 浮現，再觸發 window.print()
     setTimeout(() => window.print(), 400);
-  }, [summary, toast]);
+  }, [summary, form, toast]);
 
   return (
     <TooltipProvider>

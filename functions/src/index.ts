@@ -300,3 +300,52 @@ export const generateMeetingSummary = onCall(
     }
   }
 );
+
+
+// ------------------------------------
+// 3. 前端匯出/列印的 LINE 通知中繼 (notifyExport)
+// ------------------------------------
+// 前端按「匯出 Word」或「列印 PDF」時呼叫這個 function，後端推 LINE 給管理員。
+// 為什麼不直接從前端打 LINE API：Channel Access Token 不能進前端 bundle (會 leak)。
+// 設計：fire-and-forget，前端不需要等回應、收 ack 就好。
+export const notifyExport = onCall(
+  {
+    secrets: [lineChannelAccessToken, lineAdminUserId],
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 30,
+  },
+  async (request: any) => {
+    const data = request.data || {};
+    const exportType: 'word' | 'pdf' = data.exportType === 'pdf' ? 'pdf' : 'word';
+
+    // 兩種匯出的卡片差異
+    const cardConfig = exportType === 'word'
+      ? {
+          status: 'success' as const,
+          title: 'Word 匯出完成',
+          icon: '📝',
+        }
+      : {
+          status: 'started' as const,  // PDF 是觸發列印對話框，不一定會儲存
+          title: '列印對話框已開啟',
+          icon: '🖨️',
+        };
+
+    notifyAdminCard(
+      {
+        status: cardConfig.status,
+        title: `${cardConfig.icon} ${cardConfig.title}`,
+        appName: '領域共備GO',
+        fields: [
+          ...meetingFields(data),
+          { icon: '🎯', label: '動作', value: exportType === 'word' ? 'Word 檔已下載' : '列印 / 儲存為 PDF' },
+        ],
+      },
+      lineChannelAccessToken.value(),
+      lineAdminUserId.value()
+    );
+
+    return { ok: true };
+  }
+);

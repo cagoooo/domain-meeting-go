@@ -4,6 +4,55 @@
 
 ---
 
+## [0.4.5] — 2026-04-25 🔔 匯出 / 列印 LINE 通知
+
+### ✨ 新增 Features
+使用者按「匯出 Word」或「列印 / 儲存為 PDF」時，自動推 LINE 卡片給管理員，讓你即時知道誰在使用、何時匯出。
+
+### 卡片預覽
+**Word 匯出（綠卡）：**
+```
+┌─────────────────────────────────┐
+│ ✅  📝 Word 匯出完成             │
+│ 領域共備GO                       │
+├─────────────────────────────────┤
+│ 📚 領域       藝術與人文          │
+│ 📌 主題       觀課紀錄            │
+│ 📅 日期       2026-04-25          │
+│ 👥 成員       劉妍希、黃凱揚...    │
+│ 🎯 動作       Word 檔已下載       │
+└─────────────────────────────────┘
+```
+
+**PDF 列印（藍卡）：**
+```
+┌─────────────────────────────────┐
+│ 🆕  🖨️ 列印對話框已開啟           │
+│ 領域共備GO                       │
+├─────────────────────────────────┤
+│ 📚 領域       藝術與人文          │
+│ 🎯 動作       列印 / 儲存為 PDF   │
+└─────────────────────────────────┘
+```
+
+### 為什麼用 PDF status `started` 而不是 `success`？
+`window.print()` 只能觸發列印對話框，**前端拿不到使用者最終是否儲存的結果**（瀏覽器原生對話框是 modal，沒有 callback）。所以 PDF 通知是「使用者剛打開對話框」，標記為 `started`（藍色）；Word 是真的下載完成，用 `success`（綠色）。
+
+### 架構決策：為何不在前端直接打 LINE API
+前端 bundle 會被任何使用者下載查看 → **Token 必定 leak**。
+所以正確做法：前端按按鈕 → 呼叫 `httpsCallable('notifyExport')` → 後端讀 secret 推 LINE。
+
+### 變動檔案
+- `functions/src/index.ts`：新增 `notifyExport` onCall function（含 `LINE_CHANNEL_ACCESS_TOKEN` + `LINE_ADMIN_USER_ID` secrets）
+- `src/app/page.tsx`：在 `exportToWord` 和 `exportToPDF` 末尾加 `httpsCallable('notifyExport')` 呼叫，**fire-and-forget**（`.catch(() => {})` 通知失敗不影響主功能）
+
+### Deploy
+```
++ functions[notifyExport(asia-east1)] Successful create operation
+```
+
+---
+
 ## [0.4.4] — 2026-04-25 🚨 失敗照片「再試一次」UX 大改造
 
 ### ✨ Improvements

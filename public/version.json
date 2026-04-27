@@ -1,5 +1,5 @@
 {
-  "version": "0.4.4",
-  "releasedAt": "2026-04-27T01:41:12.133Z",
-  "notes": "失敗照片的「再試一次」按鈕優化：紅色脈動+文字+icon 慢轉，整張卡紅框+抖動"
+  "version": "0.4.5",
+  "releasedAt": "2026-04-27T01:45:25.138Z",
+  "notes": "新增 notifyExport Cloud Function：使用者匯出 Word/列印 PDF 時推 LINE 通知管理員"
 }
