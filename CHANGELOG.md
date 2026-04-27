@@ -4,6 +4,48 @@
 
 ---
 
+## [0.4.4] — 2026-04-25 🚨 失敗照片「再試一次」UX 大改造
+
+### ✨ Improvements
+之前產出失敗的照片，重試按鈕只是右下角小灰 icon（h-7 w-7），使用者**完全看不到**有重試選項。本版做三層提示：
+
+| 層級 | 改動 |
+|---|---|
+| **整張卡片** | 紅色 border + 紅光 ring + **抖動 0.6s**（card-shake，僅出現時觸發，避免長期擾人）|
+| **重試按鈕** | 從小灰 icon（h-7 w-7）→ **紅漸層按鈕 + 「再試一次」文字 + 紅光脈動**（h-9 px-3）|
+| **icon 細節** | RefreshCw 持續慢轉（3 秒一圈）暗示「可重新產生」 |
+| **描述文字** | 失敗描述改紅色 + bold + ⚠️ 前綴 |
+
+### 動畫細節（globals.css）
+```css
+@keyframes retry-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 4px 6px -1px rgba(239,68,68,0.5); transform: scale(1); }
+  50%      { box-shadow: 0 0 0 10px rgba(239,68,68,0), 0 6px 14px -2px rgba(239,68,68,0.8); transform: scale(1.06); }
+}
+@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes card-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80%      { transform: translateX(2px); }
+}
+```
+
+### 偵測邏輯
+描述文字含關鍵字 `失敗 / 忙碌 / 錯誤 / 機制 / 無法描述 / 配額 / 安全` 任一即視為失敗：
+```ts
+const isFailed = !!photo.description && /失敗|忙碌|錯誤|機制|無法描述|配額|安全/.test(photo.description);
+```
+
+### 版面對比
+**前**：小灰 RefreshCw icon（h-7 w-7）+ 純文字「產出失敗」
+**後**：
+- 整張卡輕微抖動 0.6s 提示出狀況
+- 紅色卡片邊框 + 紅光 ring 持續顯示
+- 右下角紅色脈動「⟳ 再試一次」按鈕（持續吸引注意）
+- 描述變「⚠️ 產出失敗」紅字粗體
+
+---
+
 ## [0.4.3] — 2026-04-25 🎨 LINE 通知升級為 Flex Message 卡片
 
 ### ✨ UX 大躍進
