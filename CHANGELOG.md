@@ -4,6 +4,53 @@
 
 ---
 
+## [0.4.3] — 2026-04-25 🎨 LINE 通知升級為 Flex Message 卡片
+
+### ✨ UX 大躍進
+從純文字升級為 **Flex Message 卡片**，視覺辨識度大幅提升：
+
+| 狀態 | Header 色 | Icon | 用途 |
+|---|---|---|---|
+| `started` | `#3B82F6` 藍 | 🆕 | 開始產生會議摘要 |
+| `success` | `#10B981` 綠 | ✅ | 摘要產出成功 |
+| `failed`  | `#EF4444` 紅 | ❌ | 摘要 / 照片描述失敗 |
+| `warning` | `#F59E0B` 橙 | ⚠️ | 產出空白等警告 |
+
+### 卡片結構
+- **Header**：彩色背景 + 白字標題（含 emoji icon）+ appName 副標
+- **Body**：每行一個欄位，icon + label（灰）+ value（深色），flex 3:7 比例
+- **Footer**：台灣時間戳 + 選用備註（如耗時），右對齊小灰字
+
+### 新增 Helper API（`functions/src/notify-line.ts`）
+```typescript
+notifyAdminCard({
+  status: 'success',
+  title: '會議摘要產出成功',
+  appName: '領域共備GO',
+  fields: [
+    { icon: '📚', label: '領域', value: '...' },
+    { icon: '📝', label: '字數', value: '856' },
+    { icon: '⏱️', label: '耗時', value: '12.3s' },
+  ],
+}, token, userId);
+```
+
+### 內建避雷機制
+- ✅ Color 全部 6-digit hex（避雷 #9，`#FFF` 會被 LINE 拒收）
+- ✅ Flex 失敗自動 fallback 純文字（避免 invalid color / 文字過長等情境的災難）
+- ✅ altText 自動產生（離線通知 + 通知列預覽）
+- ✅ 台灣時區（`Asia/Taipei`）格式化時間
+
+### 部署驗證
+- 🧪 Pre-deploy curl self-test：HTTP 200，卡片成功送達
+- ✅ `firebase deploy --only functions`：兩個 functions 都 updated
+- ✅ TypeScript 零 error
+
+### Skill 同步
+`line-messaging-firebase` skill 新增「🎨 LINE Flex Message 卡片式通知」整段，包含可直接複製的完整 helper、4 種狀態色彩語意對照、卡片設計守則（避雷清單）、純文字 vs 卡片的選擇時機。未來新專案做 LINE 整合時自動套用。
+
+---
+
 ## [0.4.2] — 2026-04-25 📲 LINE 管理員告警通知
 
 ### ✨ 新增 Features

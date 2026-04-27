@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { notifyAdmin, formatMeetingContext } from "./notify-line";
+import { notifyAdminCard, meetingFields } from "./notify-line";
 
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
@@ -87,8 +87,14 @@ export const generatePhotoDescriptions = onCall(
       const elapsedMs = Date.now() - startedAt;
 
       if (!output || !output.photoDescription) {
-        notifyAdmin(
-          `⚠️ 照片描述產出空白\n${formatMeetingContext(request.data)}\n⏱️ ${elapsedMs}ms`,
+        notifyAdminCard(
+          {
+            status: 'warning',
+            title: '照片描述產出空白',
+            appName: '領域共備GO',
+            fields: meetingFields(request.data),
+            footerNote: `⏱️ ${elapsedMs}ms`,
+          },
           lineChannelAccessToken.value(),
           lineAdminUserId.value()
         );
@@ -112,11 +118,21 @@ export const generatePhotoDescriptions = onCall(
         alertCategory = '🛡️ Safety Block';
       } else {
         userFacing = `分析失敗: ${errorMessage.substring(0, 30)}...`;
-        alertCategory = '❌ 其他錯誤';
+        alertCategory = '❓ 其他錯誤';
       }
 
-      notifyAdmin(
-        `❌ 照片描述失敗 — ${alertCategory}\n${formatMeetingContext(request.data)}\n⏱️ ${elapsedMs}ms\n💬 ${errorMessage.substring(0, 200)}`,
+      notifyAdminCard(
+        {
+          status: 'failed',
+          title: '照片描述失敗',
+          appName: '領域共備GO',
+          fields: [
+            ...meetingFields(request.data),
+            { icon: '🏷️', label: '類型', value: alertCategory },
+            { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
+          ],
+          footerNote: `⏱️ ${elapsedMs}ms`,
+        },
         lineChannelAccessToken.value(),
         lineAdminUserId.value()
       );
@@ -144,8 +160,16 @@ export const generateMeetingSummary = onCall(
       : 0;
 
     // 開始通知（一份報告只發一次）
-    notifyAdmin(
-      `🆕 開始產生會議摘要\n${formatMeetingContext(request.data)}\n📷 照片：${photoCount} 張`,
+    notifyAdminCard(
+      {
+        status: 'started',
+        title: '開始產生會議摘要',
+        appName: '領域共備GO',
+        fields: [
+          ...meetingFields(request.data),
+          { icon: '📷', label: '照片', value: `${photoCount} 張` },
+        ],
+      },
       lineChannelAccessToken.value(),
       lineAdminUserId.value()
     );
@@ -217,10 +241,17 @@ export const generateMeetingSummary = onCall(
 
       const { output } = await prompt(request.data);
       const elapsedMs = Date.now() - startedAt;
+      const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
       if (!output || !output.summary) {
-        notifyAdmin(
-          `⚠️ 會議摘要產出空白\n${formatMeetingContext(request.data)}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s`,
+        notifyAdminCard(
+          {
+            status: 'warning',
+            title: '會議摘要產出空白',
+            appName: '領域共備GO',
+            fields: meetingFields(request.data),
+            footerNote: `⏱️ ${elapsedSec}s`,
+          },
           lineChannelAccessToken.value(),
           lineAdminUserId.value()
         );
@@ -228,8 +259,17 @@ export const generateMeetingSummary = onCall(
       }
 
       // 成功通知（含摘要長度與耗時）
-      notifyAdmin(
-        `✅ 會議摘要產出成功\n${formatMeetingContext(request.data)}\n📝 字數：${output.summary.length}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s`,
+      notifyAdminCard(
+        {
+          status: 'success',
+          title: '會議摘要產出成功',
+          appName: '領域共備GO',
+          fields: [
+            ...meetingFields(request.data),
+            { icon: '📝', label: '字數', value: `${output.summary.length}` },
+            { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
+          ],
+        },
         lineChannelAccessToken.value(),
         lineAdminUserId.value()
       );
@@ -238,10 +278,20 @@ export const generateMeetingSummary = onCall(
     } catch (error: any) {
       console.error('generateMeetingSummary failed:', error);
       const elapsedMs = Date.now() - startedAt;
+      const elapsedSec = (elapsedMs / 1000).toFixed(1);
       const errorMessage = error?.message || String(error);
 
-      notifyAdmin(
-        `❌ 會議摘要失敗\n${formatMeetingContext(request.data)}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s\n💬 ${errorMessage.substring(0, 250)}`,
+      notifyAdminCard(
+        {
+          status: 'failed',
+          title: '會議摘要失敗',
+          appName: '領域共備GO',
+          fields: [
+            ...meetingFields(request.data),
+            { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
+          ],
+          footerNote: `⏱️ ${elapsedSec}s`,
+        },
         lineChannelAccessToken.value(),
         lineAdminUserId.value()
       );

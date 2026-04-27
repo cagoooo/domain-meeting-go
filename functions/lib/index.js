@@ -5,8 +5,13 @@ const https_1 = require("firebase-functions/v2/https");
 const params_1 = require("firebase-functions/params");
 const genkit_1 = require("genkit");
 const google_genai_1 = require("@genkit-ai/google-genai");
+const notify_line_1 = require("./notify-line");
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
+// LINE 管理員通知（單一接收者模式：所有事件都推到管理員一個 LINE 帳號）
+// secrets 由 firebase functions:secrets:set 設定，未設定時通知會 noop
+const lineChannelAccessToken = (0, params_1.defineSecret)("LINE_CHANNEL_ACCESS_TOKEN");
+const lineAdminUserId = (0, params_1.defineSecret)("LINE_ADMIN_USER_ID");
 let _aiInstance = null;
 function getAiInstance() {
     if (!_aiInstance) {
@@ -20,7 +25,13 @@ function getAiInstance() {
 // ------------------------------------
 // 1. 生成照片描述 (generatePhotoDescriptions)
 // ------------------------------------
-exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 }, async (request) => {
+exports.generatePhotoDescriptions = (0, https_1.onCall)({
+    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 120,
+}, async (request) => {
+    const startedAt = Date.now();
     try {
         const ai = getAiInstance();
         const prompt = ai.definePrompt({
@@ -69,27 +80,75 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({ secrets: [geminiApiKey
 {{media url=photoDataUri}}`,
         });
         const { output } = await prompt(request.data);
+        const elapsedMs = Date.now() - startedAt;
         if (!output || !output.photoDescription) {
+            (0, notify_line_1.notifyAdminCard)({
+                status: 'warning',
+                title: '照片描述產出空白',
+                appName: '領域共備GO',
+                fields: (0, notify_line_1.meetingFields)(request.data),
+                footerNote: `⏱️ ${elapsedMs}ms`,
+            }, lineChannelAccessToken.value(), lineAdminUserId.value());
             return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
         }
+        // 成功時不每張都通知（避免訊息轟炸），僅 log
         return { photoDescription: output.photoDescription };
     }
     catch (error) {
         console.error('Genkit Error Details:', error);
         const errorMessage = error.message || String(error);
+        const elapsedMs = Date.now() - startedAt;
+        let userFacing;
+        let alertCategory;
         if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
-            return { photoDescription: '模型目前忙碌中（配額限制），請稍候再試。' };
+            userFacing = '模型目前忙碌中（配額限制），請稍候再試。';
+            alertCategory = '🚦 配額限制 (429/503)';
         }
-        if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
-            return { photoDescription: '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。' };
+        else if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
+            userFacing = '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。';
+            alertCategory = '🛡️ Safety Block';
         }
-        return { photoDescription: `分析失敗: ${errorMessage.substring(0, 30)}...` };
+        else {
+            userFacing = `分析失敗: ${errorMessage.substring(0, 30)}...`;
+            alertCategory = '❓ 其他錯誤';
+        }
+        (0, notify_line_1.notifyAdminCard)({
+            status: 'failed',
+            title: '照片描述失敗',
+            appName: '領域共備GO',
+            fields: [
+                ...(0, notify_line_1.meetingFields)(request.data),
+                { icon: '🏷️', label: '類型', value: alertCategory },
+                { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
+            ],
+            footerNote: `⏱️ ${elapsedMs}ms`,
+        }, lineChannelAccessToken.value(), lineAdminUserId.value());
+        return { photoDescription: userFacing };
     }
 });
 // ------------------------------------
 // 2. 生成會議摘要 (generateMeetingSummary)
 // ------------------------------------
-exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 }, async (request) => {
+exports.generateMeetingSummary = (0, https_1.onCall)({
+    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 120,
+}, async (request) => {
+    const startedAt = Date.now();
+    const photoCount = Array.isArray(request.data?.photoDescriptions)
+        ? request.data.photoDescriptions.length
+        : 0;
+    // 開始通知（一份報告只發一次）
+    (0, notify_line_1.notifyAdminCard)({
+        status: 'started',
+        title: '開始產生會議摘要',
+        appName: '領域共備GO',
+        fields: [
+            ...(0, notify_line_1.meetingFields)(request.data),
+            { icon: '📷', label: '照片', value: `${photoCount} 張` },
+        ],
+    }, lineChannelAccessToken.value(), lineAdminUserId.value());
     try {
         const ai = getAiInstance();
         const { meetingType } = request.data;
@@ -153,14 +212,47 @@ exports.generateMeetingSummary = (0, https_1.onCall)({ secrets: [geminiApiKey], 
         請直接開始撰寫這份內容詳盡、排版分明（可使用條列式輔助說明）的會議總結記錄。`,
         });
         const { output } = await prompt(request.data);
+        const elapsedMs = Date.now() - startedAt;
+        const elapsedSec = (elapsedMs / 1000).toFixed(1);
         if (!output || !output.summary) {
+            (0, notify_line_1.notifyAdminCard)({
+                status: 'warning',
+                title: '會議摘要產出空白',
+                appName: '領域共備GO',
+                fields: (0, notify_line_1.meetingFields)(request.data),
+                footerNote: `⏱️ ${elapsedSec}s`,
+            }, lineChannelAccessToken.value(), lineAdminUserId.value());
             throw new https_1.HttpsError('internal', 'Failed to generate summary');
         }
+        // 成功通知（含摘要長度與耗時）
+        (0, notify_line_1.notifyAdminCard)({
+            status: 'success',
+            title: '會議摘要產出成功',
+            appName: '領域共備GO',
+            fields: [
+                ...(0, notify_line_1.meetingFields)(request.data),
+                { icon: '📝', label: '字數', value: `${output.summary.length}` },
+                { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
+            ],
+        }, lineChannelAccessToken.value(), lineAdminUserId.value());
         return { summary: output.summary };
     }
     catch (error) {
         console.error('generateMeetingSummary failed:', error);
-        throw new https_1.HttpsError('internal', error.message || 'Summary generation failed');
+        const elapsedMs = Date.now() - startedAt;
+        const elapsedSec = (elapsedMs / 1000).toFixed(1);
+        const errorMessage = error?.message || String(error);
+        (0, notify_line_1.notifyAdminCard)({
+            status: 'failed',
+            title: '會議摘要失敗',
+            appName: '領域共備GO',
+            fields: [
+                ...(0, notify_line_1.meetingFields)(request.data),
+                { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
+            ],
+            footerNote: `⏱️ ${elapsedSec}s`,
+        }, lineChannelAccessToken.value(), lineAdminUserId.value());
+        throw new https_1.HttpsError('internal', errorMessage || 'Summary generation failed');
     }
 });
 //# sourceMappingURL=index.js.map
