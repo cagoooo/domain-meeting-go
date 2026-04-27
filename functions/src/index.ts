@@ -2,9 +2,15 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
+import { notifyAdmin, formatMeetingContext } from "./notify-line";
 
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
+
+// LINE 管理員通知（單一接收者模式：所有事件都推到管理員一個 LINE 帳號）
+// secrets 由 firebase functions:secrets:set 設定，未設定時通知會 noop
+const lineChannelAccessToken = defineSecret("LINE_CHANNEL_ACCESS_TOKEN");
+const lineAdminUserId = defineSecret("LINE_ADMIN_USER_ID");
 
 let _aiInstance: any = null;
 function getAiInstance() {
@@ -21,8 +27,14 @@ function getAiInstance() {
 // 1. 生成照片描述 (generatePhotoDescriptions)
 // ------------------------------------
 export const generatePhotoDescriptions = onCall(
-  { secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 },
+  {
+    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 120,
+  },
   async (request: any) => {
+    const startedAt = Date.now();
     try {
       const ai = getAiInstance();
       const prompt = ai.definePrompt({
@@ -72,21 +84,44 @@ export const generatePhotoDescriptions = onCall(
       });
 
       const { output } = await prompt(request.data);
+      const elapsedMs = Date.now() - startedAt;
+
       if (!output || !output.photoDescription) {
+        notifyAdmin(
+          `⚠️ 照片描述產出空白\n${formatMeetingContext(request.data)}\n⏱️ ${elapsedMs}ms`,
+          lineChannelAccessToken.value(),
+          lineAdminUserId.value()
+        );
         return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
       }
+
+      // 成功時不每張都通知（避免訊息轟炸），僅 log
       return { photoDescription: output.photoDescription };
     } catch (error: any) {
       console.error('Genkit Error Details:', error);
       const errorMessage = error.message || String(error);
-      
+      const elapsedMs = Date.now() - startedAt;
+
+      let userFacing: string;
+      let alertCategory: string;
       if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
-        return { photoDescription: '模型目前忙碌中（配額限制），請稍候再試。' };
+        userFacing = '模型目前忙碌中（配額限制），請稍候再試。';
+        alertCategory = '🚦 配額限制 (429/503)';
+      } else if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
+        userFacing = '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。';
+        alertCategory = '🛡️ Safety Block';
+      } else {
+        userFacing = `分析失敗: ${errorMessage.substring(0, 30)}...`;
+        alertCategory = '❌ 其他錯誤';
       }
-      if (errorMessage.includes('safety') || errorMessage.includes('blocked')) {
-        return { photoDescription: '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。' };
-      }
-      return { photoDescription: `分析失敗: ${errorMessage.substring(0, 30)}...` };
+
+      notifyAdmin(
+        `❌ 照片描述失敗 — ${alertCategory}\n${formatMeetingContext(request.data)}\n⏱️ ${elapsedMs}ms\n💬 ${errorMessage.substring(0, 200)}`,
+        lineChannelAccessToken.value(),
+        lineAdminUserId.value()
+      );
+
+      return { photoDescription: userFacing };
     }
   }
 );
@@ -96,8 +131,25 @@ export const generatePhotoDescriptions = onCall(
 // 2. 生成會議摘要 (generateMeetingSummary)
 // ------------------------------------
 export const generateMeetingSummary = onCall(
-  { secrets: [geminiApiKey], cors: true, region: "asia-east1", timeoutSeconds: 120 },
+  {
+    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 120,
+  },
   async (request: any) => {
+    const startedAt = Date.now();
+    const photoCount = Array.isArray(request.data?.photoDescriptions)
+      ? request.data.photoDescriptions.length
+      : 0;
+
+    // 開始通知（一份報告只發一次）
+    notifyAdmin(
+      `🆕 開始產生會議摘要\n${formatMeetingContext(request.data)}\n📷 照片：${photoCount} 張`,
+      lineChannelAccessToken.value(),
+      lineAdminUserId.value()
+    );
+
     try {
       const ai = getAiInstance();
       const { meetingType } = request.data;
@@ -164,13 +216,37 @@ export const generateMeetingSummary = onCall(
       });
 
       const { output } = await prompt(request.data);
+      const elapsedMs = Date.now() - startedAt;
+
       if (!output || !output.summary) {
+        notifyAdmin(
+          `⚠️ 會議摘要產出空白\n${formatMeetingContext(request.data)}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s`,
+          lineChannelAccessToken.value(),
+          lineAdminUserId.value()
+        );
         throw new HttpsError('internal', 'Failed to generate summary');
       }
+
+      // 成功通知（含摘要長度與耗時）
+      notifyAdmin(
+        `✅ 會議摘要產出成功\n${formatMeetingContext(request.data)}\n📝 字數：${output.summary.length}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s`,
+        lineChannelAccessToken.value(),
+        lineAdminUserId.value()
+      );
+
       return { summary: output.summary };
     } catch (error: any) {
       console.error('generateMeetingSummary failed:', error);
-      throw new HttpsError('internal', error.message || 'Summary generation failed');
+      const elapsedMs = Date.now() - startedAt;
+      const errorMessage = error?.message || String(error);
+
+      notifyAdmin(
+        `❌ 會議摘要失敗\n${formatMeetingContext(request.data)}\n⏱️ ${(elapsedMs / 1000).toFixed(1)}s\n💬 ${errorMessage.substring(0, 250)}`,
+        lineChannelAccessToken.value(),
+        lineAdminUserId.value()
+      );
+
+      throw new HttpsError('internal', errorMessage || 'Summary generation failed');
     }
   }
 );

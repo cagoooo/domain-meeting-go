@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm \"C:/Users/smes/.claude/skills/pdf-export-print-best-practice/scripts/example.ts\" \"C:/Users/smes/.claude/skills/pdf-export-print-best-practice/references/api-reference.md\" \"C:/Users/smes/.claude/skills/pdf-export-print-best-practice/assets/example-asset.txt\")",
+      "Bash(rmdir \"C:/Users/smes/.claude/skills/pdf-export-print-best-practice/assets\")"
+    ]
+  }
+}

@@ -4,6 +4,41 @@
 
 ---
 
+## [0.4.2] — 2026-04-25 📲 LINE 管理員告警通知
+
+### ✨ 新增 Features
+Cloud Functions 整合 LINE Messaging API，**單一管理員模式**——不需使用者綁定 LINE，所有事件自動推送到管理員的 LINE 帳號。
+
+### 通知時機
+| 事件 | 訊息範例 |
+|---|---|
+| 開始產生會議摘要 | 🆕 開始產生會議摘要 / 領域、主題、日期、成員 / 📷 照片：N 張 |
+| 摘要產出成功 | ✅ 會議摘要產出成功 / 📝 字數：800 / ⏱️ 12.3s |
+| 摘要產出失敗 | ❌ 會議摘要失敗 / 💬 (錯誤訊息前 250 字) |
+| 照片描述失敗（429/safety/其他）| ❌ 照片描述失敗 — 🚦 配額限制 (429/503) / 💬 ... |
+| 照片描述空白 | ⚠️ 照片描述產出空白 |
+
+照片描述每張不通知（避免訊息轟炸），只在錯誤或空白時推。
+
+### 設計原則
+- **Fire-and-forget**：所有 `notifyAdmin()` 呼叫都不 await，主功能絕不被 LINE 通知失敗影響
+- **永不 throw**：用 `.then().catch()` 包裹，網路錯誤靜默 log
+- **secrets 缺失時靜默 noop**：未設 `LINE_CHANNEL_ACCESS_TOKEN` 或 `LINE_ADMIN_USER_ID` 不會壞原本流程
+- **零外部 dep**：用原生 `fetch` 直接呼叫 LINE Push API，不需 `@line/bot-sdk`
+
+### 變動檔案
+- `functions/src/notify-line.ts`（新檔）：`notifyAdmin()` + `formatMeetingContext()` helper
+- `functions/src/index.ts`：宣告 `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_ADMIN_USER_ID` secrets，在兩個 onCall 函式內加 5 個通知點
+
+### 待設定（部署前）
+- 在 LINE Developers Console 建 Messaging API Channel
+- 取得 Channel Access Token + 管理員自己的 LINE userId
+- `firebase functions:secrets:set LINE_CHANNEL_ACCESS_TOKEN`（用 `printf` 避開 `<<<` 末尾換行雷）
+- `firebase functions:secrets:set LINE_ADMIN_USER_ID`
+- `firebase deploy --only functions`
+
+---
+
 ## [0.4.1] — 2026-04-25 🛡️ ChunkLoadError 自動恢復
 
 ### 🐛 修正 Bug Fixes

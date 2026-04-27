@@ -1,5 +1,5 @@
 {
-  "version": "0.4.1",
-  "releasedAt": "2026-04-25T03:03:09.313Z",
-  "notes": "全域偵測 ChunkLoadError，自動清快取重載恢復"
+  "version": "0.4.2",
+  "releasedAt": "2026-04-27T01:07:22.407Z",
+  "notes": "Cloud Functions 加入 LINE 管理員告警通知（單一接收者模式）"
 }
