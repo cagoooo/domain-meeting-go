@@ -4,6 +4,55 @@
 
 ---
 
+## [0.5.2] — 2026-04-29 🎨 favicon + OG 預覽圖期刊風重做
+
+### ✨ 新增
+
+#### Favicon（512×512）
+從原本的舊版圖示換成編輯部期刊風縮影：
+- 酒紅實心邊框 + 牛皮米黃內框
+- 中央大字 **GO**（Microsoft JhengHei Bold）
+- 上方小字「領域共備」+ 上下雙橫線
+- 底部「VOL · 04」mono 點綴
+- 高對比 + 強辨識度，瀏覽器 tab 上看得清楚
+
+#### OG 預覽圖（1200×630，給 FB/LINE/Twitter 社群分享卡片）
+完整復刻網站「報紙頭版」設計語言：
+- 牛皮米黃背景 + 酒紅墨色字
+- 紙紋紋理（800 個隨機點 + 雙 radial 漸層）
+- 左上 VOL.04 / 右上 教師社群協力誌
+- 中央大標「領域共備GO」+ 副標 DOMAIN · MEETING · GO + 雙橫線
+- Tagline：共備 · 觀課 · 議課 · 講座 · 會議紀錄
+- 主標：教師社群會議報告自動產出助手 / 用 AI 為每一次共備留下溫度與紀錄
+- 底部：domain URL（左）+ Made with ❤ by 阿凱老師（右，愛心用 canvas path 直接畫）
+
+### 修正
+
+- **OG meta tags 缺 metadataBase**：build 時噴 warning「property metadataBase is not set, using http://localhost:3000」→ FB/LINE 抓到的 og:image 是 localhost URL 永遠載不到。設 `metadataBase: new URL('https://cagoooo.github.io/')` 避開警告。
+- **og:image 雙重 basePath bug**：直接給 `/domain-meeting-go/og_preview.png` + metadataBase 含路徑 → Next.js 拼出 `domain-meeting-go/domain-meeting-go/...` 雙重前綴。改用絕對 URL 字串直接寫死，繞開 Next.js 的 URL 拼接邏輯。
+
+### 程式碼變更
+
+- `scripts/generate-brand-images.mjs`：新增。用 `@napi-rs/canvas` + Microsoft JhengHei 系統字型生成兩張圖
+- `public/favicon.png`：v0.5.0 編輯部風重做
+- `public/og_preview.png`：v0.5.0 編輯部風重做
+- `src/app/layout.tsx`：設定 metadataBase + 改用絕對 URL 寫死社群圖路徑
+- `package.json`：dev dependency 加 `@napi-rs/canvas`
+
+### 為什麼用 canvas + 系統字型而不是 SVG / Puppeteer
+
+- SVG → PNG 在 Windows 上對中文字型支援不穩，librsvg 找不到合適 fallback
+- Puppeteer 太重，每次都要啟瀏覽器
+- @napi-rs/canvas + GlobalFonts.registerFromPath 可以直接吃 Windows 內建 `msjhbd.ttc`，視覺最接近網站使用的 Noto Serif TC
+
+### 重新生成
+
+```bash
+node scripts/generate-brand-images.mjs
+```
+
+---
+
 ## [0.5.1] — 2026-04-29 ✍️ Footer 加上阿凱老師署名
 
 ### ✨ 新增
