@@ -1048,7 +1048,17 @@ export default function Home() {
               <div className="dmg-foot__row">
                 <span>領域共備GO · 教師專業社群協力誌</span>
                 <span>由 Gemini 提供 AI 能力</span>
-                <span>© {new Date().getFullYear()} cagoooo</span>
+                <span>
+                  Made with <span aria-label="愛心" className="dmg-foot__heart">❤️</span> by{' '}
+                  <a
+                    href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="dmg-foot__author"
+                  >
+                    阿凱老師
+                  </a>
+                </span>
               </div>
             </footer>
           </main>

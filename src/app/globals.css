@@ -662,6 +662,25 @@
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em;
   color: var(--text-mute); text-transform: uppercase;
 }
+.dmg-foot__heart {
+  display: inline-block;
+  letter-spacing: normal;
+  text-transform: none;
+  vertical-align: -1px;
+  margin: 0 2px;
+  filter: saturate(1.1);
+}
+.dmg-foot__author {
+  color: var(--ink-deep);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--ink-soft);
+  padding-bottom: 1px;
+  transition: color .2s, border-color .2s;
+}
+.dmg-foot__author:hover {
+  color: var(--accent-deep);
+  border-bottom-color: var(--dmg-accent);
+}
 
 /* Responsive — Tablet & Mobile */
 @media (max-width: 1024px) {
