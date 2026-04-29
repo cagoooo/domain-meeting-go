@@ -1,70 +1,56 @@
 
 'use client';
 
-import type { ChangeEvent } from 'react';
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, UploadCloud, X, Printer, Info, Image as ImageIcon, FileText, Download, RefreshCw } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  Loader2,
+  UploadCloud,
+  X,
+  Printer,
+  Info,
+  Image as ImageIcon,
+  FileText,
+  Download,
+  RefreshCw,
+  Sparkles,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NextImage from 'next/image';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from '@/components/ui/select';
 import confetti from 'canvas-confetti';
 import ReactMarkdown from 'react-markdown';
 
-
-
 // 匯出套件
-import { 
-  Document, 
-  Packer, 
-  Paragraph, 
-  TextRun, 
-  ImageRun, 
-  AlignmentType, 
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  ImageRun,
+  AlignmentType,
   HeadingLevel,
-  BorderStyle,
   Table,
   TableRow,
   TableCell,
   WidthType,
-  VerticalAlign
+  VerticalAlign,
 } from 'docx';
 import { saveAs } from 'file-saver';
-// 注意：v0.4.0 起 PDF 改用 window.print()，不再需要 jsPDF / html2canvas / html2pdf.js
 
 const MAX_PHOTOS = 4;
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
@@ -87,83 +73,195 @@ type Photo = {
   dataUrl?: string;
 };
 
-/**
- * 🎉 巨大彩花特效——四波連環爆發
- *
- * Wave 1（即時）：中央巨型爆發，200 顆放射粒子（scalar 1.5 加大）
- * Wave 2（+250ms）：左右兩側同時對射，兩個 150 顆粒子流
- * Wave 3（+500ms）：頂部往下灑彩帶，100 顆 + 大角度散布
- * Wave 4（+750ms ~ 3s）：每 200ms 隨機位置補充小爆發，營造持續慶祝氛圍
- */
 const fireMassiveConfetti = () => {
   const colors = ['#a855f7', '#ec4899', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'];
 
-  // Wave 1: 中央巨型爆發
-  confetti({
-    particleCount: 200,
-    spread: 100,
-    origin: { x: 0.5, y: 0.5 },
-    colors,
-    startVelocity: 50,
-    scalar: 1.5,
-    ticks: 250,
-  });
+  confetti({ particleCount: 200, spread: 100, origin: { x: 0.5, y: 0.5 }, colors, startVelocity: 50, scalar: 1.5, ticks: 250 });
 
-  // Wave 2: 左右兩側對射
   setTimeout(() => {
-    confetti({
-      particleCount: 150,
-      angle: 60,
-      spread: 70,
-      origin: { x: 0, y: 0.65 },
-      colors,
-      startVelocity: 60,
-      scalar: 1.2,
-    });
-    confetti({
-      particleCount: 150,
-      angle: 120,
-      spread: 70,
-      origin: { x: 1, y: 0.65 },
-      colors,
-      startVelocity: 60,
-      scalar: 1.2,
-    });
+    confetti({ particleCount: 150, angle: 60, spread: 70, origin: { x: 0, y: 0.65 }, colors, startVelocity: 60, scalar: 1.2 });
+    confetti({ particleCount: 150, angle: 120, spread: 70, origin: { x: 1, y: 0.65 }, colors, startVelocity: 60, scalar: 1.2 });
   }, 250);
 
-  // Wave 3: 頂部往下灑
   setTimeout(() => {
-    confetti({
-      particleCount: 100,
-      angle: 270,
-      spread: 180,
-      origin: { x: 0.5, y: 0 },
-      colors,
-      startVelocity: 40,
-      scalar: 1.3,
-      gravity: 0.8,
-      ticks: 300,
-    });
+    confetti({ particleCount: 100, angle: 270, spread: 180, origin: { x: 0.5, y: 0 }, colors, startVelocity: 40, scalar: 1.3, gravity: 0.8, ticks: 300 });
   }, 500);
 
-  // Wave 4: 持續飄灑 3 秒
   const end = Date.now() + 3000;
   const flutter = setInterval(() => {
-    if (Date.now() > end) {
-      clearInterval(flutter);
-      return;
-    }
-    confetti({
-      particleCount: 30,
-      startVelocity: 30,
-      spread: 360,
-      ticks: 150,
-      origin: { x: Math.random(), y: Math.random() * 0.5 },
-      colors,
-      scalar: 0.8 + Math.random() * 0.6,
-    });
+    if (Date.now() > end) { clearInterval(flutter); return; }
+    confetti({ particleCount: 30, startVelocity: 30, spread: 360, ticks: 150, origin: { x: Math.random(), y: Math.random() * 0.5 }, colors, scalar: 0.8 + Math.random() * 0.6 });
   }, 200);
 };
+
+/* ==========================================================================
+   Editorial layout primitives
+   ========================================================================== */
+
+const EditorialHeader = () => {
+  const [today, setToday] = useState('');
+  useEffect(() => {
+    const d = new Date();
+    setToday(`${d.getFullYear()} · ${String(d.getMonth() + 1).padStart(2, '0')} · ${String(d.getDate()).padStart(2, '0')}`);
+  }, []);
+
+  return (
+    <header className="dmg-header">
+      <div className="dmg-masthead">
+        <div className="dmg-masthead__rule" />
+        <div className="dmg-masthead__row">
+          <div className="dmg-masthead__date">
+            <div>VOL. 04</div>
+            <div suppressHydrationWarning>{today || ' '}</div>
+          </div>
+          <div className="dmg-masthead__title">
+            <div className="dmg-masthead__cn">領域共備GO</div>
+            <div className="dmg-masthead__en">DOMAIN · MEETING · GO</div>
+          </div>
+          <div className="dmg-masthead__price">
+            <div>教師社群</div>
+            <div>協力誌</div>
+          </div>
+        </div>
+        <div className="dmg-masthead__rule dmg-masthead__rule--double" />
+        <div className="dmg-masthead__tag">
+          <span>A NOTEBOOK FOR</span>
+          <strong>共備 · 觀課 · 議課 · 講座 · 會議紀錄</strong>
+          <span>BUILT WITH GEMINI</span>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+type StepCardProps = {
+  index: number;
+  accent: 'ink' | 'accent';
+  icon: ReactNode;
+  kicker: string;
+  title: string;
+  status?: ReactNode;
+  children: ReactNode;
+  id?: string;
+};
+
+const StepCard = ({ index, accent, icon, kicker, title, status, children, id }: StepCardProps) => (
+  <section id={id} className={`dmg-step dmg-step--${accent}`}>
+    <div className="dmg-step__rail" aria-hidden="true">
+      <div className="dmg-step__num">{String(index).padStart(2, '0')}</div>
+      <div className="dmg-step__line" />
+      <div className="dmg-step__icon">{icon}</div>
+    </div>
+    <div className="dmg-step__body">
+      <header className="dmg-step__head">
+        <div>
+          <div className="dmg-step__kicker">{kicker}</div>
+          <h2 className="dmg-step__title">{title}</h2>
+        </div>
+        {status}
+      </header>
+      <div>{children}</div>
+    </div>
+  </section>
+);
+
+type FieldLabelProps = { label: string; hint?: string; htmlFor?: string };
+const FieldLabel = ({ label, hint, htmlFor }: FieldLabelProps) => (
+  <label className="dmg-field__label" htmlFor={htmlFor}>
+    <span>{label}</span>
+    {hint && <span className="dmg-field__hint">{hint}</span>}
+  </label>
+);
+
+/* ==========================================================================
+   Editorial Summary (journal layout)
+   ========================================================================== */
+
+type Block =
+  | { kind: 'h2'; text: string }
+  | { kind: 'h3'; text: string }
+  | { kind: 'li'; text: string }
+  | { kind: 'li-num'; text: string }
+  | { kind: 'p'; text: string };
+
+const parseSummary = (markdown: string): Block[] => {
+  const out: Block[] = [];
+  let buf: string[] = [];
+  const flush = () => { if (buf.length) { out.push({ kind: 'p', text: buf.join(' ') }); buf = []; } };
+  for (const raw of markdown.split('\n')) {
+    const line = raw.trim();
+    if (!line) { flush(); continue; }
+    if (line.startsWith('## ')) { flush(); out.push({ kind: 'h2', text: line.slice(3) }); }
+    else if (line.startsWith('### ')) { flush(); out.push({ kind: 'h3', text: line.slice(4) }); }
+    else if (/^\d+\.\s/.test(line)) { flush(); out.push({ kind: 'li-num', text: line.replace(/^\d+\.\s/, '') }); }
+    else if (/^[*-]\s/.test(line)) { flush(); out.push({ kind: 'li', text: line.replace(/^[*-]\s/, '') }); }
+    else buf.push(line);
+  }
+  flush();
+  return out;
+};
+
+const renderInline = (t: string) => {
+  const parts = t.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : <React.Fragment key={i}>{p}</React.Fragment>
+  );
+};
+
+type SummaryInfo = {
+  area: string;
+  type: string;
+  topic: string;
+  date: string;
+  members: string;
+};
+
+const EditorialSummary = ({ markdown, info }: { markdown: string; info: SummaryInfo }) => {
+  const blocks = useMemo(() => parseSummary(markdown), [markdown]);
+  const ledeArea = info.area || '本領域';
+  const ledeTopic = info.topic || '本次會議主題';
+
+  return (
+    <article className="dmg-journal">
+      <div className="dmg-journal__masthead">
+        <div className="dmg-journal__row">
+          <div>{info.date || ''}</div>
+          <div className="dmg-journal__brand">領域共備 GO · 期刊版</div>
+          <div>AI Synopsis</div>
+        </div>
+        <h1 className="dmg-journal__h1">{ledeTopic}</h1>
+        <div className="dmg-journal__byline">
+          <span>領域 / <strong>{ledeArea}</strong></span>
+          <span>類別 / <strong>{info.type || '—'}</strong></span>
+          <span>協作 / <strong>{info.members || '—'}</strong></span>
+        </div>
+      </div>
+      <div className="dmg-journal__lede">
+        <span className="dmg-journal__dropcap">本</span>
+        次社群會議以「{ledeTopic}」為核心主題，由 {ledeArea} 領域教師共同備課，討論面向涵蓋課程設計、教學策略與後續評量規劃；以下為由 AI 整理之專業會議紀錄。
+      </div>
+      <div className="dmg-journal__cols">
+        {blocks.map((b, i) => {
+          if (b.kind === 'h2') return <h2 key={i} className="dmg-journal__h2">{b.text}</h2>;
+          if (b.kind === 'h3') return <h3 key={i} className="dmg-journal__h3">{b.text}</h3>;
+          if (b.kind === 'li') return <li key={i} className="dmg-journal__li">{renderInline(b.text)}</li>;
+          if (b.kind === 'li-num') return <li key={i} className="dmg-journal__li dmg-journal__li--num">{renderInline(b.text)}</li>;
+          return <p key={i} className="dmg-journal__p">{renderInline(b.text)}</p>;
+        })}
+      </div>
+      <div className="dmg-journal__foot">
+        <span>— END —</span>
+        <span>由 Gemini 2.5 Flash Lite 整理 · 教師複校</span>
+      </div>
+    </article>
+  );
+};
+
+/* ==========================================================================
+   Main page
+   ========================================================================== */
 
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -176,8 +274,8 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const generateDescriptionsButtonRef = useRef<HTMLButtonElement>(null);
-  const summaryPreviewRef = useRef<HTMLDivElement>(null);    // 摘要預覽區塊（產出後 scroll 到此）
-  const summaryProgressRef = useRef<HTMLDivElement>(null);   // 進度條區塊（產生中 scroll 到此）
+  const summaryPreviewRef = useRef<HTMLDivElement>(null);
+  const summaryProgressRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -232,7 +330,6 @@ export default function Home() {
 
       if (validNewPhotos.length > 0) {
         setPhotos(prev => [...prev, ...validNewPhotos].slice(0, MAX_PHOTOS));
-        // 自動滾動到產生描述按鈕
         setTimeout(() => {
           generateDescriptionsButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 300);
@@ -251,10 +348,10 @@ export default function Home() {
     });
   }, []);
 
-  const callWithRetry = async (fnName: string, data: any, maxRetries = 2) => {
-    let lastError;
-    const callableFn = httpsCallable<any, any>(functions, fnName);
-    
+  const callWithRetry = async (fnName: string, data: unknown, maxRetries = 2) => {
+    let lastError: unknown;
+    const callableFn = httpsCallable<unknown, { photoDescription: string }>(functions, fnName);
+
     for (let i = 0; i <= maxRetries; i++) {
       try {
         const result = await callableFn(data);
@@ -263,7 +360,6 @@ export default function Home() {
         lastError = error;
         console.warn(`Function ${fnName} failed (attempt ${i + 1}/${maxRetries + 1}). Retrying...`, error);
         if (i < maxRetries) {
-          // 指數退避延遲
           await new Promise(resolve => setTimeout(resolve, 1500 * (i + 1)));
         }
       }
@@ -271,10 +367,6 @@ export default function Home() {
     throw lastError;
   };
 
-  /**
-   * 找出第一個未填寫的欄位，自動捲動到該位置並高亮。
-   * 回傳 true 代表全部填寫完整、可繼續執行；false 代表已彈出錯誤、應 return。
-   */
   const validateAndFocusFirstMissing = useCallback((): boolean => {
     const values = form.getValues();
     let target: { id: string; name?: 'teachingArea' | 'meetingType' | 'meetingTopic' | 'meetingDate' | 'communityMembers'; label: string } | null = null;
@@ -291,15 +383,12 @@ export default function Home() {
     const el = document.getElementById(target.id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      // 紅光閃爍
       el.classList.add('animate-field-highlight');
       setTimeout(() => el.classList.remove('animate-field-highlight'), 2500);
-      // 觸發 react-hook-form 錯誤訊息（讓 FormMessage 顯示）
       if (target.name) {
         form.setError(target.name, { type: 'manual', message: `請輸入${target.label}` });
-        // focus 到欄位內的可聚焦元素
         setTimeout(() => {
-          const focusable = el.querySelector('input, textarea, button[role="combobox"], button[type="button"]') as HTMLElement | null;
+          const focusable = el.querySelector('input, textarea, select, button[role="combobox"], button[type="button"]') as HTMLElement | null;
           focusable?.focus();
         }, 600);
       }
@@ -320,8 +409,6 @@ export default function Home() {
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
 
-    // UX 優化：按下產生的瞬間，立即自動滾動到第一張照片的位置
-    // 使用 setTimeout 確保 UI 渲染與模糊效果套用後再進行精細滾動
     if (photos.length > 0) {
       setTimeout(() => {
         const firstPhotoId = photos[0].id;
@@ -331,14 +418,11 @@ export default function Home() {
         }
       }, 100);
     }
-    
-    // 循序處理以避開 429 頻率限制
+
     let index = 0;
     for (const photo of photos) {
       index++;
       setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, isGenerating: true } : p));
-      
-      // 自動滾動到目前處理的照片
       photoRefs.current[photo.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
       try {
@@ -352,11 +436,10 @@ export default function Home() {
         const result = response.data;
 
         const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
-        
+
         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: result.photoDescription, isGenerating: false } : p));
-        
+
         if (!isError) {
-          // 成功時在照片位置放彩花
           const element = photoRefs.current[photo.id];
           if (element) {
             const rect = element.getBoundingClientRect();
@@ -365,12 +448,12 @@ export default function Home() {
               spread: 70,
               origin: {
                 x: (rect.left + rect.width / 2) / window.innerWidth,
-                y: (rect.top + rect.height / 2) / window.innerHeight
-              }
+                y: (rect.top + rect.height / 2) / window.innerHeight,
+              },
             });
           }
         }
-        
+
         if (isError) {
           toast({ title: '處理異常', description: `照片 ${index}：${result.photoDescription}`, variant: 'destructive' });
         }
@@ -379,8 +462,7 @@ export default function Home() {
       }
 
       setDescriptionProgress(Math.round((index / photos.length) * 100));
-      
-      // 加入 2 秒的冷卻延遲，確保 API 配額不被瞬間耗盡
+
       if (index < photos.length) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -388,7 +470,7 @@ export default function Home() {
 
     setIsGeneratingAllDescriptions(false);
     toast({ title: '照片描述處理完畢', description: '所有圖片已處理完成。' });
-  }, [form, photos, toast]);
+  }, [form, photos, toast, validateAndFocusFirstMissing]);
 
   const handleGenerateSingleDescription = useCallback(async (photoId: string) => {
     const photo = photos.find(p => p.id === photoId);
@@ -410,11 +492,10 @@ export default function Home() {
       const result = response.data;
 
       const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
-      
+
       setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: result.photoDescription, isGenerating: false } : p));
-      
+
       if (!isError) {
-        // 成功時在照片位置放彩花
         const element = photoRefs.current[photoId];
         if (element) {
           const rect = element.getBoundingClientRect();
@@ -423,18 +504,18 @@ export default function Home() {
             spread: 70,
             origin: {
               x: (rect.left + rect.width / 2) / window.innerWidth,
-              y: (rect.top + rect.height / 2) / window.innerHeight
-            }
+              y: (rect.top + rect.height / 2) / window.innerHeight,
+            },
           });
         }
       } else {
         toast({ title: '處理異常', description: result.photoDescription, variant: 'destructive' });
       }
-    } catch (error: any) {
+    } catch (error) {
       setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: '產出失敗', isGenerating: false } : p));
       toast({ title: '系統錯誤', description: '呼叫分析函式時發生錯誤。', variant: 'destructive' });
     }
-  }, [form, photos, toast]);
+  }, [form, photos, toast, validateAndFocusFirstMissing]);
 
   const handleGenerateSummary = useCallback(async () => {
     if (!validateAndFocusFirstMissing()) return;
@@ -444,13 +525,12 @@ export default function Home() {
     setIsGeneratingSummary(true);
     setSummaryGenerationProgress(0);
 
-    // 🎯 UX：開始產生時立刻捲動到進度條區，讓使用者看見進度
     setTimeout(() => {
       summaryProgressRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
 
     try {
-      const generateSummaryFn = httpsCallable<any, { summary: string }>(functions, 'generateMeetingSummary');
+      const generateSummaryFn = httpsCallable<unknown, { summary: string }>(functions, 'generateMeetingSummary');
       const response = await generateSummaryFn({
         meetingType,
         teachingArea,
@@ -462,10 +542,8 @@ export default function Home() {
       setSummary(response.data.summary);
       setSummaryGenerationProgress(100);
 
-      // 🎉 巨大彩花特效——四波連環爆發慶祝會議摘要產出
       fireMassiveConfetti();
 
-      // 🎯 UX：產出後自動捲動到摘要預覽區（等 React 渲染 summary 後再 scroll，故 600ms 延遲）
       setTimeout(() => {
         summaryPreviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setIsGeneratingSummary(false);
@@ -476,9 +554,8 @@ export default function Home() {
       setSummaryGenerationProgress(null);
       toast({ title: '產生摘要失敗', description: '請稍後再試。', variant: 'destructive' });
     }
-  }, [form, photos, toast]);
+  }, [form, photos, toast, validateAndFocusFirstMissing]);
 
-  // 模擬進度條動畫
   useEffect(() => {
     if (isGeneratingSummary && summaryGenerationProgress !== null && summaryGenerationProgress < 90) {
       const timer = setInterval(() => {
@@ -491,11 +568,10 @@ export default function Home() {
   const exportToWord = useCallback(async () => {
     if (!summary) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
-    
-    // 動態標題邏輯
-    const dynamicTitle = meetingType === "其他" ? "教師會議研究報告" : `${meetingType}成果報告`;
-    const displayTopic = meetingType === "其他" ? meetingTopic : `${meetingType} - ${meetingTopic}`;
-    const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
+
+    const dynamicTitle = meetingType === '其他' ? '教師會議研究報告' : `${meetingType}成果報告`;
+    const displayTopic = meetingType === '其他' ? meetingTopic : `${meetingType} - ${meetingTopic}`;
+    const memberList = communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== '');
 
     const dataUrlToUint8Array = (dataUrl: string) => {
       const base64 = dataUrl.split(',')[1];
@@ -508,16 +584,16 @@ export default function Home() {
 
     const parseMarkdownToDocx = (text: string) => {
       const lines = text.split('\n');
-      const elements: any[] = [];
+      const elements: Paragraph[] = [];
       lines.forEach(line => {
         const trimmed = line.trim();
-        if (!trimmed) { elements.push(new Paragraph({ children: [new TextRun("")] })); return; }
+        if (!trimmed) { elements.push(new Paragraph({ children: [new TextRun('')] })); return; }
         if (trimmed.startsWith('### ')) {
-          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('### ', ''), bold: true, size: 28, color: "2c3e50" })], heading: HeadingLevel.HEADING_3, spacing: { before: 300, after: 150 } }));
+          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('### ', ''), bold: true, size: 28, color: '2c3e50' })], heading: HeadingLevel.HEADING_3, spacing: { before: 300, after: 150 } }));
           return;
         }
         if (trimmed.startsWith('## ')) {
-          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('## ', ''), bold: true, size: 32, color: "1a252f" })], heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));
+          elements.push(new Paragraph({ children: [new TextRun({ text: trimmed.replace('## ', ''), bold: true, size: 32, color: '1a252f' })], heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));
           return;
         }
         const isOrderedList = /^\d+\.\s/.test(trimmed);
@@ -526,104 +602,89 @@ export default function Home() {
           const content = trimmed.replace(/^(\d+\.|[*+-])\s/, '');
           const parts = content.split(/(\*\*.*?\*\*)/);
           const children = parts.map(part => part.startsWith('**') && part.endsWith('**') ? new TextRun({ text: part.slice(2, -2), bold: true }) : new TextRun(part));
-          elements.push(new Paragraph({ children: children, bullet: isUnorderedList ? { level: 0 } : undefined, indent: { left: 720 }, spacing: { before: 80, after: 80 } }));
+          elements.push(new Paragraph({ children, bullet: isUnorderedList ? { level: 0 } : undefined, indent: { left: 720 }, spacing: { before: 80, after: 80 } }));
           return;
         }
         const parts = trimmed.split(/(\*\*.*?\*\*)/);
         const children = parts.map(part => part.startsWith('**') && part.endsWith('**') ? new TextRun({ text: part.slice(2, -2), bold: true }) : new TextRun(part));
-        elements.push(new Paragraph({ children: children, spacing: { before: 120, after: 120 } }));
+        elements.push(new Paragraph({ children, spacing: { before: 120, after: 120 } }));
       });
       return elements;
     };
 
-    const wordPhotoParagraphs: any[] = [];
+    const wordPhotoParagraphs: Paragraph[] = [];
     for (const photo of photos) {
       if (photo.dataUrl) {
-        wordPhotoParagraphs.push(new Paragraph({ children: [new ImageRun({ data: dataUrlToUint8Array(photo.dataUrl), transformation: { width: 580, height: 320 } } as any)], alignment: AlignmentType.CENTER, spacing: { before: 200, after: 100 } }));
+        wordPhotoParagraphs.push(new Paragraph({
+          children: [new ImageRun({ data: dataUrlToUint8Array(photo.dataUrl), transformation: { width: 580, height: 320 } } as any)],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 100 },
+        }));
       }
-      wordPhotoParagraphs.push(new Paragraph({ children: [new TextRun({ text: `照片描述：`, bold: true, color: "666666" }), new TextRun({ text: photo.description || '無描述' })], spacing: { before: 100, after: 400 } }));
+      wordPhotoParagraphs.push(new Paragraph({
+        children: [new TextRun({ text: '照片描述：', bold: true, color: '666666' }), new TextRun({ text: photo.description || '無描述' })],
+        spacing: { before: 100, after: 400 },
+      }));
     }
 
     const doc = new Document({
       sections: [{
         properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
         children: [
-          new Paragraph({ 
-            text: `領域共備GO - ${dynamicTitle}`, 
-            heading: HeadingLevel.TITLE, 
-            alignment: AlignmentType.CENTER, 
-            spacing: { after: 500 } 
-          }),
+          new Paragraph({ text: `領域共備GO - ${dynamicTitle}`, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, spacing: { after: 500 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             margins: { top: 100, bottom: 100, left: 100, right: 100 },
             rows: [
-              new TableRow({ 
-                children: [
-                  new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "教學領域", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ width: { size: 75, type: WidthType.PERCENTAGE }, children: [new Paragraph({ text: teachingArea, alignment: AlignmentType.LEFT })] })
-                ] 
-              }),
-              new TableRow({ 
-                children: [
-                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "會議主題", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: displayTopic, alignment: AlignmentType.LEFT })] })
-                ] 
-              }),
-              new TableRow({ 
-                children: [
-                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "會議日期", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: format(meetingDate, "yyyy年MM月dd日"), alignment: AlignmentType.LEFT })] })
-                ] 
-              }),
-              new TableRow({ 
-                children: [
-                  new TableCell({ shading: { fill: "f8f9fa" }, children: [new Paragraph({ children: [new TextRun({ text: "社群成員", bold: true, color: "495057" })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: communityMembers, alignment: AlignmentType.LEFT })] })
-                ] 
-              }),
-            ]
+              new TableRow({ children: [
+                new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, shading: { fill: 'f8f9fa' }, children: [new Paragraph({ children: [new TextRun({ text: '教學領域', bold: true, color: '495057' })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ width: { size: 75, type: WidthType.PERCENTAGE }, children: [new Paragraph({ text: teachingArea, alignment: AlignmentType.LEFT })] }),
+              ] }),
+              new TableRow({ children: [
+                new TableCell({ shading: { fill: 'f8f9fa' }, children: [new Paragraph({ children: [new TextRun({ text: '會議主題', bold: true, color: '495057' })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ children: [new Paragraph({ text: displayTopic, alignment: AlignmentType.LEFT })] }),
+              ] }),
+              new TableRow({ children: [
+                new TableCell({ shading: { fill: 'f8f9fa' }, children: [new Paragraph({ children: [new TextRun({ text: '會議日期', bold: true, color: '495057' })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ children: [new Paragraph({ text: format(meetingDate, 'yyyy年MM月dd日'), alignment: AlignmentType.LEFT })] }),
+              ] }),
+              new TableRow({ children: [
+                new TableCell({ shading: { fill: 'f8f9fa' }, children: [new Paragraph({ children: [new TextRun({ text: '社群成員', bold: true, color: '495057' })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ children: [new Paragraph({ text: communityMembers, alignment: AlignmentType.LEFT })] }),
+              ] }),
+            ],
           }),
-          new Paragraph({ text: "與會人員簽到表", heading: HeadingLevel.HEADING_2, spacing: { before: 600, after: 300 } }),
+          new Paragraph({ text: '與會人員簽到表', heading: HeadingLevel.HEADING_2, spacing: { before: 600, after: 300 } }),
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
-              new TableRow({ 
-                children: [
-                  new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "姓名", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽到", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: "e9ecef" }, children: [new Paragraph({ children: [new TextRun({ text: "簽退", bold: true, size: 28 })], alignment: AlignmentType.CENTER })] })
-                ] 
-              }),
-              ...memberList.map(member => new TableRow({ 
-                children: [
-                  new TableCell({ 
-                    verticalAlign: VerticalAlign.CENTER,
-                    children: [new Paragraph({ 
-                      children: [new TextRun({ text: member, size: 32, bold: true })], 
-                      alignment: AlignmentType.CENTER,
-                      spacing: { before: 200, after: 200 }
-                    })] 
-                  }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] }),
-                  new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] })
-                ] 
-              }))
-            ]
+              new TableRow({ children: [
+                new TableCell({ width: { size: 30, type: WidthType.PERCENTAGE }, shading: { fill: 'e9ecef' }, children: [new Paragraph({ children: [new TextRun({ text: '姓名', bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: 'e9ecef' }, children: [new Paragraph({ children: [new TextRun({ text: '簽到', bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
+                new TableCell({ width: { size: 35, type: WidthType.PERCENTAGE }, shading: { fill: 'e9ecef' }, children: [new Paragraph({ children: [new TextRun({ text: '簽退', bold: true, size: 28 })], alignment: AlignmentType.CENTER })] }),
+              ] }),
+              ...memberList.map(member => new TableRow({ children: [
+                new TableCell({
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [new Paragraph({ children: [new TextRun({ text: member, size: 32, bold: true })], alignment: AlignmentType.CENTER, spacing: { before: 200, after: 200 } })],
+                }),
+                new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] }),
+                new TableCell({ children: [new Paragraph({ spacing: { before: 600, after: 600 } })] }),
+              ] })),
+            ],
           }),
-          new Paragraph({ text: "照片紀錄", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          new Paragraph({ text: '照片紀錄', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
           ...wordPhotoParagraphs,
-          new Paragraph({ text: "會議總結", heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
-          ...parseMarkdownToDocx(summary)
-        ]
-      }]
+          new Paragraph({ text: '會議總結', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
+          ...parseMarkdownToDocx(summary),
+        ],
+      }],
     });
 
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), "yyyyMMdd")}.docx`);
+    saveAs(blob, `會議報告_${displayTopic}_${format(new Date(), 'yyyyMMdd')}.docx`);
     toast({ title: '匯出成功', description: '優化版 Word 檔案已開始下載。' });
 
-    // 🔔 LINE 通知管理員（fire-and-forget，失敗不影響主功能）
     httpsCallable(functions, 'notifyExport')({
       exportType: 'word',
       teachingArea,
@@ -633,24 +694,6 @@ export default function Home() {
     }).catch(() => { /* 通知失敗忽略 */ });
   }, [summary, photos, form, toast]);
 
-  /**
-   * 🖨️ PDF 匯出（v0.4.0 全新架構）
-   *
-   * 徹底放棄 html2pdf.js / html2canvas / jsPDF，改用瀏覽器原生 PDF 引擎。
-   * 流程：
-   *   1. 顯示「即將開啟列印對話框」toast 引導使用者
-   *   2. 透過 window.print() 開啟瀏覽器原生列印對話框
-   *   3. @media print CSS 規則自動處理：
-   *      - 隱藏所有 UI（按鈕 / 表單 / banner / 浮動工具）
-   *      - 只顯示 #printable-report
-   *      - 套用標準 CSS 分頁規則（page-break-*）
-   *   4. 使用者在對話框選「另存為 PDF」即可下載
-   *
-   * 優點：
-   *   - 中文字型完美、圖片不模糊、表格不切、座標不偏移
-   *   - 所有分頁邏輯遵循 W3C 標準 spec
-   *   - 維護簡單：未來調整版面只需改 CSS @media print 段
-   */
   const exportToPDF = useCallback(() => {
     if (!summary) return;
     toast({
@@ -658,7 +701,6 @@ export default function Home() {
       description: '請在對話框中選擇「另存為 PDF」並按下儲存即可下載報告。',
     });
 
-    // 🔔 LINE 通知管理員（fire-and-forget，failure swallowed）
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
     httpsCallable(functions, 'notifyExport')({
       exportType: 'pdf',
@@ -668,186 +710,359 @@ export default function Home() {
       communityMembers,
     }).catch(() => { /* 通知失敗忽略 */ });
 
-    // 短暫延遲讓 toast 浮現，再觸發 window.print()
     setTimeout(() => window.print(), 400);
   }, [summary, form, toast]);
 
+  const allDescribed = photos.length > 0 && photos.every(p => !!p.description && !p.isGenerating);
+  const canSummarize = allDescribed;
+  const doneCount = photos.filter(p => !!p.description && !p.isGenerating).length;
+
   return (
     <TooltipProvider>
-      <div className="container mx-auto p-4 md:p-8 lg:p-12 bg-transparent min-h-screen pb-24" id="report-content">
-        <header className="mb-10 text-center">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400 py-4 drop-shadow-lg">領域共備GO</h1>
-          <p className="text-slate-300 text-lg mt-2">教師社群會議報告自動產出助手</p>
-        </header>
+      <div className="dmg-shell" id="report-content">
+        <EditorialHeader />
 
         <Form {...form}>
-          <form className="space-y-10">
-            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-blue-500">
-              <CardHeader><CardTitle className="flex items-center gap-3"><Info className="text-blue-400" /> 第一步：輸入會議資訊</CardTitle></CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField control={form.control} name="teachingArea" render={({ field }) => (<FormItem id="field-teachingArea" className="rounded-lg p-1 -m-1 transition-shadow"><FormLabel>教學領域</FormLabel><FormControl><Input placeholder="國語、數學..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="meetingType" render={({ field }) => (
-                  <FormItem id="field-meetingType" className="rounded-lg p-1 -m-1 transition-shadow">
-                    <FormLabel>會議類別</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue placeholder="選擇主題類型" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="備課會議">備課會議</SelectItem>
-                        <SelectItem value="觀課紀錄">觀課紀錄</SelectItem>
-                        <SelectItem value="議課總整理">議課總整理</SelectItem>
-                        <SelectItem value="講座研討報告">講座研討報告</SelectItem>
-                        <SelectItem value="社群會議紀錄">社群會議紀錄</SelectItem>
-                        <SelectItem value="其他">其他 (自定義)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="meetingTopic" render={({ field }) => (<FormItem id="field-meetingTopic" className="rounded-lg p-1 -m-1 transition-shadow"><FormLabel>{form.watch("meetingType") === "其他" ? "自定義會議主題" : "會議詳細主題"}</FormLabel><FormControl><Input placeholder="例如：公開觀課教學現場紀錄..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="meetingDate" render={({ field }) => (
-                  <FormItem id="field-meetingDate" className="flex flex-col rounded-lg p-1 -m-1 transition-shadow">
-                    <FormLabel>會議日期</FormLabel>
-                    <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                      <PopoverTrigger asChild><Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "yyyy年MM月dd日") : <span>選擇日期</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus /></PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="communityMembers" render={({ field }) => (<FormItem id="field-communityMembers" className="md:col-span-2 rounded-lg p-1 -m-1 transition-shadow"><FormLabel>社群成員</FormLabel><FormControl><Input placeholder="王老師, 李老師..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-              </CardContent>
-            </Card>
+          <main className="dmg-main">
+            <form className="contents" onSubmit={(e) => e.preventDefault()}>
+              {/* Step 1 — 會議資訊 */}
+              <StepCard
+                index={1}
+                accent="ink"
+                icon={<Info size={22} />}
+                kicker="STEP 01 · BASIC INFO"
+                title="輸入會議資訊"
+                status={<span className="dmg-pill dmg-pill--ink">5 個欄位</span>}
+              >
+                <div className="dmg-grid--info">
+                  <FormField control={form.control} name="teachingArea" render={({ field }) => (
+                    <FormItem id="field-teachingArea" className="dmg-field">
+                      <FieldLabel label="教學領域" hint="REQUIRED" htmlFor="teaching-area" />
+                      <FormControl>
+                        <input id="teaching-area" className="dmg-input" placeholder="國語、數學、社會…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-green-500">
-              <CardHeader><CardTitle className="flex items-center gap-3"><ImageIcon className="text-green-400" /> 第二步：上傳會議照片</CardTitle></CardHeader>
-              <CardContent>
-                <label id="field-photos" htmlFor="photo-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:bg-slate-700/50 transition-colors">
-                  <UploadCloud className="w-10 h-10 mb-2 text-green-400" />
-                  <p className="text-sm text-slate-300">點擊或拖曳照片 (最多 {MAX_PHOTOS} 張)</p>
-                  <input id="photo-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
+                  <FormField control={form.control} name="meetingType" render={({ field }) => (
+                    <FormItem id="field-meetingType" className="dmg-field">
+                      <FieldLabel label="會議類別" htmlFor="meeting-type" />
+                      <FormControl>
+                        <div className="dmg-select">
+                          <select id="meeting-type" {...field}>
+                            <option value="備課會議">備課會議</option>
+                            <option value="觀課紀錄">觀課紀錄</option>
+                            <option value="議課總整理">議課總整理</option>
+                            <option value="講座研討報告">講座研討報告</option>
+                            <option value="社群會議紀錄">社群會議紀錄</option>
+                            <option value="其他">其他 (自定義)</option>
+                          </select>
+                          <ChevronDown size={14} className="dmg-select__chev" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="meetingTopic" render={({ field }) => (
+                    <FormItem id="field-meetingTopic" className="dmg-field dmg-field--full">
+                      <FieldLabel
+                        label={form.watch('meetingType') === '其他' ? '自定義會議主題' : '會議詳細主題'}
+                        hint="REQUIRED"
+                        htmlFor="meeting-topic"
+                      />
+                      <FormControl>
+                        <input id="meeting-topic" className="dmg-input" placeholder="例如：公開觀課教學現場紀錄…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="meetingDate" render={({ field }) => (
+                    <FormItem id="field-meetingDate" className="dmg-field">
+                      <FieldLabel label="會議日期" htmlFor="meeting-date" />
+                      <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            id="meeting-date"
+                            type="button"
+                            className={cn('dmg-date__btn', !field.value && 'dmg-date__btn--placeholder')}
+                          >
+                            {field.value ? format(field.value, 'yyyy 年 MM 月 dd 日') : '選擇日期'}
+                            <CalendarIcon size={16} className="dmg-date__icon" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="communityMembers" render={({ field }) => (
+                    <FormItem id="field-communityMembers" className="dmg-field">
+                      <FieldLabel label="社群成員" hint="以、或，分隔" htmlFor="community-members" />
+                      <FormControl>
+                        <input id="community-members" className="dmg-input" placeholder="王老師、李老師…" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </StepCard>
+
+              {/* Step 2 — 上傳會議照片 */}
+              <StepCard
+                index={2}
+                accent="accent"
+                icon={<ImageIcon size={22} />}
+                kicker="STEP 02 · GALLERY"
+                title="上傳會議照片"
+                status={<span className="dmg-pill dmg-pill--accent">{photos.length} / {MAX_PHOTOS}</span>}
+              >
+                <label
+                  id="field-photos"
+                  htmlFor="photo-upload"
+                  className="dmg-upload"
+                >
+                  <div className="dmg-upload__icon"><UploadCloud size={28} /></div>
+                  <div>
+                    <div className="dmg-upload__title">點擊或拖曳上傳照片</div>
+                    <div className="dmg-upload__sub">JPG / PNG / WEBP · 單檔 ≤ 20 MB · 最多 {MAX_PHOTOS} 張</div>
+                  </div>
+                  <div className="dmg-upload__cta">選擇檔案</div>
+                  <input
+                    id="photo-upload"
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                  {photos.map((photo) => {
-                    // 偵測描述是否為錯誤狀態（失敗 / 忙碌 / 機制 / 無法描述 / 配額 / 安全）
-                    const isFailed = !!photo.description && /失敗|忙碌|錯誤|機制|無法描述|配額|安全/.test(photo.description);
-                    const hasDescription = !!photo.description;
 
-                    return (
-                      <div key={photo.id} ref={el => { photoRefs.current[photo.id] = el; }} className={cn(
-                        "relative border rounded-lg overflow-hidden bg-slate-900/50 transition-all duration-300",
-                        isFailed ? "border-red-500/60 ring-2 ring-red-500/30 animate-card-shake" : "border-slate-700"
-                      )}>
-                        <div className="aspect-video relative overflow-hidden">
-                          <NextImage src={photo.previewUrl} alt="Preview" fill className={cn("object-cover transition-all duration-700", (photo.isGenerating || !photo.description) ? "blur-md scale-110 grayscale-[0.3]" : "blur-0 scale-100 grayscale-0")} />
-                          <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-7 w-7 z-10" onClick={() => handlePhotoRemove(photo.id)}><X /></Button>
+                {photos.length > 0 && (
+                  <div className="dmg-gallery">
+                    {photos.map((photo) => {
+                      const isFailed = !!photo.description && /失敗|忙碌|錯誤|機制|無法描述|配額|安全/.test(photo.description);
+                      const hasDescription = !!photo.description;
+                      const isPending = !photo.isGenerating && !hasDescription;
 
-                          {/* 重試按鈕：失敗時放大紅色脈動，正常時小灰按鈕 */}
-                          {!photo.isGenerating && hasDescription && (
-                            isFailed ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => handleGenerateSingleDescription(photo.id)}
-                                className="absolute bottom-2 right-2 z-10 h-9 px-3 gap-1.5
-                                           bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-400 hover:to-rose-500
-                                           text-white font-bold text-xs shadow-lg shadow-red-500/50
-                                           border border-white/20 backdrop-blur-sm
-                                           animate-retry-pulse"
-                              >
-                                <RefreshCw className="h-4 w-4 animate-spin-slow" />
-                                再試一次
-                              </Button>
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                size="icon"
-                                onClick={() => handleGenerateSingleDescription(photo.id)}
-                                className="absolute bottom-1 right-1 h-7 w-7 z-10 bg-black/40 hover:bg-black/60 text-white border-none backdrop-blur-sm"
-                              >
-                                <RefreshCw className="h-3.5 w-3.5" />
-                              </Button>
-                            )
+                      return (
+                        <div
+                          key={photo.id}
+                          ref={el => { photoRefs.current[photo.id] = el; }}
+                          className={cn(
+                            'dmg-photo',
+                            photo.isGenerating && 'is-processing',
+                            isPending && 'is-pending',
+                            isFailed && 'is-failed animate-card-shake',
                           )}
-
-                          {photo.isGenerating && (<div className="absolute inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-20"><Loader2 className="animate-spin text-white h-8 w-8" /></div>)}
+                        >
+                          <div className="dmg-photo__frame">
+                            <NextImage
+                              src={photo.previewUrl}
+                              alt=""
+                              fill
+                              sizes="(max-width: 720px) 50vw, 25vw"
+                              style={{ objectFit: 'cover' }}
+                              unoptimized
+                            />
+                            <button type="button" className="dmg-photo__x" onClick={() => handlePhotoRemove(photo.id)} aria-label="移除">
+                              <X size={14} />
+                            </button>
+                            {!photo.isGenerating && hasDescription && !isFailed && (
+                              <button
+                                type="button"
+                                className="dmg-photo__regen"
+                                onClick={() => handleGenerateSingleDescription(photo.id)}
+                                title="重新產生描述"
+                              >
+                                <RefreshCw size={13} />
+                              </button>
+                            )}
+                            {photo.isGenerating && (
+                              <div className="dmg-photo__veil">
+                                <div className="dmg-photo__spinner" />
+                                <div className="dmg-photo__veiltxt">AI 觀察中…</div>
+                              </div>
+                            )}
+                            {isFailed && (
+                              <button
+                                type="button"
+                                className="dmg-photo__retry"
+                                onClick={() => handleGenerateSingleDescription(photo.id)}
+                              >
+                                <RefreshCw size={14} className="animate-spin-slow" />
+                                再試一次
+                              </button>
+                            )}
+                          </div>
+                          <div className="dmg-photo__caption">
+                            <div className="dmg-photo__caplabel">
+                              {isFailed ? '⚠ 處理異常' : '觀察 · OBSERVATION'}
+                            </div>
+                            <p className="dmg-photo__captext">
+                              {photo.description || '尚未產生描述 — 請按下『產生照片描述』開始分析'}
+                            </p>
+                          </div>
                         </div>
-                        <div className={cn(
-                          "p-2 text-xs text-center transition-colors",
-                          isFailed ? "text-red-300 font-bold" : "text-slate-200"
-                        )}>
-                          {isFailed && <span className="mr-1">⚠️</span>}
-                          {photo.description || '尚未產生描述'}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-6 flex flex-col items-center gap-3">
-                  <Button type="button" ref={generateDescriptionsButtonRef} onClick={handleGenerateDescriptions} disabled={isGeneratingAllDescriptions || photos.length === 0} variant="secondary">{isGeneratingAllDescriptions ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 描述產生中... ({descriptionProgress}%)</> : '產生照片描述'}</Button>
-                  {descriptionProgress !== null && <Progress value={descriptionProgress} className="w-full max-w-xs h-2" />}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-purple-500">
-              <CardHeader><CardTitle className="flex items-center gap-3"><FileText className="text-purple-400" /> 第三步：產生會議摘要</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div ref={summaryProgressRef} className="space-y-4">
-                  <Button type="button" onClick={handleGenerateSummary} disabled={isGeneratingSummary || photos.length === 0} variant="secondary">{isGeneratingSummary ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> 摘要產生中...</> : '產生會議摘要'}</Button>
-                  {summaryGenerationProgress !== null && <Progress value={summaryGenerationProgress} className="h-2" />}
-                </div>
-                {summary && (
-                  <div ref={summaryPreviewRef} className="mt-4 p-6 rounded-xl bg-slate-900/60 border border-purple-500/30 shadow-2xl backdrop-blur-md transition-all duration-500">
-                    <div className="flex items-center gap-2 mb-6 pb-4 border-b border-white/10">
-                      <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
-                        <FileText size={18} />
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-200 tracking-wider">會議紀錄摘要預覽</h3>
-                    </div>
-                    <div className="prose prose-invert prose-slate max-w-none 
-                      prose-headings:text-purple-400 prose-headings:font-bold prose-headings:mt-8 prose-headings:mb-4
-                      prose-strong:text-purple-300 prose-strong:font-bold
-                      prose-p:text-slate-300 prose-p:leading-relaxed prose-p:mb-4
-                      prose-li:text-slate-300 prose-li:my-2
-                      prose-ul:list-disc prose-ol:list-decimal
-                      leading-relaxed font-sans">
-                      <ReactMarkdown>{summary}</ReactMarkdown>
-                    </div>
-                    <div className="mt-8 pt-4 border-t border-white/5 flex justify-end">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-tighter italic">AI Generated Professional Report • Confidential</span>
-                    </div>
+                      );
+                    })}
                   </div>
                 )}
-              </CardContent>
-            </Card>
 
-            <Card className="bg-slate-800/70 backdrop-blur-sm border-l-4 border-orange-500 no-print">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3"><Download className="text-orange-400" /> 第四步：匯出報告</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row gap-4">
-                <Button type="button" disabled={!summary} onClick={exportToWord} className="flex-1 bg-sky-600 hover:bg-sky-500">
-                  <Download className="mr-2 h-4 w-4" /> 匯出 Word (.docx)
-                </Button>
-                <Button type="button" disabled={!summary} onClick={exportToPDF} className="flex-1 bg-rose-600 hover:bg-rose-500">
-                  <Printer className="mr-2 h-4 w-4" /> 列印 / 儲存為 PDF
-                </Button>
-              </CardContent>
-            </Card>
-          </form>
+                <div className="dmg-actionbar">
+                  <button
+                    type="button"
+                    ref={generateDescriptionsButtonRef}
+                    onClick={handleGenerateDescriptions}
+                    disabled={isGeneratingAllDescriptions || photos.length === 0}
+                    className="dmg-btn dmg-btn--primary"
+                  >
+                    {isGeneratingAllDescriptions
+                      ? <><Loader2 size={16} className="animate-spin" /> <span>描述產生中…</span></>
+                      : <><Sparkles size={16} /> <span>產生照片描述</span></>}
+                  </button>
+                  <div className={cn('dmg-progress', descriptionProgress !== null && 'is-on')}>
+                    <div className="dmg-progress__bar" style={{ width: `${descriptionProgress ?? 0}%` }} />
+                    <div className="dmg-progress__txt">
+                      {descriptionProgress !== null ? `${descriptionProgress}%` : '尚未開始'}
+                    </div>
+                  </div>
+                </div>
+              </StepCard>
+
+              {/* Step 3 — 產生會議摘要 */}
+              <StepCard
+                index={3}
+                accent="ink"
+                icon={<FileText size={22} />}
+                kicker="STEP 03 · AI SYNTHESIS"
+                title="產生會議摘要"
+                status={
+                  <span className={cn('dmg-pill', canSummarize ? 'dmg-pill--ink' : 'dmg-pill--mute')}>
+                    {canSummarize ? '可開始產出' : '請先完成描述'}
+                  </span>
+                }
+              >
+                <div className="dmg-summary-meta">
+                  <div>
+                    <div className="dmg-summary-meta__k">資料來源</div>
+                    <div className="dmg-summary-meta__v">基本資訊 · {doneCount} 張照片描述</div>
+                  </div>
+                  <div>
+                    <div className="dmg-summary-meta__k">產出長度</div>
+                    <div className="dmg-summary-meta__v">300 – 500 字 · 期刊版型</div>
+                  </div>
+                  <div>
+                    <div className="dmg-summary-meta__k">使用模型</div>
+                    <div className="dmg-summary-meta__v">Gemini 2.5 Flash Lite</div>
+                  </div>
+                </div>
+
+                <div className="dmg-actionbar" ref={summaryProgressRef}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateSummary}
+                    disabled={isGeneratingSummary || photos.length === 0}
+                    className="dmg-btn dmg-btn--ink"
+                  >
+                    {isGeneratingSummary
+                      ? <><Loader2 size={16} className="animate-spin" /> <span>正在編輯…</span></>
+                      : <><Sparkles size={16} /> <span>產生會議摘要</span></>}
+                  </button>
+                  {summaryGenerationProgress !== null && (
+                    <div className="dmg-progress is-on">
+                      <div className="dmg-progress__bar" style={{ width: `${summaryGenerationProgress}%` }} />
+                      <div className="dmg-progress__txt">{summaryGenerationProgress}%</div>
+                    </div>
+                  )}
+                </div>
+
+                {summary && (
+                  <div ref={summaryPreviewRef} className="dmg-summary-wrap">
+                    <EditorialSummary
+                      markdown={summary}
+                      info={{
+                        area: form.getValues().teachingArea,
+                        type: form.getValues().meetingType,
+                        topic: form.getValues().meetingTopic,
+                        date: form.getValues().meetingDate ? format(form.getValues().meetingDate, 'yyyy-MM-dd') : '',
+                        members: form.getValues().communityMembers,
+                      }}
+                    />
+                  </div>
+                )}
+              </StepCard>
+
+              {/* Step 4 — 匯出報告 */}
+              <StepCard
+                index={4}
+                accent="accent"
+                icon={<Download size={22} />}
+                kicker="STEP 04 · EXPORT"
+                title="匯出報告"
+                status={
+                  <span className={cn('dmg-pill', summary ? 'dmg-pill--accent' : 'dmg-pill--mute')}>
+                    {summary ? '可匯出' : '尚未產出摘要'}
+                  </span>
+                }
+              >
+                <div className="dmg-export no-print">
+                  <button
+                    type="button"
+                    className="dmg-export-card"
+                    disabled={!summary}
+                    onClick={exportToWord}
+                  >
+                    <div className="dmg-export-card__icon"><Download size={22} /></div>
+                    <div>
+                      <div className="dmg-export-card__t">Word 文件</div>
+                      <div className="dmg-export-card__s">.docx · 含簽到表 · {photos.length} 張照片 · 摘要全文</div>
+                    </div>
+                    <div className="dmg-export-card__chev"><ChevronRight size={16} /></div>
+                  </button>
+                  <button
+                    type="button"
+                    className="dmg-export-card dmg-export-card--accent"
+                    disabled={!summary}
+                    onClick={exportToPDF}
+                  >
+                    <div className="dmg-export-card__icon"><Printer size={22} /></div>
+                    <div>
+                      <div className="dmg-export-card__t">列印 / 儲存為 PDF</div>
+                      <div className="dmg-export-card__s">A4 · 期刊版型 · 中文字型完美</div>
+                    </div>
+                    <div className="dmg-export-card__chev"><ChevronRight size={16} /></div>
+                  </button>
+                </div>
+              </StepCard>
+            </form>
+
+            <footer className="dmg-foot no-print">
+              <div className="dmg-foot__rule" />
+              <div className="dmg-foot__row">
+                <span>領域共備GO · 教師專業社群協力誌</span>
+                <span>由 Gemini 提供 AI 能力</span>
+                <span>© {new Date().getFullYear()} cagoooo</span>
+              </div>
+            </footer>
+          </main>
         </Form>
       </div>
 
       {/* Floating Buttons */}
-      {/* Floating Buttons - Modern RWD Floating Action Group */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 no-print">
         <TooltipProvider delayDuration={100}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <a 
-                href="https://document-ai-companion-ipad4.replit.app" 
-                target="_blank" 
+              <a
+                href="https://document-ai-companion-ipad4.replit.app"
+                target="_blank"
                 className="group flex items-center justify-center gap-0 md:gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 w-14 h-14 md:w-auto md:h-auto md:px-6 md:py-3.5 text-white shadow-lg shadow-purple-900/20 border border-white/10 hover:shadow-purple-500/40 hover:scale-105 active:scale-95 transition-all duration-300 ease-out"
               >
                 <span className="text-xl shrink-0">🦄</span>
@@ -856,12 +1071,12 @@ export default function Home() {
             </TooltipTrigger>
             <TooltipContent side="left" className="md:hidden"><p>創建專屬助手🦄</p></TooltipContent>
           </Tooltip>
-          
+
           <Tooltip>
             <TooltipTrigger asChild>
-              <a 
-                href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012" 
-                target="_blank" 
+              <a
+                href="https://line.me/R/ti/p/@733oiboa?oat_content=url&ts=05120012"
+                target="_blank"
                 className="group flex items-center justify-center gap-0 md:gap-2 rounded-full bg-gradient-to-r from-amber-500 to-rose-600 w-14 h-14 md:w-auto md:h-auto md:px-6 md:py-3.5 text-white shadow-lg shadow-orange-900/20 border border-white/10 hover:shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all duration-300 ease-out"
               >
                 <span className="text-xl shrink-0">🐝</span>
@@ -875,28 +1090,27 @@ export default function Home() {
       <Toaster />
 
       {/* --- 列印專用隱藏範本 (專業文書白底版) --- */}
-      <div id="printable-report" style={{ 
-        display: 'none', 
-        width: '900px', 
-        backgroundColor: 'white', 
-        color: 'black', 
-        padding: '60px 80px', 
+      <div id="printable-report" style={{
+        display: 'none',
+        width: '900px',
+        backgroundColor: 'white',
+        color: 'black',
+        padding: '60px 80px',
         fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif',
-        lineHeight: '1.6'
+        lineHeight: '1.6',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '40px', borderBottom: '3px solid #3b82f6', paddingBottom: '20px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '900', marginBottom: '8px', color: '#1e3a8a', letterSpacing: '2px' }}>領 域 共 備 G O</h1>
-          <div style={{ fontSize: '18px', color: '#64748b', fontWeight: '500' }}>教師專業社群協力發展成果報告</div>
+          <h1 style={{ fontSize: '32px', fontWeight: 900, marginBottom: '8px', color: '#1e3a8a', letterSpacing: '2px' }}>領 域 共 備 G O</h1>
+          <div style={{ fontSize: '18px', color: '#64748b', fontWeight: 500 }}>教師專業社群協力發展成果報告</div>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '5px' }}>
-            {form.getValues().meetingType === "其他" ? "教師會議研究報告" : `${form.getValues().meetingType}成果報告`}
+            {form.getValues().meetingType === '其他' ? '教師會議研究報告' : `${form.getValues().meetingType}成果報告`}
           </h2>
           <div style={{ width: '60px', height: '4px', backgroundColor: '#3b82f6', margin: '15px auto' }}></div>
         </div>
-        
-        {/* 基本資訊區塊卡片 */}
+
         <div className="pdf-section" style={{ backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #3b82f6', paddingLeft: '15px' }}>基本資訊 Basic Information</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -904,7 +1118,7 @@ export default function Home() {
               {[
                 { label: '教學領域', value: form.getValues().teachingArea },
                 { label: '會議主題', value: form.getValues().meetingTopic },
-                { label: '會議日期', value: form.getValues().meetingDate ? format(form.getValues().meetingDate, "yyyy 年 MM 月 dd 日") : "" },
+                { label: '會議日期', value: form.getValues().meetingDate ? format(form.getValues().meetingDate, 'yyyy 年 MM 月 dd 日') : '' },
                 { label: '社群成員', value: form.getValues().communityMembers },
               ].map((item, idx) => (
                 <tr key={idx}>
@@ -916,7 +1130,6 @@ export default function Home() {
           </table>
         </div>
 
-        {/* 簽到表區塊卡片 */}
         <div className="pdf-section" style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '25px', marginBottom: '40px', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
           <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #10b981', paddingLeft: '15px' }}>與會人員簽到表 Attendance</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -929,7 +1142,7 @@ export default function Home() {
             </thead>
             <tbody>
               {(() => {
-                const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== "");
+                const members = form.getValues().communityMembers.split(/[，,、\s]+/).filter(m => m.trim() !== '');
                 return members.map((member, i) => (
                   <tr key={i}>
                     <td style={{ border: '1px solid #cbd5e1', padding: '20px 10px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#1e293b' }}>{member}</td>
@@ -942,8 +1155,6 @@ export default function Home() {
           </table>
         </div>
 
-        {/* 照片紀錄區塊：每張 photo-card 自己強制 pageBreakBefore: always
-            （含第一張），標題塞進第一張卡片內部，避免「整個區塊前留白頁」的副作用 */}
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
             {photos.map((photo, i) => (
@@ -953,17 +1164,15 @@ export default function Home() {
                 style={{
                   pageBreakInside: 'avoid',
                   breakInside: 'avoid',
-                  // 每張照片都強制從新頁開始（含第一張），徹底擺脫頁尾擠壓
                   pageBreakBefore: 'always',
                   breakBefore: 'page',
                   backgroundColor: 'white',
                   borderRadius: '12px',
                   border: '1px solid #e2e8f0',
                   padding: '15px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
                 }}
               >
-                {/* 把「活動照片記錄」標題塞進第一張卡片，避免標題單獨佔頁或與卡片分離 */}
                 {i === 0 && (
                   <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '15px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>
                     活動照片記錄 Field Gallery
@@ -981,48 +1190,30 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 會議總結區塊 —— 區塊本身可能超過一頁，因此改用內部段落級別 avoid（見 globals.css） */}
         <div className="pdf-summary-wrapper" style={{
           backgroundColor: 'white',
           borderRadius: '12px',
           border: '1px solid #e2e8f0',
           padding: '30px',
           marginBottom: '40px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)'
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
         }}>
           <h3 className="pdf-avoid" style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>會議深度總結 Meeting Synopsis</h3>
           <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#1e293b' }} className="pdf-markdown-summary prose prose-slate max-w-none">
-            {/* 用 components 對每個 Markdown 元素加 inline page-break-inside: avoid。
-                這比 globals.css 的 class 規則可靠——html2pdf 對 inline style 解析最穩定。 */}
             <ReactMarkdown
               components={{
-                p: ({ children }) => (
-                  <p style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '12px' }}>{children}</p>
-                ),
-                li: ({ children }) => (
-                  <li style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '6px' }}>{children}</li>
-                ),
-                h1: ({ children }) => (
-                  <h1 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '20px', marginBottom: '12px' }}>{children}</h1>
-                ),
-                h2: ({ children }) => (
-                  <h2 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '18px', marginBottom: '10px' }}>{children}</h2>
-                ),
-                h3: ({ children }) => (
-                  <h3 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '16px', marginBottom: '8px' }}>{children}</h3>
-                ),
-                h4: ({ children }) => (
-                  <h4 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '14px', marginBottom: '6px' }}>{children}</h4>
-                ),
-                blockquote: ({ children }) => (
-                  <blockquote style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>{children}</blockquote>
-                ),
+                p: ({ children }) => (<p style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '12px' }}>{children}</p>),
+                li: ({ children }) => (<li style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '6px' }}>{children}</li>),
+                h1: ({ children }) => (<h1 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '20px', marginBottom: '12px' }}>{children}</h1>),
+                h2: ({ children }) => (<h2 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '18px', marginBottom: '10px' }}>{children}</h2>),
+                h3: ({ children }) => (<h3 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '16px', marginBottom: '8px' }}>{children}</h3>),
+                h4: ({ children }) => (<h4 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '14px', marginBottom: '6px' }}>{children}</h4>),
+                blockquote: ({ children }) => (<blockquote style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>{children}</blockquote>),
               }}
             >{summary}</ReactMarkdown>
           </div>
         </div>
 
-        {/* 頁尾 */}
         <div style={{ textAlign: 'center', marginTop: '60px', borderTop: '1px solid #f1f5f9', paddingTop: '20px', fontSize: '12px', color: '#94a3b8' }}>
           本報告由「領域共備GO」AI 助手自動生成 • 僅供教育研究與內部紀錄使用
         </div>

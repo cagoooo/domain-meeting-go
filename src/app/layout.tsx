@@ -44,16 +44,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // Apply dark theme and font variable globally
-    <html lang="zh-TW" className={cn('dark', inter.variable)}>
-      {/* Add gradient background */}
-      <body className={cn(
-          "antialiased text-foreground",
-          "bg-gradient-to-br from-slate-900 via-slate-800 to-sky-900" // Vibrant gradient background
-        )}>
+    <html lang="zh-TW" className={inter.variable}>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={cn("dmg-body antialiased")}>
         {children}
-        <Toaster /> {/* Add Toaster here */}
-        <ServiceWorkerRegister /> {/* PWA SW 註冊 + 新版 banner */}
+        <Toaster />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

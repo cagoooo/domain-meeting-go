@@ -2,7 +2,7 @@
 
 > 教師社群會議報告自動產出助手。上傳會議照片、填寫會議資訊，AI 自動生成每張照片的觀察描述與整場會議的深度總結，一鍵匯出高質感 Word 與 PDF 報告。
 
-![Version](https://img.shields.io/badge/version-0.4.5-blue)
+![Version](https://img.shields.io/badge/version-0.5.0-blue)
 ![Next.js](https://img.shields.io/badge/Next.js-15.2.3-black)
 ![Firebase](https://img.shields.io/badge/Firebase-Functions%20v2-orange)
 ![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash%20Lite-green)
@@ -17,21 +17,24 @@
 | 📷 **照片智慧描述** | 最多上傳 4 張會議照片，AI 逐張分析並產出符合教學情境的觀察描述（含重試機制 + 2 秒冷卻避開配額） |
 | 🤖 **會議深度總結** | 結合會議資訊與照片描述，AI 產出結構化 Markdown 總結報告 |
 | 📄 **Word 匯出** | 產出 `.docx`，含基本資訊表、簽到表、照片紀錄、Markdown 解析後的格式化總結 |
-| 🖨️ **PDF 匯出** | 透過 `html2pdf.js` 產出 A4 版面 PDF，段落級別分頁避免字被切半 |
+| 🖨️ **PDF 匯出** | 透過瀏覽器原生 `window.print()` + `@media print` CSS 產出 A4 版面 PDF，中文字型完美 + 標準分頁規則 |
 | 🎯 **即時視覺回饋** | 成功產出時在照片位置播放彩花動畫、進度條、自動捲動定位目前處理的項目 |
+| 🎨 **編輯部期刊風 UI** | v0.5.0 改版 — 報紙頭版 masthead + 酒紅×牛皮配色，AI 摘要以雙欄期刊版型呈現（首字下沉、■ 項目符號、底部簽名） |
 
 ---
 
 ## 🛠️ 技術棧
 
 **前端**
-- Next.js 15.2.3（App Router + Turbopack，dev port `9002`）
+- Next.js 15.2.3（App Router + Turbopack，dev port `9002`，靜態 export → GitHub Pages）
 - React 18.3.1 + TypeScript 5
 - Tailwind CSS 3.4 + shadcn/ui（Radix UI 元件庫）
+- 自訂 `dmg-*` 編輯部期刊風 CSS 元件（v0.5.0 起）
+- Google Fonts: Noto Serif TC / Noto Sans TC / JetBrains Mono
 - React Hook Form + Zod 表單驗證
-- `react-markdown` Markdown 渲染
+- `react-markdown` Markdown 渲染（列印範本用）
 - `docx` Word 文件產生
-- `html2pdf.js` PDF 匯出（基於 html2canvas + jsPDF）
+- 瀏覽器原生 `window.print()` + `@media print` CSS（PDF 匯出 — v0.4.0 起取代 html2pdf.js）
 - `canvas-confetti` 成功動畫
 
 **後端 / AI**

@@ -11,7 +11,7 @@
  * 版本號變更時，install → activate 會清掉舊 cache。
  */
 
-const SW_VERSION = 'v0.4.5';
+const SW_VERSION = 'v0.5.0';
 const HTML_CACHE = `html-${SW_VERSION}`;
 const STATIC_CACHE = `static-${SW_VERSION}`;
 const RUNTIME_CACHE = `runtime-${SW_VERSION}`;

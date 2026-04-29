@@ -39,3 +39,6 @@ next-env.d.ts
 
 .genkit/*
 .env*
+
+# design handoff bundles (exported from claude.ai/design — local reference only)
+.design-handoff/

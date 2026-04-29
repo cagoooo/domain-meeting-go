@@ -4,6 +4,52 @@
 
 ---
 
+## [0.5.0] — 2026-04-29 🎨 編輯部期刊風 UI 大改版（酒紅 × 牛皮）
+
+### ✨ 改版重點
+全頁視覺從原本的「深色 slate + 漸層色卡片」整套換成 **「報紙頭版 masthead + 編輯部期刊版型」**，主視覺定調為 **酒紅墨色 × 牛皮米黃** 雙色系，搭配 Noto Serif TC 中文襯線標題、Noto Sans TC 內文、JetBrains Mono 點綴標籤。
+
+### 設計來源
+透過 claude.ai/design 工具與設計師多輪迭代後挑定的方向：
+- **頁首樣式**：報紙頭版（VOL · 中文大標 · DOMAIN·MEETING·GO 副標 · 雙橫線）
+- **配色 palette**：酒紅 × 牛皮（Vintage 古典書卷）
+- **摘要版型**：雙欄期刊版（首字下沉、■ 項目符號、masthead、底部簽名）
+
+### 主要變更
+
+#### 視覺
+- 紙質米白背景 + 細微紙紋 SVG 紋理
+- 四步驟卡片重新設計：左側 88px 直立 rail（鉛字編號 + 連接線 + 圓 icon），右側 serif 大標 + mono kicker + 狀態 pill
+- AI 摘要產出後改用 `dmg-journal` 期刊版型（雙欄 columns、首字下沉、雙線報頭、底部簽名）
+- 匯出按鈕改為兩張卡片 grid 布局（Word / PDF）
+- 卡片進場交錯淡入動畫、hover 陰影提升
+
+#### RWD 三段式斷點
+- **桌面 ≥ 1024px**：完整三欄期刊雙欄摘要
+- **平板 ≤ 1024px**：step rail 收窄、期刊改單欄、間距縮小
+- **手機 ≤ 720px**：報紙頭版置中堆疊、step 色條從左側挪到頂部、編號/icon 改橫排、表單單欄、輸入框 `font-size: 16px` 防 iOS 自動 zoom
+- **小手機 ≤ 480px**：照片改單欄、字級再縮
+
+#### 程式碼
+- `src/app/layout.tsx`：移除 `dark` class 與深色 gradient bg，加 Google Fonts (Noto Serif TC / Noto Sans TC / JetBrains Mono)
+- `src/app/globals.css`：在最頂端注入完整的編輯部 palette + 所有 `.dmg-*` 元件 CSS（headers / step / fields / gallery / journal / export / 三段式 RWD），shadcn 的 light theme 變數保留在後面（給 Calendar Popover/Toast 用）
+- `src/app/page.tsx`：全頁重寫為 `EditorialHeader` + 4 張 `StepCard` + `EditorialSummary` 組合，**保留所有原本的功能邏輯**（react-hook-form 驗證 + 紅光高亮、Firebase callable、彩花特效、Toast、LINE 通知、Word 匯出、PDF print 範本、右下角浮動按鈕）
+
+### 修正
+
+- **CSS variable 命名衝突**：原 palette 用的 `--accent` 與 shadcn UI 的 `--accent`（給 Calendar/Tooltip 用）撞名 → 改名為 `--dmg-accent`，shadcn 元件回到正確 light-mode 配色
+- **日曆 icon 跑位**：`<CalendarIcon className="dmg-date__icon">` 直接放在 `<button className="dmg-date__btn">` 內但 button 沒 `position: relative`，icon 往上爬到 `.dmg-step` 才停 → 替 `.dmg-date__btn` 補上 `position: relative`
+- **Masthead 日期 hydration mismatch**：原本用 `useMemo([])` 算當下日期，static export 時會在 build 時被預渲染成 build 那天的日期 → 改用 `useState + useEffect` 純 client 渲染，配 `suppressHydrationWarning`，使用者每天進來都會看到當下系統日期
+- **AI 模型顯示名**：journal 頁尾與 STEP 03 摘要 meta 從假文字「Gemini 1.5 Pro」更新為實際使用的 `Gemini 2.5 Flash Lite`
+
+### 不變
+- 全部功能行為（AI 描述 / 摘要 / Word 匯出 / PDF 列印 / LINE 通知 / 表單驗證 / 彩花特效）
+- `#printable-report` 列印範本（PDF 列印時專用）
+- 浮動按鈕（創建專屬助手 🦄、點石成金 🐝）
+- Firebase Cloud Functions 後端
+
+---
+
 ## [0.4.5] — 2026-04-25 🔔 匯出 / 列印 LINE 通知
 
 ### ✨ 新增 Features
