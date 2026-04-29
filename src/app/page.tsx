@@ -1273,8 +1273,28 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '60px', borderTop: '1px solid #f1f5f9', paddingTop: '20px', fontSize: '12px', color: '#94a3b8' }}>
-          本報告由「領域共備GO」AI 助手自動生成 • 僅供教育研究與內部紀錄使用
+        <div style={{ textAlign: 'center', marginTop: '50px', borderTop: '1px solid #e2e8f0', paddingTop: '20px', fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif' }}>
+          {/* 主署名 — 教師個人品牌（professional designer credit）*/}
+          <div style={{ fontSize: '14px', color: '#1e293b', marginBottom: '8px', letterSpacing: '0.02em' }}>
+            Made with{' '}
+            <span style={{ color: '#dc2626', fontSize: '16px', display: 'inline-block', transform: 'translateY(2px)', margin: '0 1px' }}>♥</span>{' '}
+            by{' '}
+            <a
+              href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#1e293b', fontWeight: 700, textDecoration: 'none', borderBottom: '1px dotted #64748b', paddingBottom: '1px' }}
+            >
+              阿凱老師
+            </a>
+          </div>
+          {/* 副標 — domain + 原本的免責聲明 */}
+          <div style={{ fontSize: '10px', color: '#94a3b8', letterSpacing: '0.08em', marginBottom: '4px' }}>
+            CAGOOOO.GITHUB.IO / DOMAIN-MEETING-GO
+          </div>
+          <div style={{ fontSize: '10px', color: '#94a3b8', letterSpacing: '0.02em' }}>
+            本報告由「領域共備GO」AI 助手自動生成 · 僅供教育研究與內部紀錄使用
+          </div>
         </div>
       </div>
     </TooltipProvider>
