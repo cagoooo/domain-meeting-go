@@ -1009,16 +1009,21 @@ html {
     break-inside: avoid;
   }
 
-  /* ⑤ 照片每張獨佔一頁（第一張接續標題不強制） */
-  #printable-report .photo-card {
+  /* ⑤ 照片 2×2 grid 表格（v0.5.3 起）：照片列 + 說明列要綁在一起，
+        整個 2-row 配對（photo + 對應說明）不被分頁切開 */
+  #printable-report .photo-grid-table {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  #printable-report .photo-grid-table .photo-row,
+  #printable-report .photo-grid-table .desc-row {
     page-break-inside: avoid;
     break-inside: avoid;
-    page-break-before: always;
-    break-before: page;
   }
-  #printable-report .photo-card:first-of-type {
-    page-break-before: auto;
-    break-before: auto;
+  /* photo-row 後面不要立刻分頁，要與下方對應的 desc-row 留在同一頁 */
+  #printable-report .photo-grid-table .photo-row {
+    page-break-after: avoid;
+    break-after: avoid;
   }
 
   /* ⑥ 圖片永不切割 */
@@ -1121,10 +1126,18 @@ html {
  * 目的：避免段落、圖片、表格被「水平切半」出現在兩頁之間。
  */
 #printable-report .pdf-section,
-#printable-report .photo-card,
 #printable-report .pdf-avoid {
   page-break-inside: avoid;
   break-inside: avoid;
+}
+#printable-report .photo-grid-table .photo-row,
+#printable-report .photo-grid-table .desc-row {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+#printable-report .photo-grid-table .photo-row {
+  page-break-after: avoid;
+  break-after: avoid;
 }
 
 /* 會議總結區塊的 Markdown 內容——段落級別 avoid，避免字被切半 */

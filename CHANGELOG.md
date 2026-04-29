@@ -4,6 +4,53 @@
 
 ---
 
+## [0.5.3] — 2026-04-29 📐 Word / PDF 照片紀錄改 2×2 表格版型
+
+### ✨ 改良
+
+照片紀錄區塊從原本的「單欄縱向卡片堆疊（每張獨佔一頁）」改成 **2×2 表格版型**：
+
+```
+┌──────────────┬──────────────┐
+│   Photo A    │   Photo B    │   ← 照片列（高度 ~230px）
+├──────────────┼──────────────┤
+│ 說明: descA  │ 說明: descB  │   ← 說明列（淺灰底）
+├──────────────┼──────────────┤
+│   Photo C    │   Photo D    │
+├──────────────┼──────────────┤
+│ 說明: descC  │ 說明: descD  │
+└──────────────┴──────────────┘
+```
+
+### 為什麼改
+
+舊版 4 張照片要佔 4 頁，浪費篇幅且報告很厚。新版 2×2 grid 一頁裝得下 2-4 張照片+對應說明，更接近教師實際印出的會議紀錄格式。
+
+### 主要變更
+
+#### Word (`.docx`)
+- 從原本的 `wordPhotoParagraphs` 段落串改成 `Table` + `TableRow` + `TableCell` 組合
+- 每組（photoA/B + descA/B）= 2 個 TableRow（photo row + desc row）
+- 照片列 cell：50% 寬、置中對齊、`width: 280, height: 180`（縮成 ~5cm × 3cm，讓 2 張並排剛好）
+- 說明列 cell：50% 寬、淺灰底（`f8f9fa`）、加粗「說明：」前綴
+
+#### PDF（瀏覽器 print 範本）
+- 從 `<div className="photo-card">` 列表改成 `<table className="photo-grid-table">` + `<tr className="photo-row">`/`<tr className="desc-row">` 交錯
+- 照片 cell：高度固定 230px、`max-height: 210px` + `object-fit: contain` 確保不變形
+- 說明 cell：左對齊、上方 padding、淺灰底
+
+#### 分頁規則 (`@media print`)
+- 移除舊的 `.photo-card { page-break-before: always }`（每張獨佔一頁）
+- 新增 `.photo-row` + `.desc-row` 都 `page-break-inside: avoid`
+- 新增 `.photo-row { page-break-after: avoid }` 確保照片列與下方對應說明列留在同一頁，不會被切開
+
+### 程式碼變更
+
+- `src/app/page.tsx`：`exportToWord` 重構照片區塊（新增 `makePhotoCell` / `makeDescCell` helpers + `photoTableRows` 累積器）；`#printable-report` 內 photo-card grid 改 table
+- `src/app/globals.css`：移除舊 `.photo-card` 強制分頁規則，改成新的 `.photo-grid-table .photo-row` + `.desc-row` 組合分頁規則
+
+---
+
 ## [0.5.2] — 2026-04-29 🎨 favicon + OG 預覽圖期刊風重做
 
 ### ✨ 新增

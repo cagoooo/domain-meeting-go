@@ -612,18 +612,63 @@ export default function Home() {
       return elements;
     };
 
-    const wordPhotoParagraphs: Paragraph[] = [];
-    for (const photo of photos) {
-      if (photo.dataUrl) {
-        wordPhotoParagraphs.push(new Paragraph({
-          children: [new ImageRun({ data: dataUrlToUint8Array(photo.dataUrl), transformation: { width: 580, height: 320 } } as any)],
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 200, after: 100 },
-        }));
+    /* ─────────────────────────────────────────────────────────
+     * 照片紀錄 — 2×2 表格版型（v0.5.3）
+     *   ┌──────────────┬──────────────┐
+     *   │   Photo A    │   Photo B    │   ← 圖片列
+     *   ├──────────────┼──────────────┤
+     *   │ 說明: descA  │ 說明: descB  │   ← 說明列
+     *   ├──────────────┼──────────────┤
+     *   │   Photo C    │   Photo D    │
+     *   ├──────────────┼──────────────┤
+     *   │ 說明: descC  │ 說明: descD  │
+     *   └──────────────┴──────────────┘
+     * ───────────────────────────────────────────────────────── */
+    const makePhotoCell = (photo: Photo | undefined) => {
+      if (photo?.dataUrl) {
+        return new TableCell({
+          width: { size: 50, type: WidthType.PERCENTAGE },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 100, bottom: 100, left: 100, right: 100 },
+          children: [new Paragraph({
+            children: [new ImageRun({
+              data: dataUrlToUint8Array(photo.dataUrl),
+              transformation: { width: 280, height: 180 },
+            } as any)],
+            alignment: AlignmentType.CENTER,
+          })],
+        });
       }
-      wordPhotoParagraphs.push(new Paragraph({
-        children: [new TextRun({ text: '照片描述：', bold: true, color: '666666' }), new TextRun({ text: photo.description || '無描述' })],
-        spacing: { before: 100, after: 400 },
+      return new TableCell({
+        width: { size: 50, type: WidthType.PERCENTAGE },
+        children: [new Paragraph({ children: [new TextRun('')] })],
+      });
+    };
+
+    const makeDescCell = (photo: Photo | undefined) => new TableCell({
+      width: { size: 50, type: WidthType.PERCENTAGE },
+      shading: { fill: 'f8f9fa' },
+      margins: { top: 120, bottom: 120, left: 140, right: 140 },
+      children: [new Paragraph({
+        children: [
+          new TextRun({ text: '說明：', bold: true, color: '495057' }),
+          new TextRun({ text: photo?.description || '' }),
+        ],
+        spacing: { before: 60, after: 60 },
+      })],
+    });
+
+    const photoTableRows: TableRow[] = [];
+    for (let i = 0; i < photos.length; i += 2) {
+      const photoA = photos[i];
+      const photoB = photos[i + 1];
+      // 照片列
+      photoTableRows.push(new TableRow({
+        children: [makePhotoCell(photoA), makePhotoCell(photoB)],
+      }));
+      // 說明列
+      photoTableRows.push(new TableRow({
+        children: [makeDescCell(photoA), makeDescCell(photoB)],
       }));
     }
 
@@ -674,7 +719,10 @@ export default function Home() {
             ],
           }),
           new Paragraph({ text: '照片紀錄', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
-          ...wordPhotoParagraphs,
+          ...(photoTableRows.length > 0 ? [new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: photoTableRows,
+          })] : []),
           new Paragraph({ text: '會議總結', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
           ...parseMarkdownToDocx(summary),
         ],
@@ -1165,40 +1213,41 @@ export default function Home() {
           </table>
         </div>
 
-        <div style={{ marginBottom: '40px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '30px' }}>
-            {photos.map((photo, i) => (
-              <div
-                key={i}
-                className="photo-card"
-                style={{
-                  pageBreakInside: 'avoid',
-                  breakInside: 'avoid',
-                  pageBreakBefore: 'always',
-                  breakBefore: 'page',
-                  backgroundColor: 'white',
-                  borderRadius: '12px',
-                  border: '1px solid #e2e8f0',
-                  padding: '15px',
-                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-                }}
-              >
-                {i === 0 && (
-                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '15px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>
-                    活動照片記錄 Field Gallery
-                  </h3>
-                )}
-                {photo.dataUrl && <img src={photo.dataUrl} style={{ width: '100%', maxHeight: '320px', objectFit: 'contain', borderRadius: '8px', marginBottom: '15px', display: 'block', pageBreakInside: 'avoid', breakInside: 'avoid' }} />}
-                <div style={{ padding: '10px', borderTop: '1px solid #f1f5f9', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                  <p style={{ fontSize: '15px', lineHeight: '1.7', color: '#334155', margin: 0 }}>
-                    <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '13px', display: 'block', marginBottom: '5px' }}>觀察描述 Snapshot Description:</span>
-                    {photo.description || '無描述'}
-                  </p>
-                </div>
-              </div>
-            ))}
+        {photos.length > 0 && (
+          <div style={{ marginBottom: '40px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '15px', borderLeft: '5px solid #f59e0b', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>
+              活動照片記錄 Field Gallery
+            </h3>
+            <table className="photo-grid-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <tbody>
+                {Array.from({ length: Math.ceil(photos.length / 2) }).map((_, rowIdx) => {
+                  const photoA = photos[rowIdx * 2];
+                  const photoB = photos[rowIdx * 2 + 1];
+                  return (
+                    <React.Fragment key={rowIdx}>
+                      <tr className="photo-row" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <td style={{ width: '50%', border: '1px solid #cbd5e1', padding: '12px', textAlign: 'center', verticalAlign: 'middle', height: '230px', backgroundColor: 'white' }}>
+                          {photoA?.dataUrl && <img src={photoA.dataUrl} style={{ maxWidth: '100%', maxHeight: '210px', display: 'block', margin: '0 auto', objectFit: 'contain' }} />}
+                        </td>
+                        <td style={{ width: '50%', border: '1px solid #cbd5e1', padding: '12px', textAlign: 'center', verticalAlign: 'middle', height: '230px', backgroundColor: 'white' }}>
+                          {photoB?.dataUrl && <img src={photoB.dataUrl} style={{ maxWidth: '100%', maxHeight: '210px', display: 'block', margin: '0 auto', objectFit: 'contain' }} />}
+                        </td>
+                      </tr>
+                      <tr className="desc-row" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <td style={{ border: '1px solid #cbd5e1', padding: '10px 14px', verticalAlign: 'top', backgroundColor: '#f8fafc', fontSize: '13px', lineHeight: 1.6, color: '#334155' }}>
+                          {photoA && (<><strong style={{ color: '#475569', marginRight: '4px' }}>說明：</strong>{photoA.description || ''}</>)}
+                        </td>
+                        <td style={{ border: '1px solid #cbd5e1', padding: '10px 14px', verticalAlign: 'top', backgroundColor: '#f8fafc', fontSize: '13px', lineHeight: 1.6, color: '#334155' }}>
+                          {photoB && (<><strong style={{ color: '#475569', marginRight: '4px' }}>說明：</strong>{photoB.description || ''}</>)}
+                        </td>
+                      </tr>
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
 
         <div className="pdf-summary-wrapper" style={{
           backgroundColor: 'white',
