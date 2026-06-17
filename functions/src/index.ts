@@ -2,15 +2,30 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
-import { notifyAdminCard, meetingFields } from "./notify-line";
+import { notifyAdminCard, meetingFields, type CardSpec } from "./notify-line";
+import { notifyAdminChatCard } from "./notify-chat";
 
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
-// LINE 管理員通知（單一接收者模式：所有事件都推到管理員一個 LINE 帳號）
-// secrets 由 firebase functions:secrets:set 設定，未設定時通知會 noop
+// 管理員通知（單一接收者模式：所有事件都推到管理員）
+// secrets 由 firebase functions:secrets:set 設定，未設定時各管道各自 noop
 const lineChannelAccessToken = defineSecret("LINE_CHANNEL_ACCESS_TOKEN");
 const lineAdminUserId = defineSecret("LINE_ADMIN_USER_ID");
+// Google Chat incoming webhook（免費・無則數上限・即時手機推播）
+const googleChatWebhook = defineSecret("GOOGLE_CHAT_WEBHOOK");
+
+// 每個 onCall 都要把這組 secrets 掛上去，notifyAdminAll() 才讀得到 .value()
+const NOTIFY_SECRETS = [lineChannelAccessToken, lineAdminUserId, googleChatWebhook];
+
+/**
+ * 同時把同一張卡片 fan-out 到 LINE + Google Chat。
+ * 兩者皆 fire-and-forget、缺對應 secret 時各自靜默略過，互不影響主流程。
+ */
+function notifyAdminAll(card: CardSpec): void {
+  notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
+  notifyAdminChatCard(card, googleChatWebhook.value());
+}
 
 let _aiInstance: any = null;
 function getAiInstance() {
@@ -28,7 +43,7 @@ function getAiInstance() {
 // ------------------------------------
 export const generatePhotoDescriptions = onCall(
   {
-    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    secrets: [geminiApiKey, ...NOTIFY_SECRETS],
     cors: true,
     region: "asia-east1",
     timeoutSeconds: 120,
@@ -87,17 +102,13 @@ export const generatePhotoDescriptions = onCall(
       const elapsedMs = Date.now() - startedAt;
 
       if (!output || !output.photoDescription) {
-        notifyAdminCard(
-          {
-            status: 'warning',
-            title: '照片描述產出空白',
-            appName: '領域共備GO',
-            fields: meetingFields(request.data),
-            footerNote: `⏱️ ${elapsedMs}ms`,
-          },
-          lineChannelAccessToken.value(),
-          lineAdminUserId.value()
-        );
+        notifyAdminAll({
+          status: 'warning',
+          title: '照片描述產出空白',
+          appName: '領域共備GO',
+          fields: meetingFields(request.data),
+          footerNote: `⏱️ ${elapsedMs}ms`,
+        });
         return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
       }
 
@@ -121,21 +132,17 @@ export const generatePhotoDescriptions = onCall(
         alertCategory = '❓ 其他錯誤';
       }
 
-      notifyAdminCard(
-        {
-          status: 'failed',
-          title: '照片描述失敗',
-          appName: '領域共備GO',
-          fields: [
-            ...meetingFields(request.data),
-            { icon: '🏷️', label: '類型', value: alertCategory },
-            { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
-          ],
-          footerNote: `⏱️ ${elapsedMs}ms`,
-        },
-        lineChannelAccessToken.value(),
-        lineAdminUserId.value()
-      );
+      notifyAdminAll({
+        status: 'failed',
+        title: '照片描述失敗',
+        appName: '領域共備GO',
+        fields: [
+          ...meetingFields(request.data),
+          { icon: '🏷️', label: '類型', value: alertCategory },
+          { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
+        ],
+        footerNote: `⏱️ ${elapsedMs}ms`,
+      });
 
       return { photoDescription: userFacing };
     }
@@ -148,7 +155,7 @@ export const generatePhotoDescriptions = onCall(
 // ------------------------------------
 export const generateMeetingSummary = onCall(
   {
-    secrets: [geminiApiKey, lineChannelAccessToken, lineAdminUserId],
+    secrets: [geminiApiKey, ...NOTIFY_SECRETS],
     cors: true,
     region: "asia-east1",
     timeoutSeconds: 120,
@@ -160,19 +167,15 @@ export const generateMeetingSummary = onCall(
       : 0;
 
     // 開始通知（一份報告只發一次）
-    notifyAdminCard(
-      {
-        status: 'started',
-        title: '開始產生會議摘要',
-        appName: '領域共備GO',
-        fields: [
-          ...meetingFields(request.data),
-          { icon: '📷', label: '照片', value: `${photoCount} 張` },
-        ],
-      },
-      lineChannelAccessToken.value(),
-      lineAdminUserId.value()
-    );
+    notifyAdminAll({
+      status: 'started',
+      title: '開始產生會議摘要',
+      appName: '領域共備GO',
+      fields: [
+        ...meetingFields(request.data),
+        { icon: '📷', label: '照片', value: `${photoCount} 張` },
+      ],
+    });
 
     try {
       const ai = getAiInstance();
@@ -244,35 +247,27 @@ export const generateMeetingSummary = onCall(
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
       if (!output || !output.summary) {
-        notifyAdminCard(
-          {
-            status: 'warning',
-            title: '會議摘要產出空白',
-            appName: '領域共備GO',
-            fields: meetingFields(request.data),
-            footerNote: `⏱️ ${elapsedSec}s`,
-          },
-          lineChannelAccessToken.value(),
-          lineAdminUserId.value()
-        );
+        notifyAdminAll({
+          status: 'warning',
+          title: '會議摘要產出空白',
+          appName: '領域共備GO',
+          fields: meetingFields(request.data),
+          footerNote: `⏱️ ${elapsedSec}s`,
+        });
         throw new HttpsError('internal', 'Failed to generate summary');
       }
 
       // 成功通知（含摘要長度與耗時）
-      notifyAdminCard(
-        {
-          status: 'success',
-          title: '會議摘要產出成功',
-          appName: '領域共備GO',
-          fields: [
-            ...meetingFields(request.data),
-            { icon: '📝', label: '字數', value: `${output.summary.length}` },
-            { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
-          ],
-        },
-        lineChannelAccessToken.value(),
-        lineAdminUserId.value()
-      );
+      notifyAdminAll({
+        status: 'success',
+        title: '會議摘要產出成功',
+        appName: '領域共備GO',
+        fields: [
+          ...meetingFields(request.data),
+          { icon: '📝', label: '字數', value: `${output.summary.length}` },
+          { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
+        ],
+      });
 
       return { summary: output.summary };
     } catch (error: any) {
@@ -281,20 +276,16 @@ export const generateMeetingSummary = onCall(
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
       const errorMessage = error?.message || String(error);
 
-      notifyAdminCard(
-        {
-          status: 'failed',
-          title: '會議摘要失敗',
-          appName: '領域共備GO',
-          fields: [
-            ...meetingFields(request.data),
-            { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
-          ],
-          footerNote: `⏱️ ${elapsedSec}s`,
-        },
-        lineChannelAccessToken.value(),
-        lineAdminUserId.value()
-      );
+      notifyAdminAll({
+        status: 'failed',
+        title: '會議摘要失敗',
+        appName: '領域共備GO',
+        fields: [
+          ...meetingFields(request.data),
+          { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
+        ],
+        footerNote: `⏱️ ${elapsedSec}s`,
+      });
 
       throw new HttpsError('internal', errorMessage || 'Summary generation failed');
     }
@@ -310,7 +301,7 @@ export const generateMeetingSummary = onCall(
 // 設計：fire-and-forget，前端不需要等回應、收 ack 就好。
 export const notifyExport = onCall(
   {
-    secrets: [lineChannelAccessToken, lineAdminUserId],
+    secrets: NOTIFY_SECRETS,
     cors: true,
     region: "asia-east1",
     timeoutSeconds: 30,
@@ -332,19 +323,15 @@ export const notifyExport = onCall(
           icon: '🖨️',
         };
 
-    notifyAdminCard(
-      {
-        status: cardConfig.status,
-        title: `${cardConfig.icon} ${cardConfig.title}`,
-        appName: '領域共備GO',
-        fields: [
-          ...meetingFields(data),
-          { icon: '🎯', label: '動作', value: exportType === 'word' ? 'Word 檔已下載' : '列印 / 儲存為 PDF' },
-        ],
-      },
-      lineChannelAccessToken.value(),
-      lineAdminUserId.value()
-    );
+    notifyAdminAll({
+      status: cardConfig.status,
+      title: `${cardConfig.icon} ${cardConfig.title}`,
+      appName: '領域共備GO',
+      fields: [
+        ...meetingFields(data),
+        { icon: '🎯', label: '動作', value: exportType === 'word' ? 'Word 檔已下載' : '列印 / 儲存為 PDF' },
+      ],
+    });
 
     return { ok: true };
   }
