@@ -95,6 +95,7 @@ async function pushToChat(webhookUrl, payload) {
 function buildChatCard(card) {
     const icon = CHAT_ICONS[card.status];
     const now = formatTaiwanTime();
+    const previewText = `${icon} ${card.title} (${card.appName || '領域共備GO'})`;
     const widgets = card.fields.map((f) => ({
         decoratedText: {
             topLabel: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
@@ -108,6 +109,7 @@ function buildChatCard(card) {
         textParagraph: { text: `<font color="#94A3B8">🕒 ${footer}</font>` },
     });
     return {
+        text: previewText,
         cardsV2: [
             {
                 cardId: `report-${Date.now()}`,

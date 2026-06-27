@@ -27,6 +27,60 @@ function notifyAdminAll(card: CardSpec): void {
   notifyAdminChatCard(card, googleChatWebhook.value());
 }
 
+function safeText(value: unknown, fallback = "未提供", maxLength = 240): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return fallback;
+  return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
+}
+
+function statusLabel(status: CardSpec["status"]): string {
+  switch (status) {
+    case "success":
+      return "成功";
+    case "failed":
+      return "失敗";
+    case "warning":
+      return "警示";
+    default:
+      return "進行中";
+  }
+}
+
+export const reportClientEvent = onCall(
+  {
+    secrets: NOTIFY_SECRETS,
+    cors: true,
+    region: "asia-east1",
+    timeoutSeconds: 30,
+  },
+  async (request: any) => {
+    const data = request.data || {};
+    const status: CardSpec["status"] =
+      data.status === "success" || data.status === "failed" || data.status === "warning"
+        ? data.status
+        : "started";
+    const progress = typeof data.progress === "number"
+      ? `${Math.max(0, Math.min(100, Math.round(data.progress)))}%`
+      : safeText(data.progress, "未提供", 40);
+
+    notifyAdminAll({
+      status,
+      title: safeText(data.title, `使用服務${statusLabel(status)}`, 80),
+      appName: safeText(data.appName, "領域共備GO", 80),
+      fields: [
+        { icon: "📌", label: "狀態", value: statusLabel(status) },
+        { icon: "⏳", label: "進度", value: progress },
+        { icon: "🧩", label: "階段", value: safeText(data.stage, "未提供", 80) },
+        { icon: "📝", label: "說明", value: safeText(data.message, "未提供", 300) },
+        ...meetingFields(data),
+      ],
+      footerNote: safeText(data.userAgent, "client event", 120),
+    });
+
+    return { ok: true };
+  }
+);
+
 let _aiInstance: any = null;
 function getAiInstance() {
   if (!_aiInstance) {

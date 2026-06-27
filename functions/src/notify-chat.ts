@@ -70,6 +70,7 @@ async function pushToChat(webhookUrl: string, payload: object): Promise<Response
 function buildChatCard(card: CardSpec): object {
   const icon = CHAT_ICONS[card.status];
   const now = formatTaiwanTime();
+  const previewText = `${icon} ${card.title} (${card.appName || '領域共備GO'})`;
 
   const widgets: any[] = card.fields.map((f) => ({
     decoratedText: {
@@ -86,6 +87,7 @@ function buildChatCard(card: CardSpec): object {
   });
 
   return {
+    text: previewText,
     cardsV2: [
       {
         cardId: `report-${Date.now()}`,

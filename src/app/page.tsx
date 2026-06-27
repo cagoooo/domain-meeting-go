@@ -276,7 +276,27 @@ export default function Home() {
   const generateDescriptionsButtonRef = useRef<HTMLButtonElement>(null);
   const summaryPreviewRef = useRef<HTMLDivElement>(null);
   const summaryProgressRef = useRef<HTMLDivElement>(null);
+  const hasReportedUseRef = useRef(false);
   const { toast } = useToast();
+
+  const reportClientEvent = useCallback((payload: {
+    status: 'started' | 'success' | 'failed' | 'warning';
+    title: string;
+    stage: string;
+    message: string;
+    progress?: number | string;
+    teachingArea?: string;
+    meetingTopic?: string;
+    meetingDate?: string;
+    communityMembers?: string;
+  }) => {
+    const callable = httpsCallable(functions, 'reportClientEvent');
+    callable({
+      appName: 'Domain Meeting GO',
+      userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+      ...payload,
+    }).catch(() => { /* best-effort notification */ });
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -287,6 +307,37 @@ export default function Home() {
       communityMembers: '',
     },
   });
+
+  useEffect(() => {
+    const reportRuntimeError = (stage: string, message: string) => {
+      reportClientEvent({
+        status: 'failed',
+        title: 'Client runtime error',
+        stage,
+        message,
+        progress: 'client-runtime',
+      });
+    };
+
+    const onError = (event: ErrorEvent) => {
+      reportRuntimeError('window-error', event.message || 'Unknown window error');
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      reportRuntimeError(
+        'unhandled-rejection',
+        reason instanceof Error ? reason.message : String(reason || 'Unknown promise rejection')
+      );
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+    };
+  }, [reportClientEvent]);
 
   const readFileAsDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -405,6 +456,22 @@ export default function Home() {
   const handleGenerateDescriptions = useCallback(async () => {
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
+
+    if (!hasReportedUseRef.current) {
+      hasReportedUseRef.current = true;
+      reportClientEvent({
+        status: 'started',
+        title: 'User started service',
+        stage: 'photo-description',
+        message: `Generating ${photos.length} photo descriptions`,
+        progress: 0,
+        teachingArea,
+        meetingTopic,
+        meetingDate: meetingDateText,
+        communityMembers,
+      });
+    }
 
     setIsGeneratingAllDescriptions(true);
     setDescriptionProgress(0);
@@ -430,7 +497,7 @@ export default function Home() {
           teachingArea,
           meetingTopic,
           communityMembers,
-          meetingDate: format(meetingDate, 'yyyy-MM-dd'),
+          meetingDate: meetingDateText,
           photoDataUri: photo.dataUrl!,
         });
         const result = response.data;
@@ -470,7 +537,7 @@ export default function Home() {
 
     setIsGeneratingAllDescriptions(false);
     toast({ title: '照片描述處理完畢', description: '所有圖片已處理完成。' });
-  }, [form, photos, toast, validateAndFocusFirstMissing]);
+  }, [form, photos, reportClientEvent, toast, validateAndFocusFirstMissing]);
 
   const handleGenerateSingleDescription = useCallback(async (photoId: string) => {
     const photo = photos.find(p => p.id === photoId);
@@ -478,6 +545,7 @@ export default function Home() {
 
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
 
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, isGenerating: true } : p));
 
@@ -486,7 +554,7 @@ export default function Home() {
         teachingArea,
         meetingTopic,
         communityMembers,
-        meetingDate: format(meetingDate, 'yyyy-MM-dd'),
+        meetingDate: meetingDateText,
         photoDataUri: photo.dataUrl!,
       });
       const result = response.data;
@@ -520,6 +588,7 @@ export default function Home() {
   const handleGenerateSummary = useCallback(async () => {
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
+    const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
     const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.includes('失敗') && !d.includes('忙碌') && !d.includes('無法描述'));
 
     setIsGeneratingSummary(true);
@@ -541,6 +610,17 @@ export default function Home() {
       });
       setSummary(response.data.summary);
       setSummaryGenerationProgress(100);
+      reportClientEvent({
+        status: 'success',
+        title: 'User completed service',
+        stage: 'summary-generation',
+        message: `Summary generated from ${photoDescriptions.length} photo descriptions`,
+        progress: 100,
+        teachingArea,
+        meetingTopic,
+        meetingDate: meetingDateText,
+        communityMembers,
+      });
 
       fireMassiveConfetti();
 
@@ -552,9 +632,20 @@ export default function Home() {
     } catch (error) {
       setIsGeneratingSummary(false);
       setSummaryGenerationProgress(null);
+      reportClientEvent({
+        status: 'failed',
+        title: 'Summary generation failed',
+        stage: 'summary-generation',
+        message: error instanceof Error ? error.message : String(error),
+        progress: summaryGenerationProgress ?? 'summary-running',
+        teachingArea,
+        meetingTopic,
+        meetingDate: meetingDateText,
+        communityMembers,
+      });
       toast({ title: '產生摘要失敗', description: '請稍後再試。', variant: 'destructive' });
     }
-  }, [form, photos, toast, validateAndFocusFirstMissing]);
+  }, [form, photos, reportClientEvent, summaryGenerationProgress, toast, validateAndFocusFirstMissing]);
 
   useEffect(() => {
     if (isGeneratingSummary && summaryGenerationProgress !== null && summaryGenerationProgress < 90) {
