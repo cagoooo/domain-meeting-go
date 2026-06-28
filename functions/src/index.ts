@@ -22,9 +22,9 @@ const NOTIFY_SECRETS = [lineChannelAccessToken, lineAdminUserId, googleChatWebho
  * 同時把同一張卡片 fan-out 到 LINE + Google Chat。
  * 兩者皆 fire-and-forget、缺對應 secret 時各自靜默略過，互不影響主流程。
  */
-function notifyAdminAll(card: CardSpec): void {
+async function notifyAdminAll(card: CardSpec): Promise<void> {
   notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
-  notifyAdminChatCard(card, googleChatWebhook.value());
+  await notifyAdminChatCard(card, googleChatWebhook.value());
 }
 
 function safeText(value: unknown, fallback = "未提供", maxLength = 240): string {
@@ -63,7 +63,7 @@ export const reportClientEvent = onCall(
       ? `${Math.max(0, Math.min(100, Math.round(data.progress)))}%`
       : safeText(data.progress, "未提供", 40);
 
-    notifyAdminAll({
+    await notifyAdminAll({
       status,
       title: safeText(data.title, `使用服務${statusLabel(status)}`, 80),
       appName: safeText(data.appName, "領域共備GO", 80),
