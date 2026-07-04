@@ -309,7 +309,16 @@ export default function Home() {
   });
 
   useEffect(() => {
+    const reportedMessages = new Set<string>();
+    const MAX_REPORTS_PER_SESSION = 5;
+    let reportCount = 0;
+
     const reportRuntimeError = (stage: string, message: string) => {
+      if (reportedMessages.has(message) || reportCount >= MAX_REPORTS_PER_SESSION) {
+        return;
+      }
+      reportedMessages.add(message);
+      reportCount += 1;
       reportClientEvent({
         status: 'failed',
         title: 'Client runtime error',
@@ -320,15 +329,24 @@ export default function Home() {
     };
 
     const onError = (event: ErrorEvent) => {
-      reportRuntimeError('window-error', event.message || 'Unknown window error');
+      // 跨網域腳本（無 CORS 標頭）會被瀏覽器遮蔽成 "Script error."，無檔名無行號，
+      // 通常來自第三方腳本或瀏覽器擴充功能，不是本站程式碼問題，直接忽略避免噪音。
+      if ((event.message === 'Script error.' || event.message === 'Script error') && !event.filename) {
+        return;
+      }
+      const stack = event.error instanceof Error ? event.error.stack : undefined;
+      const location = event.filename ? ` @ ${event.filename}:${event.lineno}:${event.colno}` : '';
+      const detail = `${event.message || 'Unknown window error'}${location}${stack ? `\n${stack.slice(0, 500)}` : ''}`;
+      reportRuntimeError('window-error', detail);
     };
 
     const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
-      reportRuntimeError(
-        'unhandled-rejection',
-        reason instanceof Error ? reason.message : String(reason || 'Unknown promise rejection')
-      );
+      const message =
+        reason instanceof Error
+          ? `${reason.message}${reason.stack ? `\n${reason.stack.slice(0, 500)}` : ''}`
+          : String(reason || 'Unknown promise rejection');
+      reportRuntimeError('unhandled-rejection', message);
     };
 
     window.addEventListener('error', onError);
