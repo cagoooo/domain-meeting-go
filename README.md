@@ -7,6 +7,8 @@
 ![Firebase](https://img.shields.io/badge/Firebase-Functions%20v2-orange)
 ![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash%20Lite-green)
 
+🌐 **線上使用：[會議記錄自動產出平台 (Pro版)](https://cagoooo.github.io/domain-meeting-go/)**
+
 ---
 
 ## ✨ 核心功能
@@ -144,7 +146,7 @@ report/
 - Repository：`cagoooo/domain-meeting-go`
 - 可見性：公開
 - 主要技術：TypeScript、React、Next.js、Firebase、Tailwind CSS
-- 線上入口：未在 GitHub repository metadata 設定
+- 線上入口：<https://cagoooo.github.io/domain-meeting-go/>
 
 ### 可以怎麼應用
 
