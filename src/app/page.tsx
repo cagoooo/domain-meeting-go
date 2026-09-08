@@ -1208,7 +1208,7 @@ export default function Home() {
                 <span>
                   Made with <span aria-label="愛心" className="dmg-foot__heart">❤️</span> by{' '}
                   <a
-                    href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+                    href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="dmg-foot__author"
@@ -1389,7 +1389,7 @@ export default function Home() {
             <span style={{ color: '#dc2626', fontSize: '16px', display: 'inline-block', transform: 'translateY(2px)', margin: '0 1px' }}>♥</span>{' '}
             by{' '}
             <a
-              href="https://www.smes.tyc.edu.tw/modules/tadnews/page.php?ncsn=11&nsn=16#a5"
+              href="https://www.smes.tyc.edu.tw/modules/school/index.php?department_id=2&zone_id=0&page_id=2&content_id=11&type=news&from_op=all_news#a5"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#1e293b', fontWeight: 700, textDecoration: 'none', borderBottom: '1px dotted #64748b', paddingBottom: '1px' }}
