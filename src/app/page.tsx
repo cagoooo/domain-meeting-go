@@ -33,7 +33,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import confetti from 'canvas-confetti';
-import ReactMarkdown from 'react-markdown';
 
 // 匯出套件
 import {
@@ -1383,29 +1382,20 @@ export default function Home() {
           </div>
         )}
 
-        <div className="pdf-summary-wrapper" style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          padding: '30px',
-          marginBottom: '40px',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-        }}>
-          <h3 className="pdf-avoid" style={{ fontSize: '18px', fontWeight: 'bold', color: '#334155', marginBottom: '20px', borderLeft: '5px solid #8b5cf6', paddingLeft: '15px', pageBreakAfter: 'avoid', breakAfter: 'avoid' }}>會議深度總結 Meeting Synopsis</h3>
-          <div style={{ fontSize: '16px', lineHeight: '1.8', color: '#1e293b' }} className="pdf-markdown-summary prose prose-slate max-w-none">
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => (<p style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '12px' }}>{children}</p>),
-                li: ({ children }) => (<li style={{ pageBreakInside: 'avoid', breakInside: 'avoid', orphans: 3, widows: 3, marginBottom: '6px' }}>{children}</li>),
-                h1: ({ children }) => (<h1 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '20px', marginBottom: '12px' }}>{children}</h1>),
-                h2: ({ children }) => (<h2 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '18px', marginBottom: '10px' }}>{children}</h2>),
-                h3: ({ children }) => (<h3 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '16px', marginBottom: '8px' }}>{children}</h3>),
-                h4: ({ children }) => (<h4 style={{ pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakAfter: 'avoid', breakAfter: 'avoid', marginTop: '14px', marginBottom: '6px' }}>{children}</h4>),
-                blockquote: ({ children }) => (<blockquote style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>{children}</blockquote>),
+        {summary && (
+          <section className="pdf-summary-wrapper">
+            <EditorialSummary
+              markdown={summary}
+              info={{
+                area: form.getValues().teachingArea,
+                type: form.getValues().meetingType,
+                topic: form.getValues().meetingTopic,
+                date: form.getValues().meetingDate ? format(form.getValues().meetingDate, 'yyyy-MM-dd') : '',
+                members: form.getValues().communityMembers,
               }}
-            >{summary}</ReactMarkdown>
-          </div>
-        </div>
+            />
+          </section>
+        )}
 
         <div style={{ textAlign: 'center', marginTop: '50px', borderTop: '1px solid #e2e8f0', paddingTop: '20px', fontFamily: '"Noto Sans TC", "Microsoft JhengHei", sans-serif' }}>
           {/* 主署名 — 教師個人品牌（professional designer credit）*/}

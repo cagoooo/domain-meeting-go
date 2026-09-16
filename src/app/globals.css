@@ -1061,6 +1061,52 @@ html {
   }
 
   /* ⑨ 隱藏所有標記為 no-print 的元素（floating buttons, banner 等） */
+  /* 摘要共用網頁期刊元件；紙張寬度不套用手機的單欄規則。 */
+  #printable-report .pdf-summary-wrapper {
+    break-before: page;
+    margin: 0 0 8mm;
+  }
+  #printable-report .dmg-journal {
+    padding: 8mm 7mm;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+    overflow: visible;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #printable-report .dmg-journal__masthead,
+  #printable-report .dmg-journal__lede,
+  #printable-report .dmg-journal__foot { break-inside: avoid; }
+  #printable-report .dmg-journal__row {
+    grid-template-columns: 1fr auto 1fr;
+    font-size: 8pt;
+  }
+  #printable-report .dmg-journal__h1 { font-size: 25pt; line-height: 1.25; }
+  #printable-report .dmg-journal__byline { font-size: 9pt; gap: 2mm 5mm; }
+  #printable-report .dmg-journal__lede { font-size: 11pt; line-height: 1.8; margin: 5mm 0; }
+  #printable-report .dmg-journal__dropcap { font-size: 42pt; }
+  #printable-report .dmg-journal__cols {
+    columns: 2;
+    column-gap: 7mm;
+    column-fill: balance;
+    font-size: 10.5pt;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+  }
+  #printable-report .dmg-journal__p {
+    break-inside: auto;
+    orphans: 3;
+    widows: 3;
+  }
+  #printable-report .dmg-journal__h2 { font-size: 13pt; }
+  #printable-report .dmg-journal__h3 { font-size: 11pt; }
+  #printable-report .dmg-journal__foot {
+    /* 完整報告末尾已有署名，避免期刊裝飾尾註單獨佔一頁。 */
+    display: none;
+  }
   .no-print {
     display: none !important;
   }
