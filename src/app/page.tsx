@@ -419,7 +419,7 @@ export default function Home() {
 
   const callWithRetry = async (fnName: string, data: unknown, maxRetries = 2) => {
     let lastError: unknown;
-    const callableFn = httpsCallable<unknown, { photoDescription: string }>(functions, fnName);
+    const callableFn = httpsCallable<unknown, { photoDescription: string; errorCode?: string }>(functions, fnName);
 
     for (let i = 0; i <= maxRetries; i++) {
       try {
@@ -520,7 +520,7 @@ export default function Home() {
         });
         const result = response.data;
 
-        const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
+        const isError = !!result.errorCode || result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
 
         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: result.photoDescription, isGenerating: false } : p));
 
@@ -541,6 +541,11 @@ export default function Home() {
 
         if (isError) {
           toast({ title: '處理異常', description: `照片 ${index}：${result.photoDescription}`, variant: 'destructive' });
+        }
+        if (result.errorCode === 'billing-depleted') {
+          setDescriptionProgress(Math.round(((index - 1) / photos.length) * 100));
+          setIsGeneratingAllDescriptions(false);
+          return;
         }
       } catch (error) {
         setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: '產出失敗', isGenerating: false } : p));
@@ -577,7 +582,7 @@ export default function Home() {
       });
       const result = response.data;
 
-      const isError = result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
+      const isError = !!result.errorCode || result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
 
       setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: result.photoDescription, isGenerating: false } : p));
 
@@ -607,7 +612,7 @@ export default function Home() {
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
     const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
-    const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.includes('失敗') && !d.includes('忙碌') && !d.includes('無法描述'));
+    const photoDescriptions = photos.map(p => p.description).filter(d => d && !d.includes('失敗') && !d.includes('忙碌') && !d.includes('無法描述') && !d.includes('AI 服務無法使用'));
 
     setIsGeneratingSummary(true);
     setSummaryGenerationProgress(0);

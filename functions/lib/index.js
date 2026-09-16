@@ -159,7 +159,12 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
         const elapsedMs = Date.now() - startedAt;
         let userFacing;
         let alertCategory;
-        if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
+        const billingDepleted = /prepayment credits are depleted/i.test(errorMessage);
+        if (billingDepleted) {
+            userFacing = 'AI 服務無法使用：Gemini API 預付額度已耗盡，請管理員至 Google AI Studio 處理專案帳務後再試。';
+            alertCategory = '💳 預付額度耗盡（重試無效）';
+        }
+        else if (errorMessage.includes('429') || errorMessage.includes('exhausted') || errorMessage.includes('503')) {
             userFacing = '模型目前忙碌中（配額限制），請稍候再試。';
             alertCategory = '🚦 配額限制 (429/503)';
         }
@@ -182,7 +187,7 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
             ],
             footerNote: `⏱️ ${elapsedMs}ms`,
         });
-        return { photoDescription: userFacing };
+        return { photoDescription: userFacing, errorCode: billingDepleted ? 'billing-depleted' : 'generation-failed' };
     }
 });
 // ------------------------------------
