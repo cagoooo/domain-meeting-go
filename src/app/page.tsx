@@ -872,7 +872,27 @@ export default function Home() {
       communityMembers,
     }).catch(() => { /* 通知失敗忽略 */ });
 
-    setTimeout(() => window.print(), 400);
+    // 瀏覽器「另存為 PDF」以頁面標題作為預設檔名。
+    const pdfTitle = [
+      meetingDate ? format(meetingDate, 'yyyy-MM-dd') : '未填日期',
+      teachingArea || '未填領域',
+      meetingTopic || '會議紀錄',
+    ].map(part => part.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '＿').trim().replace(/[. ]+$/g, '')).join('_');
+    setTimeout(() => {
+      const originalTitle = document.title;
+      const restoreTitle = () => {
+        document.title = originalTitle;
+        window.removeEventListener('afterprint', restoreTitle);
+      };
+      window.addEventListener('afterprint', restoreTitle, { once: true });
+      document.title = pdfTitle;
+      try {
+        window.print();
+      } catch (error) {
+        restoreTitle();
+        throw error;
+      }
+    }, 400);
   }, [summary, form, toast]);
 
   const allDescribed = photos.length > 0 && photos.every(p => !!p.description && !p.isGenerating);
