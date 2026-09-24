@@ -59,6 +59,21 @@ http://localhost/*
 
 ---
 
+## 🤖 Cloud Functions 防濫用（v0.6.0 起）
+
+```
+瀏覽器 → Cloudflare Turnstile（Managed，interaction-only）
+      → issueAppCheckToken：siteverify 通過才簽發 App Check token（1 小時）
+      → 所有 onCall：enforceAppCheck + CORS 白名單 + maxInstances 5 + 輸入驗證
+```
+
+- Turnstile site key：GitHub repo **Variables** `TURNSTILE_SITE_KEY`（公開值）
+- Turnstile secret key：Firebase Secret Manager `TURNSTILE_SECRET`
+- 與「台灣本土 AI 教育平台」共用同一個 Turnstile widget（hostname `cagoooo.github.io`），**輪換金鑰時兩邊要一起更新**
+- widget 未加 `localhost`，本機開發呼叫 AI 會被 App Check 擋下
+
+---
+
 ## 🛡️ 回報漏洞
 
 若發現**真正的**資安問題（例如 Cloud Function 未驗證輸入、或真的機敏憑證外洩），請透過 GitHub Issue 以 `security` 標籤回報，或私訊維護者。
