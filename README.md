@@ -54,7 +54,7 @@
 ## 🚀 本地開發
 
 ### 前置需求
-- Node.js 20+
+- Node.js 22+
 - Firebase CLI（`npm install -g firebase-tools`）
 - Google Cloud 專案（開啟 Blaze 方案以使用 Functions v2）
 
