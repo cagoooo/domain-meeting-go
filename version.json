@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
-  "releasedAt": "2026-09-24T00:37:53.088Z",
-  "notes": "資安強化：Cloudflare Turnstile + Firebase App Check 防機器人、CORS 白名單、輸入驗證"
+  "version": "0.6.1",
+  "releasedAt": "2026-09-24T02:26:24.536Z",
+  "notes": "人機驗證改為置中提示框、驗證失敗時顯示明確原因"
 }
