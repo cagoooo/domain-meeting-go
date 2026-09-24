@@ -1,5 +1,5 @@
 {
-  "version": "0.6.2",
-  "releasedAt": "2026-09-24T02:51:25.867Z",
-  "notes": "每小時使用上限（防止單一使用者濫用）、Next.js 15.5 升級"
+  "version": "0.6.3",
+  "releasedAt": "2026-09-24T02:55:00.142Z",
+  "notes": "移除未使用的 nodemailer 與 email 通知骨架"
 }
