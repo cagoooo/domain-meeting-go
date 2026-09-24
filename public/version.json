@@ -1,5 +1,5 @@
 {
-  "version": "0.5.4",
-  "releasedAt": "2026-04-29T08:40:10.599Z",
-  "notes": "PDF footer 改阿凱老師署名版"
+  "version": "0.6.0",
+  "releasedAt": "2026-09-24T00:37:53.088Z",
+  "notes": "資安強化：Cloudflare Turnstile + Firebase App Check 防機器人、CORS 白名單、輸入驗證"
 }

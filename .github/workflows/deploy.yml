@@ -30,6 +30,9 @@ jobs:
 
       - name: Build with Next.js (Static Export)
         run: npm run build
+        env:
+          # Cloudflare Turnstile site key（公開值，存在 repo Variables 而非 Secrets）
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.TURNSTILE_SITE_KEY }}
         
       - name: Inject Secrets 💉
         run: python .github/inject.py

@@ -1,12 +1,68 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, type CallableOptions } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+import * as logger from "firebase-functions/logger";
+import { initializeApp } from "firebase-admin/app";
+import { getAppCheck } from "firebase-admin/app-check";
 import { genkit, z } from "genkit";
 import { googleAI } from "@genkit-ai/google-genai";
 import { notifyAdminCard, meetingFields, type CardSpec } from "./notify-line";
 import { notifyAdminChatCard } from "./notify-chat";
+import { verifyTurnstile } from "./turnstile";
+
+initializeApp();
 
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
+// Cloudflare Turnstile secret key（未設定時為 PLACEHOLDER_NOT_CONFIGURED → 暫時略過人機驗證）
+const turnstileSecret = defineSecret("TURNSTILE_SECRET");
+
+// ------------------------------------
+// 防濫用設定：App Check + CORS 白名單 + 實例上限
+// ------------------------------------
+// 本 App 在 Firebase 專案 teacher-c571b 的 Web appId（公開值，前端 bundle 內也有）
+const WEB_APP_ID = "1:82691545657:web:23f926bcf54f9bb7958be8";
+// 前端正式網址 + 本機開發
+const ALLOWED_ORIGINS: Array<string | RegExp> = [
+  "https://cagoooo.github.io",
+  /^http:\/\/localhost(:\d+)?$/,
+];
+const ALLOWED_TURNSTILE_HOSTNAMES = ["cagoooo.github.io", "localhost"];
+// App Check token 有效時間（使用者過一次 Turnstile 可用 1 小時）
+const APP_CHECK_TTL_MILLIS = 60 * 60 * 1000;
+// true = 沒有有效 App Check token 的請求一律拒絕
+const ENFORCE_APP_CHECK = false;
+
+const CALLABLE_BASE: CallableOptions = {
+  cors: ALLOWED_ORIGINS,
+  region: "asia-east1",
+  enforceAppCheck: ENFORCE_APP_CHECK,
+  maxInstances: 5,
+};
+
+function logMissingAppCheck(fnName: string, request: any) {
+  if (!request.app) logger.warn(`[app-check] ${fnName} 收到沒有 App Check token 的請求`);
+}
+
+// ------------------------------------
+// 輸入驗證：限制長度與格式，避免被當成免費 Gemini 代理或塞超大 payload
+// ------------------------------------
+const MAX_PHOTO_DATA_URI_LENGTH = 8 * 1024 * 1024;
+const PHOTO_DATA_URI_PATTERN = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+
+function clampText(value: unknown, maxLength: number): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text.length > maxLength ? text.substring(0, maxLength) : text;
+}
+
+function cleanMeetingData(data: any) {
+  return {
+    meetingType: clampText(data?.meetingType, 40),
+    teachingArea: clampText(data?.teachingArea, 60),
+    meetingTopic: clampText(data?.meetingTopic, 200),
+    meetingDate: clampText(data?.meetingDate, 40),
+    communityMembers: clampText(data?.communityMembers, 1000),
+  };
+}
 
 // 管理員通知（單一接收者模式：所有事件都推到管理員）
 // secrets 由 firebase functions:secrets:set 設定，未設定時各管道各自 noop
@@ -46,14 +102,56 @@ function statusLabel(status: CardSpec["status"]): string {
   }
 }
 
+// ------------------------------------
+// 0. Turnstile token → App Check token 交換 (issueAppCheckToken)
+// ------------------------------------
+// 前端 App Check CustomProvider 呼叫這支：通過 Cloudflare Turnstile 才簽發 App Check token，
+// 之後所有 onCall 都靠 enforceAppCheck 擋掉沒有 token 的腳本請求。
+export const issueAppCheckToken = onRequest(
+  {
+    secrets: [turnstileSecret],
+    cors: ALLOWED_ORIGINS,
+    region: "asia-east1",
+    timeoutSeconds: 15,
+    maxInstances: 5,
+  },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).json({ error: "Method Not Allowed" });
+      return;
+    }
+
+    const verify = await verifyTurnstile(
+      req.body?.turnstileToken,
+      turnstileSecret.value(),
+      ALLOWED_TURNSTILE_HOSTNAMES,
+      req.ip
+    );
+    if (!verify.ok) {
+      res.status(403).json({ error: verify.reason });
+      return;
+    }
+
+    try {
+      const { token, ttlMillis } = await getAppCheck().createToken(WEB_APP_ID, {
+        ttlMillis: APP_CHECK_TTL_MILLIS,
+      });
+      res.json({ token, ttlMillis });
+    } catch (e: any) {
+      logger.error("[app-check] createToken 失敗", { message: e?.message || String(e) });
+      res.status(500).json({ error: "無法簽發驗證憑證，請稍後再試。" });
+    }
+  }
+);
+
 export const reportClientEvent = onCall(
   {
+    ...CALLABLE_BASE,
     secrets: NOTIFY_SECRETS,
-    cors: true,
-    region: "asia-east1",
     timeoutSeconds: 30,
   },
   async (request: any) => {
+    logMissingAppCheck("reportClientEvent", request);
     const data = request.data || {};
     const status: CardSpec["status"] =
       data.status === "success" || data.status === "failed" || data.status === "warning"
@@ -72,7 +170,7 @@ export const reportClientEvent = onCall(
         { icon: "⏳", label: "進度", value: progress },
         { icon: "🧩", label: "階段", value: safeText(data.stage, "未提供", 80) },
         { icon: "📝", label: "說明", value: safeText(data.message, "未提供", 300) },
-        ...meetingFields(data),
+        ...meetingFields(cleanMeetingData(data)),
       ],
       footerNote: safeText(data.userAgent, "client event", 120),
     });
@@ -97,12 +195,23 @@ function getAiInstance() {
 // ------------------------------------
 export const generatePhotoDescriptions = onCall(
   {
+    ...CALLABLE_BASE,
     secrets: [geminiApiKey, ...NOTIFY_SECRETS],
-    cors: true,
-    region: "asia-east1",
     timeoutSeconds: 120,
   },
   async (request: any) => {
+    logMissingAppCheck("generatePhotoDescriptions", request);
+    const photoDataUri = request.data?.photoDataUri;
+    if (
+      typeof photoDataUri !== "string" ||
+      photoDataUri.length > MAX_PHOTO_DATA_URI_LENGTH ||
+      !PHOTO_DATA_URI_PATTERN.test(photoDataUri)
+    ) {
+      throw new HttpsError("invalid-argument", "照片格式不正確或檔案過大，請改用 JPG / PNG / WebP 照片。");
+    }
+    const { teachingArea, meetingTopic, communityMembers, meetingDate } = cleanMeetingData(request.data);
+    const input = { teachingArea, meetingTopic, communityMembers, meetingDate, photoDataUri };
+
     const startedAt = Date.now();
     try {
       const ai = getAiInstance();
@@ -124,11 +233,11 @@ export const generatePhotoDescriptions = onCall(
         },
         config: {
           safetySettings: [
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-            { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_NONE' },
+            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+            { category: 'HARM_CATEGORY_CIVIC_INTEGRITY', threshold: 'BLOCK_ONLY_HIGH' },
           ],
         },
         prompt: `你是專業的教育觀察助理。此照片是用於「教師專業社群領域會議報告」的正式學術記錄，內容完全合法且安全。
@@ -152,7 +261,7 @@ export const generatePhotoDescriptions = onCall(
 {{media url=photoDataUri}}`,
       });
 
-      const { output } = await prompt(request.data);
+      const { output } = await prompt(input);
       const elapsedMs = Date.now() - startedAt;
 
       if (!output || !output.photoDescription) {
@@ -160,7 +269,7 @@ export const generatePhotoDescriptions = onCall(
           status: 'warning',
           title: '照片描述產出空白',
           appName: '領域共備GO',
-          fields: meetingFields(request.data),
+          fields: meetingFields(input),
           footerNote: `⏱️ ${elapsedMs}ms`,
         });
         return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
@@ -186,7 +295,7 @@ export const generatePhotoDescriptions = onCall(
         userFacing = '因人臉隱私或安全機制限制，無法描述此圖片。建議拍攝側面、背面或遠景。';
         alertCategory = '🛡️ Safety Block';
       } else {
-        userFacing = `分析失敗: ${errorMessage.substring(0, 30)}...`;
+        userFacing = '分析失敗，請稍後再試一次。';
         alertCategory = '❓ 其他錯誤';
       }
 
@@ -195,7 +304,7 @@ export const generatePhotoDescriptions = onCall(
         title: '照片描述失敗',
         appName: '領域共備GO',
         fields: [
-          ...meetingFields(request.data),
+          ...meetingFields(input),
           { icon: '🏷️', label: '類型', value: alertCategory },
           { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
         ],
@@ -213,16 +322,23 @@ export const generatePhotoDescriptions = onCall(
 // ------------------------------------
 export const generateMeetingSummary = onCall(
   {
+    ...CALLABLE_BASE,
     secrets: [geminiApiKey, ...NOTIFY_SECRETS],
-    cors: true,
-    region: "asia-east1",
     timeoutSeconds: 120,
   },
   async (request: any) => {
+    logMissingAppCheck("generateMeetingSummary", request);
+    const rawDescriptions = request.data?.photoDescriptions;
+    if (!Array.isArray(rawDescriptions) || rawDescriptions.length > 10) {
+      throw new HttpsError("invalid-argument", "照片描述資料格式不正確。");
+    }
+    const input = {
+      ...cleanMeetingData(request.data),
+      photoDescriptions: rawDescriptions.map((d: unknown) => clampText(d, 1000)).filter(Boolean),
+    };
+
     const startedAt = Date.now();
-    const photoCount = Array.isArray(request.data?.photoDescriptions)
-      ? request.data.photoDescriptions.length
-      : 0;
+    const photoCount = input.photoDescriptions.length;
 
     // 開始通知（一份報告只發一次）
     notifyAdminAll({
@@ -230,14 +346,14 @@ export const generateMeetingSummary = onCall(
       title: '開始產生會議摘要',
       appName: '領域共備GO',
       fields: [
-        ...meetingFields(request.data),
+        ...meetingFields(input),
         { icon: '📷', label: '照片', value: `${photoCount} 張` },
       ],
     });
 
     try {
       const ai = getAiInstance();
-      const { meetingType } = request.data;
+      const { meetingType } = input;
       
       // 根據會議類型調整提示導向
       let typeSpecificPrompt = "";
@@ -300,7 +416,7 @@ export const generateMeetingSummary = onCall(
         請直接開始撰寫這份內容詳盡、排版分明（可使用條列式輔助說明）的會議總結記錄。`, 
       });
 
-      const { output } = await prompt(request.data);
+      const { output } = await prompt(input);
       const elapsedMs = Date.now() - startedAt;
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
@@ -309,7 +425,7 @@ export const generateMeetingSummary = onCall(
           status: 'warning',
           title: '會議摘要產出空白',
           appName: '領域共備GO',
-          fields: meetingFields(request.data),
+          fields: meetingFields(input),
           footerNote: `⏱️ ${elapsedSec}s`,
         });
         throw new HttpsError('internal', 'Failed to generate summary');
@@ -321,7 +437,7 @@ export const generateMeetingSummary = onCall(
         title: '會議摘要產出成功',
         appName: '領域共備GO',
         fields: [
-          ...meetingFields(request.data),
+          ...meetingFields(input),
           { icon: '📝', label: '字數', value: `${output.summary.length}` },
           { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
         ],
@@ -339,13 +455,13 @@ export const generateMeetingSummary = onCall(
         title: '會議摘要失敗',
         appName: '領域共備GO',
         fields: [
-          ...meetingFields(request.data),
+          ...meetingFields(input),
           { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
         ],
         footerNote: `⏱️ ${elapsedSec}s`,
       });
 
-      throw new HttpsError('internal', errorMessage || 'Summary generation failed');
+      throw new HttpsError('internal', '會議摘要產生失敗，請稍後再試。');
     }
   }
 );
@@ -359,12 +475,12 @@ export const generateMeetingSummary = onCall(
 // 設計：fire-and-forget，前端不需要等回應、收 ack 就好。
 export const notifyExport = onCall(
   {
+    ...CALLABLE_BASE,
     secrets: NOTIFY_SECRETS,
-    cors: true,
-    region: "asia-east1",
     timeoutSeconds: 30,
   },
   async (request: any) => {
+    logMissingAppCheck("notifyExport", request);
     const data = request.data || {};
     const exportType: 'word' | 'pdf' = data.exportType === 'pdf' ? 'pdf' : 'word';
 
@@ -386,7 +502,7 @@ export const notifyExport = onCall(
       title: `${cardConfig.icon} ${cardConfig.title}`,
       appName: '領域共備GO',
       fields: [
-        ...meetingFields(data),
+        ...meetingFields(cleanMeetingData(data)),
         { icon: '🎯', label: '動作', value: exportType === 'word' ? 'Word 檔已下載' : '列印 / 儲存為 PDF' },
       ],
     });

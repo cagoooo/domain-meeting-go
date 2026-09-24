@@ -4,6 +4,21 @@
 
 ---
 
+## [0.6.0] — 2026-09-24 🛡️ 後端防濫用強化
+
+### 🔒 資安
+- **Cloudflare Turnstile + Firebase App Check**：新增 `issueAppCheckToken`，通過 Turnstile 人機驗證才簽發 App Check token（1 小時有效）；前端以 `CustomProvider` 自動帶 token 呼叫所有 Cloud Functions
+- **CORS 白名單**：只允許 `https://cagoooo.github.io` 與 `localhost`
+- **實例上限**：所有 Function `maxInstances: 5`，被刷時成本有上限
+- **輸入驗證**：`photoDataUri` 必須是 JPG/PNG/WebP 的 data URI 且 ≤ 8MB；文字欄位限制長度；照片描述最多 10 則
+- **安全過濾**：Gemini safety 由 `BLOCK_NONE` 改為 `BLOCK_ONLY_HIGH`
+- **錯誤訊息**：不再把後端原始錯誤回傳給前端
+
+### ✨ 改良
+- 照片送 AI 分析前先縮為長邊 1600px JPEG（匯出 Word / PDF 仍用原圖），上傳更快、省 Gemini token
+
+---
+
 ## [0.5.4] — 2026-04-29 ✍️ PDF footer 改阿凱老師署名版
 
 ### ✨ 改良
