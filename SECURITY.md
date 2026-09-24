@@ -72,7 +72,7 @@ http://localhost/*
 - Turnstile secret key：Firebase Secret Manager `TURNSTILE_SECRET`
 - 與「台灣本土 AI 教育平台」共用同一個 Turnstile widget（hostname `cagoooo.github.io`），**輪換金鑰時兩邊要一起更新**
 - 上限數值在 `functions/src/index.ts` 的 `RATE_LIMITS`；計數文件有 `expireAt`，由 Firestore TTL 自動刪除
-- widget 未加 `localhost`，本機開發呼叫 AI 會被 App Check 擋下
+- widget 的 hostname 為 `cagoooo.github.io` 與 `localhost`（2026-09-24 加入 localhost），本機開發可正常通過人機驗證
 
 ---
 
