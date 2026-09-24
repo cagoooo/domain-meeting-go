@@ -42,16 +42,31 @@ function loadScript(): Promise<void> {
   return scriptPromise;
 }
 
-function getContainer(): HTMLElement {
-  let el = document.getElementById('dmg-turnstile');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'dmg-turnstile';
-    el.style.cssText =
-      'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;max-width:calc(100vw - 32px);';
-    document.body.appendChild(el);
+// 驗證框容器：平常是空的（interaction-only 不佔畫面），需要真人互動時才變成置中卡片 + 半透明背景
+function getContainer(): { slot: HTMLElement; setInteractive: (on: boolean) => void } {
+  let root = document.getElementById('dmg-turnstile');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'dmg-turnstile';
+    root.innerHTML =
+      '<div data-part="backdrop" style="display:none;position:fixed;inset:0;background:rgba(40,20,20,.45);z-index:10000"></div>' +
+      '<div data-part="card" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10001;max-width:calc(100vw - 32px);text-align:center;border-radius:12px">' +
+      '<p data-part="caption" style="display:none;margin:0 0 12px;font:600 15px/1.5 &quot;Noto Sans TC&quot;,sans-serif;color:#4a1d1f">🛡️ 請勾選下方驗證，完成後 AI 會自動開始</p>' +
+      '<div data-part="slot"></div></div>';
+    document.body.appendChild(root);
   }
-  return el;
+  const part = (name: string) => root!.querySelector<HTMLElement>(`[data-part="${name}"]`)!;
+  const card = part('card');
+  return {
+    slot: part('slot'),
+    setInteractive: (on) => {
+      part('backdrop').style.display = on ? 'block' : 'none';
+      part('caption').style.display = on ? 'block' : 'none';
+      card.style.background = on ? '#fffaf2' : 'transparent';
+      card.style.padding = on ? '20px 20px 16px' : '0';
+      card.style.boxShadow = on ? '0 12px 40px rgba(0,0,0,.25)' : 'none';
+    },
+  };
 }
 
 let inflight: Promise<string> | null = null;
@@ -65,26 +80,35 @@ export function getTurnstileToken(): Promise<string> {
     const turnstile = window.turnstile;
     if (!turnstile) throw new Error('Cloudflare 人機驗證尚未載入。');
 
-    const container = getContainer();
+    const { slot, setInteractive } = getContainer();
     return await new Promise<string>((resolve, reject) => {
       let widgetId: string | undefined;
       const cleanup = () => {
         clearTimeout(timer);
-        if (widgetId) {
-          try { turnstile.remove(widgetId); } catch { /* 已移除 */ }
-        }
+        setInteractive(false);
+        // 等 Turnstile 自己的 callback 跑完再移除，否則它內部 reset 會丟 "Nothing to reset"
+        const id = widgetId;
+        widgetId = undefined;
+        if (id) setTimeout(() => { try { turnstile.remove(id); } catch { /* 已移除 */ } }, 0);
       };
       const timer = setTimeout(() => {
         cleanup();
         reject(new Error('人機驗證逾時，請再試一次。'));
       }, TOKEN_TIMEOUT_MS);
 
-      widgetId = turnstile.render(container, {
+      widgetId = turnstile.render(slot, {
         sitekey: TURNSTILE_SITE_KEY,
         theme: 'light',
         appearance: 'interaction-only',
+        retry: 'never',
+        'before-interactive-callback': () => setInteractive(true),
+        'after-interactive-callback': () => setInteractive(false),
         callback: (token: string) => { cleanup(); resolve(token); },
-        'error-callback': () => { cleanup(); reject(new Error('人機驗證失敗，請重新整理頁面再試。')); },
+        'error-callback': (code: string) => {
+          cleanup();
+          reject(new Error(`人機驗證失敗（${code}），請重新整理頁面再試。`));
+          return true; // 告訴 Turnstile 錯誤已處理，不要再丟例外
+        },
       });
     });
   })().finally(() => { inflight = null; });

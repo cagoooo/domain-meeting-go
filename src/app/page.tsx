@@ -437,6 +437,18 @@ export default function Home() {
     });
   }, []);
 
+  const isNonRetryableError = (error: unknown) => {
+    const code = (error as { code?: string })?.code;
+    return code === 'functions/unauthenticated' || code === 'functions/invalid-argument';
+  };
+
+  const describeCallError = (error: unknown): string => {
+    const code = (error as { code?: string })?.code;
+    if (code === 'functions/unauthenticated') return '人機驗證未完成，請按「再試一次」並勾選畫面中央的驗證框';
+    if (code === 'functions/invalid-argument') return (error as Error).message || '照片格式不正確';
+    return '產出失敗';
+  };
+
   const callWithRetry = async (fnName: string, data: unknown, maxRetries = 2) => {
     let lastError: unknown;
     const callableFn = httpsCallable<unknown, { photoDescription: string; errorCode?: string }>(functions, fnName);
@@ -447,6 +459,8 @@ export default function Home() {
         return result;
       } catch (error) {
         lastError = error;
+        // 人機驗證沒過、輸入格式錯誤：重試也不會成功，直接交給呼叫端顯示原因
+        if (isNonRetryableError(error)) break;
         console.warn(`Function ${fnName} failed (attempt ${i + 1}/${maxRetries + 1}). Retrying...`, error);
         if (i < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 1500 * (i + 1)));
@@ -568,7 +582,17 @@ export default function Home() {
           return;
         }
       } catch (error) {
-        setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: '產出失敗', isGenerating: false } : p));
+        const message = describeCallError(error);
+        setPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, description: message, isGenerating: false } : p));
+        if (isNonRetryableError(error)) {
+          toast({ title: '處理異常', description: `照片 ${index}：${message}`, variant: 'destructive' });
+        }
+        // 人機驗證沒過，後面的照片也一定會失敗，先停下來讓使用者重試
+        if ((error as { code?: string })?.code === 'functions/unauthenticated') {
+          setDescriptionProgress(Math.round(((index - 1) / photos.length) * 100));
+          setIsGeneratingAllDescriptions(false);
+          return;
+        }
       }
 
       setDescriptionProgress(Math.round((index / photos.length) * 100));
@@ -623,8 +647,9 @@ export default function Home() {
         toast({ title: '處理異常', description: result.photoDescription, variant: 'destructive' });
       }
     } catch (error) {
-      setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: '產出失敗', isGenerating: false } : p));
-      toast({ title: '系統錯誤', description: '呼叫分析函式時發生錯誤。', variant: 'destructive' });
+      const message = describeCallError(error);
+      setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: message, isGenerating: false } : p));
+      toast({ title: '系統錯誤', description: message === '產出失敗' ? '呼叫分析函式時發生錯誤。' : message, variant: 'destructive' });
     }
   }, [form, photos, toast, validateAndFocusFirstMissing]);
 
