@@ -71,6 +71,7 @@ http://localhost/*
 - Turnstile site key：GitHub repo **Variables** `TURNSTILE_SITE_KEY`（公開值）
 - Turnstile secret key：Firebase Secret Manager `TURNSTILE_SECRET`
 - 與「台灣本土 AI 教育平台」共用同一個 Turnstile widget（hostname `cagoooo.github.io`），**輪換金鑰時兩邊要一起更新**
+- 預算告警：Gemini 金鑰所在的 `photopoet-ha364`（NT$30／月，與 PhotoPoet 共用）與 Cloud Functions 所在的 `teacher-c571b`（NT$5／月），實際花費 50%／90%／100% 與預測超過 100% 時寄信
 - 上限數值在 `functions/src/index.ts` 的 `RATE_LIMITS`；計數文件有 `expireAt`，由 Firestore TTL 自動刪除
 - widget 的 hostname 為 `cagoooo.github.io` 與 `localhost`（2026-09-24 加入 localhost），本機開發可正常通過人機驗證
 
