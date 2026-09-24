@@ -680,17 +680,7 @@ export default function Home() {
       });
       setSummary(response.data.summary);
       setSummaryGenerationProgress(100);
-      reportClientEvent({
-        status: 'success',
-        title: 'User completed service',
-        stage: 'summary-generation',
-        message: `Summary generated from ${photoDescriptions.length} photo descriptions`,
-        progress: 100,
-        teachingArea,
-        meetingTopic,
-        meetingDate: meetingDateText,
-        communityMembers,
-      });
+      // 成功通知由後端 generateMeetingSummary 發送（含照片數、字數、耗時），前端不重複發
 
       fireMassiveConfetti();
 
@@ -702,7 +692,8 @@ export default function Home() {
     } catch (error) {
       setIsGeneratingSummary(false);
       setSummaryGenerationProgress(null);
-      reportClientEvent({
+      // functions/internal = 後端已發過失敗通知；其他（網路、人機驗證、上限）後端看不到，才由前端回報
+      if ((error as { code?: string })?.code !== 'functions/internal') reportClientEvent({
         status: 'failed',
         title: 'Summary generation failed',
         stage: 'summary-generation',

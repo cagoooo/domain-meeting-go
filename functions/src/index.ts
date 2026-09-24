@@ -9,6 +9,7 @@ import { notifyAdminCard, meetingFields, type CardSpec } from "./notify-line";
 import { notifyAdminChatCard } from "./notify-chat";
 import { verifyTurnstile } from "./turnstile";
 import { consumeRateLimit, getClientIp } from "./rate-limit";
+import { notifySignature, shouldSendNotification, NOTIFY_WINDOW_MS } from "./notify-throttle";
 
 initializeApp();
 
@@ -98,11 +99,29 @@ const googleChatWebhook = defineSecret("GOOGLE_CHAT_WEBHOOK");
 // 每個 onCall 都要把這組 secrets 掛上去，notifyAdminAll() 才讀得到 .value()
 const NOTIFY_SECRETS = [lineChannelAccessToken, lineAdminUserId, googleChatWebhook];
 
+// 用來判斷「是不是同一種問題」的欄位（不含老師、會議等每次都不同的資訊）
+const SIGNATURE_LABELS = ["類型", "訊息", "錯誤", "說明", "階段"];
+
 /**
  * 同時把同一張卡片 fan-out 到 LINE + Google Chat。
- * 兩者皆 fire-and-forget、缺對應 secret 時各自靜默略過，互不影響主流程。
+ * 失敗／警示類先經過節流：同一種問題 10 分鐘內只推第一則，其餘合併計數。
+ * 兩個管道皆 fire-and-forget、缺對應 secret 時各自靜默略過，互不影響主流程。
+ * 節流需要查 Firestore，失敗／警示的呼叫端請 await，避免回應送出後背景工作被中斷。
  */
 async function notifyAdminAll(card: CardSpec): Promise<void> {
+  if (card.status === "failed" || card.status === "warning") {
+    const signature = notifySignature([
+      card.status,
+      card.title,
+      ...card.fields.filter((f) => SIGNATURE_LABELS.includes(f.label)).map((f) => f.value),
+    ]);
+    const decision = await shouldSendNotification(signature);
+    if (!decision.send) return;
+    if (decision.merged > 0) {
+      const mergedNote = `🔁 前 ${NOTIFY_WINDOW_MS / 60000} 分鐘內另有 ${decision.merged} 則相同通知已合併`;
+      card = { ...card, footerNote: card.footerNote ? `${card.footerNote}　${mergedNote}` : mergedNote };
+    }
+  }
   notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
   await notifyAdminChatCard(card, googleChatWebhook.value());
 }
@@ -300,7 +319,7 @@ export const generatePhotoDescriptions = onCall(
       const elapsedMs = Date.now() - startedAt;
 
       if (!output || !output.photoDescription) {
-        notifyAdminAll({
+        await notifyAdminAll({
           status: 'warning',
           title: '照片描述產出空白',
           appName: '領域共備GO',
@@ -334,7 +353,7 @@ export const generatePhotoDescriptions = onCall(
         alertCategory = '❓ 其他錯誤';
       }
 
-      notifyAdminAll({
+      await notifyAdminAll({
         status: 'failed',
         title: '照片描述失敗',
         appName: '領域共備GO',
@@ -378,16 +397,7 @@ export const generateMeetingSummary = onCall(
     const startedAt = Date.now();
     const photoCount = input.photoDescriptions.length;
 
-    // 開始通知（一份報告只發一次）
-    notifyAdminAll({
-      status: 'started',
-      title: '開始產生會議摘要',
-      appName: '領域共備GO',
-      fields: [
-        ...meetingFields(input),
-        { icon: '📷', label: '照片', value: `${photoCount} 張` },
-      ],
-    });
+    // 不另發「開始」通知：摘要約 10 秒就有結果，成功／失敗通知已含同樣資訊
 
     try {
       const ai = getAiInstance();
@@ -459,7 +469,7 @@ export const generateMeetingSummary = onCall(
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
       if (!output || !output.summary) {
-        notifyAdminAll({
+        await notifyAdminAll({
           status: 'warning',
           title: '會議摘要產出空白',
           appName: '領域共備GO',
@@ -476,6 +486,7 @@ export const generateMeetingSummary = onCall(
         appName: '領域共備GO',
         fields: [
           ...meetingFields(input),
+          { icon: '📷', label: '照片', value: `${photoCount} 張` },
           { icon: '📝', label: '字數', value: `${output.summary.length}` },
           { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
         ],
@@ -488,7 +499,8 @@ export const generateMeetingSummary = onCall(
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
       const errorMessage = error?.message || String(error);
 
-      notifyAdminAll({
+      // 產出空白時上面已發過「警示」通知，這裡不再重複發「失敗」
+      if (!(error instanceof HttpsError)) await notifyAdminAll({
         status: 'failed',
         title: '會議摘要失敗',
         appName: '領域共備GO',

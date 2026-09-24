@@ -1,5 +1,5 @@
 {
-  "version": "0.6.3",
-  "releasedAt": "2026-09-24T02:55:00.142Z",
-  "notes": "移除未使用的 nodemailer 與 email 通知骨架"
+  "version": "0.6.4",
+  "releasedAt": "2026-09-24T03:13:44.561Z",
+  "notes": "管理員通知合併節流、移除重複通知"
 }
