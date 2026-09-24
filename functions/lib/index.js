@@ -44,6 +44,7 @@ const google_genai_1 = require("@genkit-ai/google-genai");
 const notify_line_1 = require("./notify-line");
 const notify_chat_1 = require("./notify-chat");
 const turnstile_1 = require("./turnstile");
+const rate_limit_1 = require("./rate-limit");
 (0, app_1.initializeApp)();
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
@@ -70,6 +71,24 @@ const CALLABLE_BASE = {
     enforceAppCheck: ENFORCE_APP_CHECK,
     maxInstances: 5,
 };
+// 每小時上限：token = 單一使用者 session；ip = 整個對外 IP（學校可能整校共用，所以放寬）
+const RATE_LIMITS = {
+    issueAppCheckToken: { ip: 60 },
+    generatePhotoDescriptions: { token: 40, ip: 300 },
+    generateMeetingSummary: { token: 10, ip: 60 },
+    reportClientEvent: { token: 30, ip: 150 },
+    notifyExport: { token: 20, ip: 100 },
+};
+const RATE_LIMIT_MESSAGE = "使用次數已達每小時上限，請稍後再試。";
+/** 回傳 true = 允許；false = 超過上限 */
+function withinCallableLimit(scope, request) {
+    const limits = RATE_LIMITS[scope];
+    const raw = request.rawRequest;
+    return (0, rate_limit_1.consumeRateLimit)(scope, [
+        { key: raw?.header?.("x-firebase-appcheck") || undefined, limit: limits.token },
+        { key: raw ? (0, rate_limit_1.getClientIp)(raw) : undefined, limit: limits.ip },
+    ]);
+}
 function logMissingAppCheck(fnName, request) {
     if (!request.app)
         logger.warn(`[app-check] ${fnName} 收到沒有 App Check token 的請求`);
@@ -142,7 +161,12 @@ exports.issueAppCheckToken = (0, https_1.onRequest)({
         res.status(405).json({ error: "Method Not Allowed" });
         return;
     }
-    const verify = await (0, turnstile_1.verifyTurnstile)(req.body?.turnstileToken, turnstileSecret.value(), ALLOWED_TURNSTILE_HOSTNAMES, req.ip);
+    const clientIp = (0, rate_limit_1.getClientIp)(req);
+    if (!(await (0, rate_limit_1.consumeRateLimit)("issueAppCheckToken", [{ key: clientIp, limit: RATE_LIMITS.issueAppCheckToken.ip }]))) {
+        res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+        return;
+    }
+    const verify = await (0, turnstile_1.verifyTurnstile)(req.body?.turnstileToken, turnstileSecret.value(), ALLOWED_TURNSTILE_HOSTNAMES, clientIp);
     if (!verify.ok) {
         res.status(403).json({ error: verify.reason });
         return;
@@ -164,6 +188,9 @@ exports.reportClientEvent = (0, https_1.onCall)({
     timeoutSeconds: 30,
 }, async (request) => {
     logMissingAppCheck("reportClientEvent", request);
+    // 通知類超量時靜默略過（前端本來就不等結果），避免被拿來洗 LINE / Chat
+    if (!(await withinCallableLimit("reportClientEvent", request)))
+        return { ok: true, throttled: true };
     const data = request.data || {};
     const status = data.status === "success" || data.status === "failed" || data.status === "warning"
         ? data.status
@@ -213,6 +240,9 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
     }
     const { teachingArea, meetingTopic, communityMembers, meetingDate } = cleanMeetingData(request.data);
     const input = { teachingArea, meetingTopic, communityMembers, meetingDate, photoDataUri };
+    if (!(await withinCallableLimit("generatePhotoDescriptions", request))) {
+        throw new https_1.HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
     const startedAt = Date.now();
     try {
         const ai = getAiInstance();
@@ -330,6 +360,9 @@ exports.generateMeetingSummary = (0, https_1.onCall)({
         ...cleanMeetingData(request.data),
         photoDescriptions: rawDescriptions.map((d) => clampText(d, 1000)).filter(Boolean),
     };
+    if (!(await withinCallableLimit("generateMeetingSummary", request))) {
+        throw new https_1.HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
     const startedAt = Date.now();
     const photoCount = input.photoDescriptions.length;
     // 開始通知（一份報告只發一次）
@@ -460,6 +493,8 @@ exports.notifyExport = (0, https_1.onCall)({
     timeoutSeconds: 30,
 }, async (request) => {
     logMissingAppCheck("notifyExport", request);
+    if (!(await withinCallableLimit("notifyExport", request)))
+        return { ok: true, throttled: true };
     const data = request.data || {};
     const exportType = data.exportType === 'pdf' ? 'pdf' : 'word';
     // 兩種匯出的卡片差異

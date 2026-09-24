@@ -8,6 +8,7 @@ import { googleAI } from "@genkit-ai/google-genai";
 import { notifyAdminCard, meetingFields, type CardSpec } from "./notify-line";
 import { notifyAdminChatCard } from "./notify-chat";
 import { verifyTurnstile } from "./turnstile";
+import { consumeRateLimit, getClientIp } from "./rate-limit";
 
 initializeApp();
 
@@ -38,6 +39,29 @@ const CALLABLE_BASE: CallableOptions = {
   enforceAppCheck: ENFORCE_APP_CHECK,
   maxInstances: 5,
 };
+
+// 每小時上限：token = 單一使用者 session；ip = 整個對外 IP（學校可能整校共用，所以放寬）
+const RATE_LIMITS = {
+  issueAppCheckToken: { ip: 60 },
+  generatePhotoDescriptions: { token: 40, ip: 300 },
+  generateMeetingSummary: { token: 10, ip: 60 },
+  reportClientEvent: { token: 30, ip: 150 },
+  notifyExport: { token: 20, ip: 100 },
+} as const;
+const RATE_LIMIT_MESSAGE = "使用次數已達每小時上限，請稍後再試。";
+
+/** 回傳 true = 允許；false = 超過上限 */
+function withinCallableLimit(
+  scope: "generatePhotoDescriptions" | "generateMeetingSummary" | "reportClientEvent" | "notifyExport",
+  request: any
+): Promise<boolean> {
+  const limits = RATE_LIMITS[scope];
+  const raw = request.rawRequest;
+  return consumeRateLimit(scope, [
+    { key: raw?.header?.("x-firebase-appcheck") || undefined, limit: limits.token },
+    { key: raw ? getClientIp(raw) : undefined, limit: limits.ip },
+  ]);
+}
 
 function logMissingAppCheck(fnName: string, request: any) {
   if (!request.app) logger.warn(`[app-check] ${fnName} 收到沒有 App Check token 的請求`);
@@ -121,11 +145,17 @@ export const issueAppCheckToken = onRequest(
       return;
     }
 
+    const clientIp = getClientIp(req);
+    if (!(await consumeRateLimit("issueAppCheckToken", [{ key: clientIp, limit: RATE_LIMITS.issueAppCheckToken.ip }]))) {
+      res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+      return;
+    }
+
     const verify = await verifyTurnstile(
       req.body?.turnstileToken,
       turnstileSecret.value(),
       ALLOWED_TURNSTILE_HOSTNAMES,
-      req.ip
+      clientIp
     );
     if (!verify.ok) {
       res.status(403).json({ error: verify.reason });
@@ -152,6 +182,8 @@ export const reportClientEvent = onCall(
   },
   async (request: any) => {
     logMissingAppCheck("reportClientEvent", request);
+    // 通知類超量時靜默略過（前端本來就不等結果），避免被拿來洗 LINE / Chat
+    if (!(await withinCallableLimit("reportClientEvent", request))) return { ok: true, throttled: true };
     const data = request.data || {};
     const status: CardSpec["status"] =
       data.status === "success" || data.status === "failed" || data.status === "warning"
@@ -211,6 +243,9 @@ export const generatePhotoDescriptions = onCall(
     }
     const { teachingArea, meetingTopic, communityMembers, meetingDate } = cleanMeetingData(request.data);
     const input = { teachingArea, meetingTopic, communityMembers, meetingDate, photoDataUri };
+    if (!(await withinCallableLimit("generatePhotoDescriptions", request))) {
+      throw new HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
 
     const startedAt = Date.now();
     try {
@@ -336,6 +371,9 @@ export const generateMeetingSummary = onCall(
       ...cleanMeetingData(request.data),
       photoDescriptions: rawDescriptions.map((d: unknown) => clampText(d, 1000)).filter(Boolean),
     };
+    if (!(await withinCallableLimit("generateMeetingSummary", request))) {
+      throw new HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
 
     const startedAt = Date.now();
     const photoCount = input.photoDescriptions.length;
@@ -481,6 +519,7 @@ export const notifyExport = onCall(
   },
   async (request: any) => {
     logMissingAppCheck("notifyExport", request);
+    if (!(await withinCallableLimit("notifyExport", request))) return { ok: true, throttled: true };
     const data = request.data || {};
     const exportType: 'word' | 'pdf' = data.exportType === 'pdf' ? 'pdf' : 'word';
 

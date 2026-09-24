@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
@@ -51,7 +51,7 @@
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",
-    "next": "15.2.3",
+    "next": "^15.5.26",
     "nodemailer": "^7.0.2",
     "patch-package": "^8.0.0",
     "react": "^18.3.1",

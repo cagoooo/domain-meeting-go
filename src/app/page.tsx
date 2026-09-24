@@ -439,13 +439,14 @@ export default function Home() {
 
   const isNonRetryableError = (error: unknown) => {
     const code = (error as { code?: string })?.code;
-    return code === 'functions/unauthenticated' || code === 'functions/invalid-argument';
+    return code === 'functions/unauthenticated' || code === 'functions/invalid-argument' || code === 'functions/resource-exhausted';
   };
 
   const describeCallError = (error: unknown): string => {
     const code = (error as { code?: string })?.code;
     if (code === 'functions/unauthenticated') return '人機驗證未完成，請按「再試一次」並勾選畫面中央的驗證框';
     if (code === 'functions/invalid-argument') return (error as Error).message || '照片格式不正確';
+    if (code === 'functions/resource-exhausted') return '使用次數已達每小時上限，請稍後再試';
     return '產出失敗';
   };
 
@@ -587,8 +588,9 @@ export default function Home() {
         if (isNonRetryableError(error)) {
           toast({ title: '處理異常', description: `照片 ${index}：${message}`, variant: 'destructive' });
         }
-        // 人機驗證沒過，後面的照片也一定會失敗，先停下來讓使用者重試
-        if ((error as { code?: string })?.code === 'functions/unauthenticated') {
+        // 人機驗證沒過或達到上限，後面的照片也一定會失敗，先停下來讓使用者稍後重試
+        const code = (error as { code?: string })?.code;
+        if (code === 'functions/unauthenticated' || code === 'functions/resource-exhausted') {
           setDescriptionProgress(Math.round(((index - 1) / photos.length) * 100));
           setIsGeneratingAllDescriptions(false);
           return;
@@ -711,7 +713,8 @@ export default function Home() {
         meetingDate: meetingDateText,
         communityMembers,
       });
-      toast({ title: '產生摘要失敗', description: '請稍後再試。', variant: 'destructive' });
+      const reason = describeCallError(error);
+      toast({ title: '產生摘要失敗', description: reason === '產出失敗' ? '請稍後再試。' : reason, variant: 'destructive' });
     }
   }, [form, photos, reportClientEvent, summaryGenerationProgress, toast, validateAndFocusFirstMissing]);
 

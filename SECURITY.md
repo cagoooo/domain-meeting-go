@@ -65,11 +65,13 @@ http://localhost/*
 瀏覽器 → Cloudflare Turnstile（Managed，interaction-only）
       → issueAppCheckToken：siteverify 通過才簽發 App Check token（1 小時）
       → 所有 onCall：enforceAppCheck + CORS 白名單 + maxInstances 5 + 輸入驗證
+      → 每小時上限：依 App Check token（每人）與 IP（寬鬆）計次，Firestore `dmg_rate_limits`
 ```
 
 - Turnstile site key：GitHub repo **Variables** `TURNSTILE_SITE_KEY`（公開值）
 - Turnstile secret key：Firebase Secret Manager `TURNSTILE_SECRET`
 - 與「台灣本土 AI 教育平台」共用同一個 Turnstile widget（hostname `cagoooo.github.io`），**輪換金鑰時兩邊要一起更新**
+- 上限數值在 `functions/src/index.ts` 的 `RATE_LIMITS`；計數文件有 `expireAt`，由 Firestore TTL 自動刪除
 - widget 未加 `localhost`，本機開發呼叫 AI 會被 App Check 擋下
 
 ---
