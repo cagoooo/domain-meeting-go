@@ -260,8 +260,9 @@ reports/{userId}/{reportId}
 
 ### 優先度 4（橘色）：啟用 Email 通知
 
-`src/lib/email-notifications.ts` 已有骨架，目前為模擬。
-使用已安裝的 `nodemailer` + Gmail App Password 實作。
+> v0.6.3 起已移除未使用的 `email-notifications.ts` 骨架與前端 `nodemailer` 依賴。
+> 若要實作，請寫在 Cloud Functions（寄信憑證不能進前端 bundle），並用 `defineSecret` 管理。
+> 目前管理員通知已改走 LINE + Google Chat（`functions/src/notify-*.ts`）。
 
 新增環境變數：
 - `GMAIL_USER`

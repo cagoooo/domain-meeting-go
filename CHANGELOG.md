@@ -4,6 +4,15 @@
 
 ---
 
+## [0.6.3] — 2026-09-24 🧹 移除未使用依賴
+
+### 🧹 清理
+- 移除前端未使用的 `nodemailer` 依賴（Dependabot 回報 high 漏洞，但專案根本沒用到）
+- 移除從未被引用的 `src/lib/email-notifications.ts` 模擬骨架
+- 管理員通知統一走 Cloud Functions 的 LINE + Google Chat
+
+---
+
 ## [0.6.2] — 2026-09-24 🚦 使用次數上限 + 套件升級
 
 ### 🔒 資安
