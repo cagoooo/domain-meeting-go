@@ -1,9 +1,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // 型別錯誤會讓建置失敗，避免有 bug 的版本被部署上線
   eslint: {
     ignoreDuringBuilds: true,
   },
