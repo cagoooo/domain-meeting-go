@@ -63,7 +63,7 @@ const ALLOWED_TURNSTILE_HOSTNAMES = ["cagoooo.github.io", "localhost"];
 // App Check token 有效時間（使用者過一次 Turnstile 可用 1 小時）
 const APP_CHECK_TTL_MILLIS = 60 * 60 * 1000;
 // true = 沒有有效 App Check token 的請求一律拒絕
-const ENFORCE_APP_CHECK = false;
+const ENFORCE_APP_CHECK = true;
 const CALLABLE_BASE = {
     cors: ALLOWED_ORIGINS,
     region: "asia-east1",
