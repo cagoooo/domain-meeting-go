@@ -77,6 +77,27 @@ http://localhost/*
 
 ---
 
+## 📦 Dependabot 警告評估紀錄（2026-10-07）
+
+前端是純靜態輸出（`output: 'export'`），AI 功能全部在 `functions/`。下列 16 則已在 GitHub 標成「已評估」關閉，每則都有簡短留言：
+
+| 警告 | 套件（位置） | 判斷 |
+|---|---|---|
+| #1、#2 | `@opentelemetry/sdk-node`、`auto-instrumentations-node`（functions） | 未啟用 Prometheus exporter：genkit 啟動 NodeSDK 時沒設 metric reader，也沒設 `OTEL_METRICS_EXPORTER` |
+| #5 | `@opentelemetry/propagator-jaeger`（functions） | 未使用 JaegerPropagator，NodeSDK 也沒註冊 HTTP instrumentation |
+| #4 | `@opentelemetry/core`（functions） | 沒註冊 HTTP instrumentation，不會解析傳入的 `baggage` 標頭 |
+| #3 | `uuid`（functions） | 本專案與相依套件都沒有呼叫 v3/v5/v6 |
+| #191–#197 | OpenTelemetry 資料庫 instrumentation（functions） | 只用 Firestore，沒用 PostgreSQL、MySQL、Mongoose 等資料庫 |
+| #198、#199 | `@grpc/grpc-js`（前端，Firebase SDK 帶入） | 瀏覽器版 Firestore 走 WebChannel，打包結果不含 grpc-js；漏洞屬 gRPC 伺服器端 |
+| #200、#201 | `braces`、`postcss-selector-parser`（前端，Tailwind 帶入） | 只在建置時處理自己寫的設定與 CSS，不進瀏覽器；要升級 Tailwind v4 才能移除 |
+
+**要重新打開的時機**（GitHub → Security → Dependabot → Closed → 點進警告 → Reopen，或 `gh api -X PATCH repos/cagoooo/domain-meeting-go/dependabot/alerts/<編號> -f state=open`）：
+
+- `functions/` 呼叫 `enableFirebaseTelemetry()`，或在 Cloud Functions 設定任何 `OTEL_*` 環境變數 → 重開 #1、#2、#4、#5
+- 改用 PostgreSQL、MySQL 等上表列出的資料庫 → 重開 #191–#197
+
+---
+
 ## 🛡️ 回報漏洞
 
 若發現**真正的**資安問題（例如 Cloud Function 未驗證輸入、或真的機敏憑證外洩），請透過 GitHub Issue 以 `security` 標籤回報，或私訊維護者。
