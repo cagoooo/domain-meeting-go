@@ -75,7 +75,6 @@ firebase functions:secrets:set GEMINI_API_KEY
 
 ```bash
 npm run dev           # Next.js 前端（http://localhost:9002）
-npm run genkit:dev    # Genkit AI 開發介面（選用）
 ```
 
 ### 部署

@@ -104,7 +104,6 @@ npm run dev
 | `npm run dev` | 啟動開發伺服器（Turbopack 加速，Port 9002） |
 | `npm run build` | 打包正式環境版本 |
 | `npm run start` | 啟動正式環境伺服器 |
-| `npm run genkit:dev` | 啟動 Genkit 開發介面（除錯 AI Flow 用） |
 
 ---
 
