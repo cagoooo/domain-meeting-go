@@ -59,7 +59,7 @@ const formSchema = z.object({
   teachingArea: z.string().min(1, '教學領域不能為空'),
   meetingType: z.string().min(1, '請選擇會議類別'),
   meetingTopic: z.string().min(1, '會議主題不能為空'),
-  meetingDate: z.date({ required_error: '請選擇會議日期' }),
+  meetingDate: z.date({ error: '請選擇會議日期' }),
   communityMembers: z.string().min(1, '社群成員不能為空'),
 });
 
