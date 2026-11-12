@@ -96,6 +96,18 @@ http://localhost/*
 - `functions/` 呼叫 `enableFirebaseTelemetry()`，或在 Cloud Functions 設定任何 `OTEL_*` 環境變數 → 重開 #1、#2、#4、#5
 - 改用 PostgreSQL、MySQL 等上表列出的資料庫 → 重開 #191–#197
 
+### 2026-11-12 補充
+
+當天處理掉 Dependabot PR #5–#13，並以 `package.json` 的 `overrides` 把 `postcss-selector-parser` 強制升到 6.1.6（`@tailwindcss/typography` 0.5.20 寫死 6.0.10，Dependabot 無法自動升級；升級前後產出的 CSS 完全相同）。剩下 3 則屬上游寫死、無法單獨升級，評估如下：
+
+| 警告 | 套件（位置） | 判斷 |
+|---|---|---|
+| #216 | `zod` 3.25.76（functions，genkit 1.42 帶入） | 唯一的陣列 schema `photoDescriptions` 在交給 zod 前已限制最多 10 筆、每筆截到 1000 字，另有 App Check 與頻率限制；前端的 zod 已升到 4.6.6 |
+| #223、#224 | `glob`、`minimatch`（functions，google-gax → gaxios → rimraf 帶入） | 執行時沒有任何程式呼叫 rimraf／glob，也不處理外部傳入的比對規則 |
+
+- genkit 改用 zod 4，或 google-gax 不再帶 rimraf 5 → 更新套件後這幾則會自動關閉；若改寫 `functions/` 讓使用者能傳入不限長度的陣列 → 重開 #216
+- 日後 `@tailwindcss/typography` 放寬版本後，可移除 `overrides` 裡的 `postcss-selector-parser`
+
 ---
 
 ## 🛡️ 回報漏洞
