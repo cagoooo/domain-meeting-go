@@ -22,6 +22,16 @@ import { RefreshCw, X, Check, AlertCircle } from 'lucide-react';
 const BASE_PATH = '/domain-meeting-go';
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 分鐘自動檢查
 
+// 同網域（cagoooo.github.io）其他工具也共用 Cache Storage，只能清除本工具自己的快取
+// 名稱規則與 public/sw.js 的 CACHE_PREFIX 一致
+const CACHE_PREFIX = 'domain-meeting-go-';
+const isOwnCache = (k: string) =>
+  k.startsWith(CACHE_PREFIX) || k.includes(`${window.location.origin}${BASE_PATH}/`);
+async function clearOwnCaches() {
+  const keys = await caches.keys();
+  await Promise.all(keys.filter(isOwnCache).map((k) => caches.delete(k)));
+}
+
 type VersionInfo = {
   version: string;
   releasedAt?: string;
@@ -63,8 +73,7 @@ export function ServiceWorkerRegister() {
       console.warn('[SW] 偵測到 ChunkLoadError，自動清快取並重載：', errMsg);
       try {
         if ('caches' in window) {
-          const keys = await caches.keys();
-          await Promise.all(keys.map((k) => caches.delete(k)));
+          await clearOwnCaches();
         }
         if ('serviceWorker' in navigator) {
           const reg = await navigator.serviceWorker.getRegistration();
@@ -160,8 +169,7 @@ export function ServiceWorkerRegister() {
         reg?.waiting?.postMessage({ type: 'SKIP_WAITING' });
       }
       if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
+        await clearOwnCaches();
       }
       window.location.reload();
     } catch (err) {
