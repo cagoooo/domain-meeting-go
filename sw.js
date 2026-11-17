@@ -11,10 +11,25 @@
  * 版本號變更時，install → activate 會清掉舊 cache。
  */
 
-const SW_VERSION = 'v0.6.5';
-const HTML_CACHE = `html-${SW_VERSION}`;
-const STATIC_CACHE = `static-${SW_VERSION}`;
-const RUNTIME_CACHE = `runtime-${SW_VERSION}`;
+const SW_VERSION = 'v0.6.6';
+// 同網域（cagoooo.github.io）其他工具也共用 Cache Storage，快取名稱要加本工具專屬前綴，清除時也只清自己的
+const CACHE_PREFIX = 'domain-meeting-go-';
+const HTML_CACHE = `${CACHE_PREFIX}html-${SW_VERSION}`;
+const STATIC_CACHE = `${CACHE_PREFIX}static-${SW_VERSION}`;
+const RUNTIME_CACHE = `${CACHE_PREFIX}runtime-${SW_VERSION}`;
+// v0.6.5 以前沒有前綴（html-v0.x.y、static-v0.x.y、runtime-v0.x.y），只認得本站真的用過的版本，升級時清掉
+const LEGACY_VERSIONS = [
+  'v0.3.0', 'v0.3.1', 'v0.3.2', 'v0.3.3', 'v0.3.4', 'v0.3.5', 'v0.3.6', 'v0.3.7', 'v0.3.8', 'v0.3.9',
+  'v0.4.0', 'v0.4.1', 'v0.4.2', 'v0.4.3', 'v0.4.4', 'v0.4.5',
+  'v0.5.0', 'v0.5.1', 'v0.5.2', 'v0.5.3', 'v0.5.4',
+  'v0.6.0', 'v0.6.1', 'v0.6.2', 'v0.6.3', 'v0.6.4', 'v0.6.5',
+];
+const LEGACY_CACHES = new Set(
+  LEGACY_VERSIONS.flatMap((v) => [`html-${v}`, `static-${v}`, `runtime-${v}`])
+);
+const CURRENT_CACHES = [HTML_CACHE, STATIC_CACHE, RUNTIME_CACHE];
+const isOwnOldCache = (k) =>
+  (k.startsWith(CACHE_PREFIX) || LEGACY_CACHES.has(k)) && !CURRENT_CACHES.includes(k);
 
 // ========== Lifecycle ==========
 
@@ -26,11 +41,11 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      // 清掉不屬於當前版本的舊 cache
+      // 只清掉本工具自己的舊版 cache（不動同網域其他工具的快取）
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((k) => !k.endsWith(SW_VERSION))
+          .filter(isOwnOldCache)
           .map((k) => caches.delete(k))
       );
       // 接管所有已開啟的頁面
