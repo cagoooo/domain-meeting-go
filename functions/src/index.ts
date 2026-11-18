@@ -111,7 +111,7 @@ const NOTIFY_SECRETS = [lineChannelAccessToken, lineAdminUserId, googleChatWebho
 const SIGNATURE_LABELS = ["類型", "訊息", "錯誤", "說明", "階段"];
 
 /**
- * 同時把同一張卡片 fan-out 到 LINE + Google Chat。
+ * 每張卡片都發 Google Chat；只有失敗卡片另外推 LINE。
  * 失敗／警示類先經過節流：同一種問題 10 分鐘內只推第一則，其餘合併計數。
  * 兩個管道皆 fire-and-forget、缺對應 secret 時各自靜默略過，互不影響主流程。
  * 節流需要查 Firestore，失敗／警示的呼叫端請 await，避免回應送出後背景工作被中斷。
@@ -130,7 +130,11 @@ async function notifyAdminAll(card: CardSpec): Promise<void> {
       card = { ...card, footerNote: card.footerNote ? `${card.footerNote}　${mergedNote}` : mergedNote };
     }
   }
-  notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
+  // 2026-11-18 起 LINE 只推「失敗」卡片（AI 失敗、系統錯誤）：多個網站共用同一個 LINE 官方帳號，
+  // 免費方案每月 200 則；使用、匯出、次數用完等一般事件只發 Google Chat。
+  if (card.status === "failed") {
+    notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
+  }
   await notifyAdminChatCard(card, googleChatWebhook.value());
 }
 
