@@ -24,11 +24,15 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
+  LogIn,
+  LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NextImage from 'next/image';
-import { functions } from '@/lib/firebase';
+import { functions, auth, signInWithGoogle, signOutGoogle } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { Toaster } from '@/components/ui/toaster';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -52,6 +56,7 @@ import {
 import { saveAs } from 'file-saver';
 
 const MAX_PHOTOS = 4;
+const DAILY_SUMMARY_LIMIT = 5; // 與後端 functions/src/auth-quota.ts DAILY_LIMITS.summary 一致
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -276,7 +281,58 @@ export default function Home() {
   const summaryPreviewRef = useRef<HTMLDivElement>(null);
   const summaryProgressRef = useRef<HTMLDivElement>(null);
   const hasReportedUseRef = useRef(false);
+  const loginPanelRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // ── Google 登入（AI 功能必須登入；每個帳號每天 5 份會議摘要，台北時間午夜重置）──
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [summaryRemaining, setSummaryRemaining] = useState<number | null>(null);
+  const [photoRemaining, setPhotoRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (u) => {
+      if (u?.isAnonymous) {
+        // 匿名身分不能用 AI，清掉殘留
+        signOutGoogle().catch(() => { /* ignore */ });
+        setUser(null);
+      } else {
+        setUser(u);
+      }
+      setSummaryRemaining(null);
+      setPhotoRemaining(null);
+      setAuthLoading(false);
+    });
+  }, []);
+
+  const handleSignIn = useCallback(async () => {
+    setIsSigningIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      toast({
+        title: '登入失敗',
+        description: code === 'auth/popup-blocked' ? '瀏覽器擋下了登入視窗，請允許彈出視窗後再按一次。' : '請稍後再試一次。',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [toast]);
+
+  /** 未登入就不送出 AI 請求：提示並捲到登入區 */
+  const requireLogin = useCallback((): boolean => {
+    if (user && !user.isAnonymous) return true;
+    loginPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast({
+      title: '請先用 Google 帳號登入',
+      description: authLoading ? '登入狀態確認中，請稍候再按一次。' : 'AI 功能需要登入才能使用，請按上方「用 Google 帳號登入」。',
+      variant: 'destructive',
+    });
+    return false;
+  }, [user, authLoading, toast]);
 
   const reportClientEvent = useCallback((payload: {
     status: 'started' | 'success' | 'failed' | 'warning';
@@ -444,15 +500,20 @@ export default function Home() {
 
   const describeCallError = (error: unknown): string => {
     const code = (error as { code?: string })?.code;
-    if (code === 'functions/unauthenticated') return '人機驗證未完成，請按「再試一次」並勾選畫面中央的驗證框';
-    if (code === 'functions/invalid-argument') return (error as Error).message || '照片格式不正確';
-    if (code === 'functions/resource-exhausted') return '使用次數已達每小時上限，請稍後再試';
+    const message = (error as Error)?.message || '';
+    if (code === 'functions/unauthenticated') {
+      // 後端的中文訊息（沒登入）直接顯示；框架回的英文 Unauthenticated 可能是人機驗證或登入過期
+      if (message.includes('登入')) return message;
+      return '驗證未完成：請按「再試一次」並完成畫面上的人機驗證；若仍失敗請登出後重新登入';
+    }
+    if (code === 'functions/invalid-argument') return message || '照片格式不正確';
+    if (code === 'functions/resource-exhausted') return message || '使用次數已達上限，請稍後再試';
     return '產出失敗';
   };
 
   const callWithRetry = async (fnName: string, data: unknown, maxRetries = 2) => {
     let lastError: unknown;
-    const callableFn = httpsCallable<unknown, { photoDescription: string; errorCode?: string }>(functions, fnName);
+    const callableFn = httpsCallable<unknown, { photoDescription: string; errorCode?: string; photoRemaining?: number }>(functions, fnName);
 
     for (let i = 0; i <= maxRetries; i++) {
       try {
@@ -507,6 +568,7 @@ export default function Home() {
   }, [form, photos, toast]);
 
   const handleGenerateDescriptions = useCallback(async () => {
+    if (!requireLogin()) return;
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
     const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
@@ -554,6 +616,7 @@ export default function Home() {
           photoDataUri: await downscaleForAi(photo.dataUrl!),
         });
         const result = response.data;
+        if (typeof result.photoRemaining === 'number') setPhotoRemaining(result.photoRemaining);
 
         const isError = !!result.errorCode || result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
 
@@ -606,11 +669,12 @@ export default function Home() {
 
     setIsGeneratingAllDescriptions(false);
     toast({ title: '照片描述處理完畢', description: '所有圖片已處理完成。' });
-  }, [form, photos, reportClientEvent, toast, validateAndFocusFirstMissing]);
+  }, [form, photos, reportClientEvent, requireLogin, toast, validateAndFocusFirstMissing]);
 
   const handleGenerateSingleDescription = useCallback(async (photoId: string) => {
     const photo = photos.find(p => p.id === photoId);
     if (!photo || photo.isGenerating) return;
+    if (!requireLogin()) return;
 
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingTopic, meetingDate, communityMembers } = form.getValues();
@@ -627,6 +691,7 @@ export default function Home() {
         photoDataUri: await downscaleForAi(photo.dataUrl!),
       });
       const result = response.data;
+      if (typeof result.photoRemaining === 'number') setPhotoRemaining(result.photoRemaining);
 
       const isError = !!result.errorCode || result.photoDescription.includes('忙碌') || result.photoDescription.includes('錯誤') || result.photoDescription.includes('機制') || result.photoDescription.includes('無法描述');
 
@@ -653,9 +718,10 @@ export default function Home() {
       setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, description: message, isGenerating: false } : p));
       toast({ title: '系統錯誤', description: message === '產出失敗' ? '呼叫分析函式時發生錯誤。' : message, variant: 'destructive' });
     }
-  }, [form, photos, toast, validateAndFocusFirstMissing]);
+  }, [form, photos, requireLogin, toast, validateAndFocusFirstMissing]);
 
   const handleGenerateSummary = useCallback(async () => {
+    if (!requireLogin()) return;
     if (!validateAndFocusFirstMissing()) return;
     const { teachingArea, meetingType, meetingTopic, meetingDate, communityMembers } = form.getValues();
     const meetingDateText = format(meetingDate, 'yyyy-MM-dd');
@@ -669,7 +735,7 @@ export default function Home() {
     }, 100);
 
     try {
-      const generateSummaryFn = httpsCallable<unknown, { summary: string }>(functions, 'generateMeetingSummary');
+      const generateSummaryFn = httpsCallable<unknown, { summary: string; remaining?: number }>(functions, 'generateMeetingSummary');
       const response = await generateSummaryFn({
         meetingType,
         teachingArea,
@@ -679,6 +745,7 @@ export default function Home() {
         photoDescriptions,
       });
       setSummary(response.data.summary);
+      if (typeof response.data.remaining === 'number') setSummaryRemaining(response.data.remaining);
       setSummaryGenerationProgress(100);
       // 成功通知由後端 generateMeetingSummary 發送（含照片數、字數、耗時），前端不重複發
 
@@ -704,10 +771,14 @@ export default function Home() {
         meetingDate: meetingDateText,
         communityMembers,
       });
+      const errCode = (error as { code?: string })?.code;
+      const errRemaining = (error as { details?: { remaining?: number } })?.details?.remaining;
+      if (typeof errRemaining === 'number') setSummaryRemaining(errRemaining);
+      else if (errCode === 'functions/resource-exhausted' && ((error as Error)?.message || '').includes('今天')) setSummaryRemaining(0);
       const reason = describeCallError(error);
       toast({ title: '產生摘要失敗', description: reason === '產出失敗' ? '請稍後再試。' : reason, variant: 'destructive' });
     }
-  }, [form, photos, reportClientEvent, summaryGenerationProgress, toast, validateAndFocusFirstMissing]);
+  }, [form, photos, reportClientEvent, requireLogin, summaryGenerationProgress, toast, validateAndFocusFirstMissing]);
 
   useEffect(() => {
     if (isGeneratingSummary && summaryGenerationProgress !== null && summaryGenerationProgress < 90) {
@@ -945,6 +1016,46 @@ export default function Home() {
 
         <Form {...form}>
           <main className="dmg-main">
+            {/* Google 登入：AI 功能必須登入，每個帳號每天 5 份會議摘要 */}
+            <section ref={loginPanelRef} className={cn('dmg-login', user && 'is-in')} aria-live="polite">
+              <div className="dmg-login__icon"><ShieldCheck size={22} /></div>
+              <div className="dmg-login__body">
+                {authLoading ? (
+                  <>
+                    <div className="dmg-login__title">確認登入狀態中…</div>
+                    <div className="dmg-login__sub">請稍候</div>
+                  </>
+                ) : user ? (
+                  <>
+                    <div className="dmg-login__title">已登入：{user.displayName || user.email}</div>
+                    <div className="dmg-login__sub">
+                      {summaryRemaining === null
+                        ? `每個帳號每天可產生 ${DAILY_SUMMARY_LIMIT} 份會議摘要（台北時間午夜重新計算）`
+                        : `今日剩餘 ${summaryRemaining} / ${DAILY_SUMMARY_LIMIT} 份會議摘要（台北時間午夜重新計算）`}
+                      {photoRemaining !== null && photoRemaining <= 8 && `・照片描述今日還可 ${photoRemaining} 張`}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="dmg-login__title">請先用 Google 帳號登入，才能使用 AI 功能</div>
+                    <div className="dmg-login__sub">登入後每個帳號每天可產生 {DAILY_SUMMARY_LIMIT} 份會議摘要（台北時間午夜重新計算）。照片與會議內容不會因登入而另外保存。</div>
+                  </>
+                )}
+              </div>
+              <div className="dmg-login__action">
+                {user ? (
+                  <button type="button" className="dmg-btn dmg-btn--ghost" onClick={() => signOutGoogle()}>
+                    <LogOut size={16} /> <span>登出</span>
+                  </button>
+                ) : (
+                  <button type="button" className="dmg-btn dmg-btn--ink" onClick={handleSignIn} disabled={authLoading || isSigningIn}>
+                    {isSigningIn ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                    <span>{isSigningIn ? '登入中…' : '用 Google 帳號登入'}</span>
+                  </button>
+                )}
+              </div>
+            </section>
+
             <form className="contents" onSubmit={(e) => e.preventDefault()}>
               {/* Step 1 — 會議資訊 */}
               <StepCard

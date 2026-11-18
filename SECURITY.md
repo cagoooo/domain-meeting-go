@@ -66,7 +66,12 @@ http://localhost/*
       → issueAppCheckToken：siteverify 通過才簽發 App Check token（1 小時）
       → 所有 onCall：enforceAppCheck + CORS 白名單 + maxInstances 5 + 輸入驗證
       → 每小時上限：依 App Check token（每人）與 IP（寬鬆）計次，Firestore `dmg_rate_limits`
+      → v0.7.0 起 AI 函式必須 Google 登入（拒絕匿名），每個帳號每天 5 份會議摘要／20 張照片描述
+        （台北時間午夜重置，`dmg_rate_limits/daily_<種類>_<uid>_<日期>`，AI 失敗退回）
 ```
+
+- 每日上限數值在 `functions/src/auth-quota.ts` 的 `DAILY_LIMITS`（前端顯示用的 `DAILY_SUMMARY_LIMIT` 在 `src/app/page.tsx`，改的時候兩邊一起改）
+- 每次產生會議摘要都發 Google Chat 通知（Secret `GOOGLE_CHAT_WEBHOOK`），含使用者與今日剩餘；次數用完被擋發 ⛔ 警示（10 分鐘內同一人只推一則）
 
 - Turnstile site key：GitHub repo **Variables** `TURNSTILE_SITE_KEY`（公開值）
 - Turnstile secret key：Firebase Secret Manager `TURNSTILE_SECRET`

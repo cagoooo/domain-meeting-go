@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeAppCheck, CustomProvider } from "firebase/app-check";
 import { getFunctions } from "firebase/functions";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, type User } from "firebase/auth";
 import { getTurnstileToken } from "./turnstile";
 
 // 使用使用者嚴格規定的佔位符機制 (Placeholder)
@@ -43,3 +44,37 @@ if (typeof window !== "undefined") {
 }
 
 export const functions = getFunctions(app, REGION);
+
+// Google 登入：AI 功能必須登入（後端驗 ID Token，httpsCallable 會自動帶上）
+export const auth = getAuth(app);
+
+/** 和頁首 App 內建瀏覽器防護同一條判斷式 */
+export const isInAppBrowser = () =>
+  typeof navigator !== "undefined" &&
+  /FBAN|FBAV|FB_IAB|Instagram|Messenger|MicroMessenger|KAKAOTALK|\bLine\//i.test(navigator.userAgent || "");
+
+/** 回傳 null = 使用者取消（或在 App 內建瀏覽器中，已提醒改用瀏覽器） */
+export async function signInWithGoogle(): Promise<User | null> {
+  // App 內建瀏覽器（LINE／FB 等）：Google 禁止在此登入（403 disallowed_useragent）。
+  // 頁首防護會自動跳轉／引導；這裡再提醒一次，不開登入視窗。
+  if (isInAppBrowser()) {
+    try {
+      window.alert("您目前在 App 內建瀏覽器（LINE／FB 等）中，Google 基於安全政策禁止在此登入。\n\n請點右上／右下角「⋯」→ 選「用預設瀏覽器開啟」後再登入。");
+    } catch (e) {
+      /* 部分 App 不允許 alert */
+    }
+    return null;
+  }
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try {
+    const cred = await signInWithPopup(auth, provider);
+    return cred.user;
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return null;
+    throw e;
+  }
+}
+
+export const signOutGoogle = () => signOut(auth);

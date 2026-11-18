@@ -463,6 +463,49 @@
   box-shadow: 0 6px 14px -6px color-mix(in oklch, var(--ink-deep) 65%, transparent);
 }
 .dmg-btn--ink:not(:disabled):hover { background: var(--ink); }
+.dmg-btn--ghost {
+  background: transparent; color: var(--ink-deep);
+  border-color: var(--rule);
+}
+.dmg-btn--ghost:not(:disabled):hover { background: var(--paper-3); }
+
+/* Google 登入列（AI 功能必須登入） */
+.dmg-login {
+  display: flex; align-items: center; gap: 18px;
+  padding: 18px 22px;
+  background: var(--ink-tint);
+  border: 1px solid color-mix(in oklch, var(--ink) 35%, transparent);
+  border-left: 4px solid var(--ink-deep);
+  border-radius: var(--dmg-radius);
+  box-shadow: var(--shadow-1);
+}
+.dmg-login.is-in {
+  background: var(--accent-tint);
+  border-color: var(--rule-soft);
+  border-left-color: var(--dmg-accent);
+}
+.dmg-login__icon {
+  flex: none; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--paper); color: var(--ink-deep);
+  border: 1px solid var(--rule-soft);
+}
+.dmg-login__body { flex: 1; min-width: 0; }
+.dmg-login__title {
+  font-family: var(--serif); font-weight: 700; font-size: 17px;
+  color: var(--ink-deep); overflow-wrap: anywhere;
+}
+.dmg-login__sub { margin-top: 4px; font-size: 13.5px; line-height: 1.6; color: var(--text-soft); }
+.dmg-login__action { flex: none; }
+.dmg-login__action .dmg-btn { min-height: 48px; }
+@media (max-width: 720px) {
+  .dmg-login { flex-wrap: wrap; padding: 16px; gap: 12px 14px; }
+  .dmg-login__icon { width: 38px; height: 38px; }
+  .dmg-login__body { flex-basis: calc(100% - 56px); }
+  .dmg-login__action { flex-basis: 100%; }
+  .dmg-login__action .dmg-btn { width: 100%; justify-content: center; }
+}
+@media print { .dmg-login { display: none !important; } }
 
 .dmg-progress {
   position: relative;

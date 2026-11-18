@@ -10,6 +10,14 @@ import { notifyAdminChatCard } from "./notify-chat";
 import { verifyTurnstile } from "./turnstile";
 import { consumeRateLimit, getClientIp } from "./rate-limit";
 import { notifySignature, shouldSendNotification, NOTIFY_WINDOW_MS } from "./notify-throttle";
+import {
+  requireGoogleUser,
+  consumeDailyQuota,
+  refundDailyQuota,
+  dailyExhaustedMessage,
+  DAILY_LIMITS,
+  type GoogleUser,
+} from "./auth-quota";
 
 initializeApp();
 
@@ -124,6 +132,15 @@ async function notifyAdminAll(card: CardSpec): Promise<void> {
   }
   notifyAdminCard(card, lineChannelAccessToken.value(), lineAdminUserId.value());
   await notifyAdminChatCard(card, googleChatWebhook.value());
+}
+
+/** 通知卡片的使用者欄位（不放使用者上傳的內容） */
+function userFields(user: GoogleUser, remainingText?: string): CardSpec['fields'] {
+  const fields: CardSpec['fields'] = [
+    { icon: '👤', label: '使用者', value: `${safeText(user.name, '未提供', 60)}（${safeText(user.email, '未提供', 80)}）` },
+  ];
+  if (remainingText) fields.push({ icon: '🎟️', label: '今日剩餘', value: remainingText });
+  return fields;
 }
 
 function safeText(value: unknown, fallback = "未提供", maxLength = 240): string {
@@ -252,6 +269,8 @@ export const generatePhotoDescriptions = onCall(
   },
   async (request: any) => {
     logMissingAppCheck("generatePhotoDescriptions", request);
+    // 順序：登入 → App Check（Turnstile，框架已先驗）→ 每小時保險絲 → 每日次數 → AI
+    const user = requireGoogleUser(request);
     const photoDataUri = request.data?.photoDataUri;
     if (
       typeof photoDataUri !== "string" ||
@@ -264,6 +283,19 @@ export const generatePhotoDescriptions = onCall(
     const input = { teachingArea, meetingTopic, communityMembers, meetingDate, photoDataUri };
     if (!(await withinCallableLimit("generatePhotoDescriptions", request))) {
       throw new HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
+    const quota = await consumeDailyQuota('photo', user.uid);
+    if (!quota.ok) {
+      await notifyAdminAll({
+        status: 'warning',
+        title: '⛔ 照片描述今日上限已用完被擋',
+        appName: '領域共備GO',
+        fields: [
+          ...userFields(user, `0 / ${DAILY_LIMITS.photo} 張`),
+          { icon: '📝', label: '說明', value: `${user.email} 今日照片描述已達上限` },
+        ],
+      });
+      throw new HttpsError("resource-exhausted", dailyExhaustedMessage('photo'));
     }
 
     const startedAt = Date.now();
@@ -319,18 +351,20 @@ export const generatePhotoDescriptions = onCall(
       const elapsedMs = Date.now() - startedAt;
 
       if (!output || !output.photoDescription) {
+        const left = await refundDailyQuota('photo', user.uid, quota.date);
         await notifyAdminAll({
           status: 'warning',
-          title: '照片描述產出空白',
+          title: '照片描述產出空白（已退回次數）',
           appName: '領域共備GO',
-          fields: meetingFields(input),
+          fields: [...userFields(user, left === null ? undefined : `照片 ${left} / ${DAILY_LIMITS.photo} 張`), ...meetingFields(input)],
           footerNote: `⏱️ ${elapsedMs}ms`,
         });
-        return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
+        return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。', errorCode: 'empty-output', photoRemaining: left ?? quota.remaining };
       }
 
-      // 成功時不每張都通知（避免訊息轟炸），僅 log
-      return { photoDescription: output.photoDescription };
+      // 每張照片不另發通知（一份報告最多 4 張，會洗版）；「使用」的通知在產生會議摘要時發，這裡只記 log
+      logger.info('[photo] 照片描述成功', { uid: user.uid, remaining: quota.remaining, elapsedMs });
+      return { photoDescription: output.photoDescription, photoRemaining: quota.remaining };
     } catch (error: any) {
       console.error('Genkit Error Details:', error);
       const errorMessage = error.message || String(error);
@@ -353,11 +387,13 @@ export const generatePhotoDescriptions = onCall(
         alertCategory = '❓ 其他錯誤';
       }
 
+      const left = await refundDailyQuota('photo', user.uid, quota.date);
       await notifyAdminAll({
         status: 'failed',
-        title: '照片描述失敗',
+        title: '❌ 照片描述失敗（已退回次數）',
         appName: '領域共備GO',
         fields: [
+          ...userFields(user, left === null ? undefined : `照片 ${left} / ${DAILY_LIMITS.photo} 張`),
           ...meetingFields(input),
           { icon: '🏷️', label: '類型', value: alertCategory },
           { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
@@ -365,7 +401,11 @@ export const generatePhotoDescriptions = onCall(
         footerNote: `⏱️ ${elapsedMs}ms`,
       });
 
-      return { photoDescription: userFacing, errorCode: billingDepleted ? 'billing-depleted' : 'generation-failed' };
+      return {
+        photoDescription: userFacing,
+        errorCode: billingDepleted ? 'billing-depleted' : 'generation-failed',
+        photoRemaining: left ?? quota.remaining,
+      };
     }
   }
 );
@@ -382,6 +422,7 @@ export const generateMeetingSummary = onCall(
   },
   async (request: any) => {
     logMissingAppCheck("generateMeetingSummary", request);
+    const user = requireGoogleUser(request);
     const rawDescriptions = request.data?.photoDescriptions;
     if (!Array.isArray(rawDescriptions) || rawDescriptions.length > 10) {
       throw new HttpsError("invalid-argument", "照片描述資料格式不正確。");
@@ -392,6 +433,19 @@ export const generateMeetingSummary = onCall(
     };
     if (!(await withinCallableLimit("generateMeetingSummary", request))) {
       throw new HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
+    const quota = await consumeDailyQuota('summary', user.uid);
+    if (!quota.ok) {
+      await notifyAdminAll({
+        status: 'warning',
+        title: '⛔ 今日次數已用完被擋',
+        appName: '領域共備GO',
+        fields: [
+          ...userFields(user, `0 / ${DAILY_LIMITS.summary} 次`),
+          { icon: '📝', label: '說明', value: `${user.email} 今日會議摘要已用完` },
+        ],
+      });
+      throw new HttpsError("resource-exhausted", dailyExhaustedMessage('summary'));
     }
 
     const startedAt = Date.now();
@@ -469,22 +523,24 @@ export const generateMeetingSummary = onCall(
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
 
       if (!output || !output.summary) {
+        const left = await refundDailyQuota('summary', user.uid, quota.date);
         await notifyAdminAll({
           status: 'warning',
-          title: '會議摘要產出空白',
+          title: '會議摘要產出空白（已退回次數）',
           appName: '領域共備GO',
-          fields: meetingFields(input),
+          fields: [...userFields(user, left === null ? undefined : `${left} / ${DAILY_LIMITS.summary} 次`), ...meetingFields(input)],
           footerNote: `⏱️ ${elapsedSec}s`,
         });
-        throw new HttpsError('internal', 'Failed to generate summary');
+        throw new HttpsError('internal', '會議摘要產生失敗，請稍後再試（這次不扣次數）。', { remaining: left ?? undefined });
       }
 
-      // 成功通知（含摘要長度與耗時）
-      notifyAdminAll({
+      // 每次使用都通知（含使用者、今日剩餘、摘要長度與耗時）；回應前 await，避免背景工作被中斷
+      await notifyAdminAll({
         status: 'success',
-        title: '會議摘要產出成功',
+        title: '✅ 有人使用了領域共備GO（會議摘要）',
         appName: '領域共備GO',
         fields: [
+          ...userFields(user, `${quota.remaining} / ${DAILY_LIMITS.summary} 次`),
           ...meetingFields(input),
           { icon: '📷', label: '照片', value: `${photoCount} 張` },
           { icon: '📝', label: '字數', value: `${output.summary.length}` },
@@ -492,26 +548,29 @@ export const generateMeetingSummary = onCall(
         ],
       });
 
-      return { summary: output.summary };
+      return { summary: output.summary, remaining: quota.remaining, limit: DAILY_LIMITS.summary };
     } catch (error: any) {
+      // 產出空白那條已退過次數、發過通知，直接往外丟
+      if (error instanceof HttpsError) throw error;
       console.error('generateMeetingSummary failed:', error);
       const elapsedMs = Date.now() - startedAt;
       const elapsedSec = (elapsedMs / 1000).toFixed(1);
       const errorMessage = error?.message || String(error);
 
-      // 產出空白時上面已發過「警示」通知，這裡不再重複發「失敗」
-      if (!(error instanceof HttpsError)) await notifyAdminAll({
+      const left = await refundDailyQuota('summary', user.uid, quota.date);
+      await notifyAdminAll({
         status: 'failed',
-        title: '會議摘要失敗',
+        title: '❌ 會議摘要失敗（已退回次數）',
         appName: '領域共備GO',
         fields: [
+          ...userFields(user, left === null ? undefined : `${left} / ${DAILY_LIMITS.summary} 次`),
           ...meetingFields(input),
           { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
         ],
         footerNote: `⏱️ ${elapsedSec}s`,
       });
 
-      throw new HttpsError('internal', '會議摘要產生失敗，請稍後再試。');
+      throw new HttpsError('internal', '會議摘要產生失敗，請稍後再試（這次不扣次數）。', { remaining: left ?? undefined });
     }
   }
 );
