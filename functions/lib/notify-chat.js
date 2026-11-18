@@ -81,10 +81,32 @@ async function pushToChat(webhookUrl, payload) {
         body: JSON.stringify(payload),
     });
 }
+// 平台名稱統一用中文；前端舊版送來的英文名也換成中文
+const DEFAULT_APP_NAME = '領域共備GO';
+const LEGACY_APP_NAMES = ['Domain Meeting GO'];
+function platformName(card) {
+    const name = (card.appName || '').trim();
+    return !name || LEGACY_APP_NAMES.includes(name) ? DEFAULT_APP_NAME : name;
+}
+/**
+ * 拆出標題開頭的表情符號，並拿掉標題裡已經寫到的平台名（避免重複）。
+ * 例：「✅ 有人使用了領域共備GO（會議摘要）」→ { emoji: '✅', body: '有人使用了（會議摘要）' }
+ */
+function splitTitle(title, appName) {
+    const match = title.match(/^((?:\p{Extended_Pictographic}[\p{Mn}\p{Cf}]*)+)\s*/u);
+    const emoji = match ? match[1] : '';
+    const rest = match ? title.slice(match[0].length) : title;
+    const body = rest.split(appName).join('').replace(/\s{2,}/g, ' ').trim();
+    return { emoji, body: body || '通知' };
+}
 function buildChatCard(card) {
     const icon = CHAT_ICONS[card.status];
     const now = formatTaiwanTime();
-    const previewText = `${icon} ${card.title} (${card.appName || 'Domain Meeting GO'})`;
+    const appName = platformName(card);
+    const { emoji, body } = splitTitle(card.title, appName);
+    const lead = emoji ? `${icon} ${emoji}` : icon;
+    // 手機推播只看得到這一行 → 平台名放在表情符號後面：「[OK] ✅ 【領域共備GO】有人使用了（會議摘要）」
+    const previewText = `${lead} 【${appName}】${body}`;
     const widgets = card.fields.map((f) => ({
         decoratedText: {
             topLabel: `${f.icon ? f.icon + ' ' : ''}${f.label}`,
@@ -103,8 +125,8 @@ function buildChatCard(card) {
                 cardId: `report-${Date.now()}`,
                 card: {
                     header: {
-                        title: `${icon} ${card.title}`,
-                        subtitle: card.appName || 'Domain Meeting GO',
+                        title: `${lead} ${body}｜${appName}`,
+                        subtitle: appName,
                     },
                     sections: [{ widgets }],
                 },
@@ -114,9 +136,10 @@ function buildChatCard(card) {
 }
 function cardToPlainText(card) {
     const icon = CHAT_ICONS[card.status];
-    const lines = [`${icon} ${card.title}`];
-    if (card.appName)
-        lines.push(`(${card.appName})`);
+    const appName = platformName(card);
+    const { emoji, body } = splitTitle(card.title, appName);
+    // 備援純文字的第一行也一樣把平台名放前面
+    const lines = [`${emoji ? `${icon} ${emoji}` : icon} 【${appName}】${body}`];
     lines.push('');
     for (const f of card.fields) {
         lines.push(`${f.icon || ''} ${f.label}: ${f.value || '-'}`);
