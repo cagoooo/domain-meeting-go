@@ -46,6 +46,7 @@ const notify_chat_1 = require("./notify-chat");
 const turnstile_1 = require("./turnstile");
 const rate_limit_1 = require("./rate-limit");
 const notify_throttle_1 = require("./notify-throttle");
+const auth_quota_1 = require("./auth-quota");
 (0, app_1.initializeApp)();
 // 宣告使用 Secret Manager 中的 API Key
 const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
@@ -145,6 +146,15 @@ async function notifyAdminAll(card) {
     }
     (0, notify_line_1.notifyAdminCard)(card, lineChannelAccessToken.value(), lineAdminUserId.value());
     await (0, notify_chat_1.notifyAdminChatCard)(card, googleChatWebhook.value());
+}
+/** 通知卡片的使用者欄位（不放使用者上傳的內容） */
+function userFields(user, remainingText) {
+    const fields = [
+        { icon: '👤', label: '使用者', value: `${safeText(user.name, '未提供', 60)}（${safeText(user.email, '未提供', 80)}）` },
+    ];
+    if (remainingText)
+        fields.push({ icon: '🎟️', label: '今日剩餘', value: remainingText });
+    return fields;
 }
 function safeText(value, fallback = "未提供", maxLength = 240) {
     const text = typeof value === "string" ? value.trim() : "";
@@ -251,6 +261,8 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
     timeoutSeconds: 120,
 }, async (request) => {
     logMissingAppCheck("generatePhotoDescriptions", request);
+    // 順序：登入 → App Check（Turnstile，框架已先驗）→ 每小時保險絲 → 每日次數 → AI
+    const user = (0, auth_quota_1.requireGoogleUser)(request);
     const photoDataUri = request.data?.photoDataUri;
     if (typeof photoDataUri !== "string" ||
         photoDataUri.length > MAX_PHOTO_DATA_URI_LENGTH ||
@@ -261,6 +273,19 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
     const input = { teachingArea, meetingTopic, communityMembers, meetingDate, photoDataUri };
     if (!(await withinCallableLimit("generatePhotoDescriptions", request))) {
         throw new https_1.HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
+    const quota = await (0, auth_quota_1.consumeDailyQuota)('photo', user.uid);
+    if (!quota.ok) {
+        await notifyAdminAll({
+            status: 'warning',
+            title: '⛔ 照片描述今日上限已用完被擋',
+            appName: '領域共備GO',
+            fields: [
+                ...userFields(user, `0 / ${auth_quota_1.DAILY_LIMITS.photo} 張`),
+                { icon: '📝', label: '說明', value: `${user.email} 今日照片描述已達上限` },
+            ],
+        });
+        throw new https_1.HttpsError("resource-exhausted", (0, auth_quota_1.dailyExhaustedMessage)('photo'));
     }
     const startedAt = Date.now();
     try {
@@ -313,17 +338,19 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
         const { output } = await prompt(input);
         const elapsedMs = Date.now() - startedAt;
         if (!output || !output.photoDescription) {
+            const left = await (0, auth_quota_1.refundDailyQuota)('photo', user.uid, quota.date);
             await notifyAdminAll({
                 status: 'warning',
-                title: '照片描述產出空白',
+                title: '照片描述產出空白（已退回次數）',
                 appName: '領域共備GO',
-                fields: (0, notify_line_1.meetingFields)(input),
+                fields: [...userFields(user, left === null ? undefined : `照片 ${left} / ${auth_quota_1.DAILY_LIMITS.photo} 張`), ...(0, notify_line_1.meetingFields)(input)],
                 footerNote: `⏱️ ${elapsedMs}ms`,
             });
-            return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。' };
+            return { photoDescription: 'AI 無法產出有效描述，請嘗試調整拍攝角度後再試一次。', errorCode: 'empty-output', photoRemaining: left ?? quota.remaining };
         }
-        // 成功時不每張都通知（避免訊息轟炸），僅 log
-        return { photoDescription: output.photoDescription };
+        // 每張照片不另發通知（一份報告最多 4 張，會洗版）；「使用」的通知在產生會議摘要時發，這裡只記 log
+        logger.info('[photo] 照片描述成功', { uid: user.uid, remaining: quota.remaining, elapsedMs });
+        return { photoDescription: output.photoDescription, photoRemaining: quota.remaining };
     }
     catch (error) {
         console.error('Genkit Error Details:', error);
@@ -348,18 +375,24 @@ exports.generatePhotoDescriptions = (0, https_1.onCall)({
             userFacing = '分析失敗，請稍後再試一次。';
             alertCategory = '❓ 其他錯誤';
         }
+        const left = await (0, auth_quota_1.refundDailyQuota)('photo', user.uid, quota.date);
         await notifyAdminAll({
             status: 'failed',
-            title: '照片描述失敗',
+            title: '❌ 照片描述失敗（已退回次數）',
             appName: '領域共備GO',
             fields: [
+                ...userFields(user, left === null ? undefined : `照片 ${left} / ${auth_quota_1.DAILY_LIMITS.photo} 張`),
                 ...(0, notify_line_1.meetingFields)(input),
                 { icon: '🏷️', label: '類型', value: alertCategory },
                 { icon: '💬', label: '訊息', value: errorMessage.substring(0, 200) },
             ],
             footerNote: `⏱️ ${elapsedMs}ms`,
         });
-        return { photoDescription: userFacing, errorCode: billingDepleted ? 'billing-depleted' : 'generation-failed' };
+        return {
+            photoDescription: userFacing,
+            errorCode: billingDepleted ? 'billing-depleted' : 'generation-failed',
+            photoRemaining: left ?? quota.remaining,
+        };
     }
 });
 // ------------------------------------
@@ -371,6 +404,7 @@ exports.generateMeetingSummary = (0, https_1.onCall)({
     timeoutSeconds: 120,
 }, async (request) => {
     logMissingAppCheck("generateMeetingSummary", request);
+    const user = (0, auth_quota_1.requireGoogleUser)(request);
     const rawDescriptions = request.data?.photoDescriptions;
     if (!Array.isArray(rawDescriptions) || rawDescriptions.length > 10) {
         throw new https_1.HttpsError("invalid-argument", "照片描述資料格式不正確。");
@@ -381,6 +415,19 @@ exports.generateMeetingSummary = (0, https_1.onCall)({
     };
     if (!(await withinCallableLimit("generateMeetingSummary", request))) {
         throw new https_1.HttpsError("resource-exhausted", RATE_LIMIT_MESSAGE);
+    }
+    const quota = await (0, auth_quota_1.consumeDailyQuota)('summary', user.uid);
+    if (!quota.ok) {
+        await notifyAdminAll({
+            status: 'warning',
+            title: '⛔ 今日次數已用完被擋',
+            appName: '領域共備GO',
+            fields: [
+                ...userFields(user, `0 / ${auth_quota_1.DAILY_LIMITS.summary} 次`),
+                { icon: '📝', label: '說明', value: `${user.email} 今日會議摘要已用完` },
+            ],
+        });
+        throw new https_1.HttpsError("resource-exhausted", (0, auth_quota_1.dailyExhaustedMessage)('summary'));
     }
     const startedAt = Date.now();
     const photoCount = input.photoDescriptions.length;
@@ -451,47 +498,52 @@ exports.generateMeetingSummary = (0, https_1.onCall)({
         const elapsedMs = Date.now() - startedAt;
         const elapsedSec = (elapsedMs / 1000).toFixed(1);
         if (!output || !output.summary) {
+            const left = await (0, auth_quota_1.refundDailyQuota)('summary', user.uid, quota.date);
             await notifyAdminAll({
                 status: 'warning',
-                title: '會議摘要產出空白',
+                title: '會議摘要產出空白（已退回次數）',
                 appName: '領域共備GO',
-                fields: (0, notify_line_1.meetingFields)(input),
+                fields: [...userFields(user, left === null ? undefined : `${left} / ${auth_quota_1.DAILY_LIMITS.summary} 次`), ...(0, notify_line_1.meetingFields)(input)],
                 footerNote: `⏱️ ${elapsedSec}s`,
             });
-            throw new https_1.HttpsError('internal', 'Failed to generate summary');
+            throw new https_1.HttpsError('internal', '會議摘要產生失敗，請稍後再試（這次不扣次數）。', { remaining: left ?? undefined });
         }
-        // 成功通知（含摘要長度與耗時）
-        notifyAdminAll({
+        // 每次使用都通知（含使用者、今日剩餘、摘要長度與耗時）；回應前 await，避免背景工作被中斷
+        await notifyAdminAll({
             status: 'success',
-            title: '會議摘要產出成功',
+            title: '✅ 有人使用了領域共備GO（會議摘要）',
             appName: '領域共備GO',
             fields: [
+                ...userFields(user, `${quota.remaining} / ${auth_quota_1.DAILY_LIMITS.summary} 次`),
                 ...(0, notify_line_1.meetingFields)(input),
                 { icon: '📷', label: '照片', value: `${photoCount} 張` },
                 { icon: '📝', label: '字數', value: `${output.summary.length}` },
                 { icon: '⏱️', label: '耗時', value: `${elapsedSec}s` },
             ],
         });
-        return { summary: output.summary };
+        return { summary: output.summary, remaining: quota.remaining, limit: auth_quota_1.DAILY_LIMITS.summary };
     }
     catch (error) {
+        // 產出空白那條已退過次數、發過通知，直接往外丟
+        if (error instanceof https_1.HttpsError)
+            throw error;
         console.error('generateMeetingSummary failed:', error);
         const elapsedMs = Date.now() - startedAt;
         const elapsedSec = (elapsedMs / 1000).toFixed(1);
         const errorMessage = error?.message || String(error);
-        // 產出空白時上面已發過「警示」通知，這裡不再重複發「失敗」
-        if (!(error instanceof https_1.HttpsError))
-            await notifyAdminAll({
-                status: 'failed',
-                title: '會議摘要失敗',
-                appName: '領域共備GO',
-                fields: [
-                    ...(0, notify_line_1.meetingFields)(input),
-                    { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
-                ],
-                footerNote: `⏱️ ${elapsedSec}s`,
-            });
-        throw new https_1.HttpsError('internal', '會議摘要產生失敗，請稍後再試。');
+        const left = await (0, auth_quota_1.refundDailyQuota)('summary', user.uid, quota.date);
+        await notifyAdminAll({
+            status: 'failed',
+            title: '❌ 會議摘要失敗（已退回次數）',
+            appName: '領域共備GO',
+            fields: [
+                ...userFields(user, left === null ? undefined : `${left} / ${auth_quota_1.DAILY_LIMITS.summary} 次`),
+                ...(0, notify_line_1.meetingFields)(input),
+                { icon: '💬', label: '錯誤', value: errorMessage.substring(0, 250) },
+            ],
+            footerNote: `⏱️ ${elapsedSec}s`,
+        });
+        throw new https_1.HttpsError('internal', '會議摘要產生失敗，請稍後再試（這次不扣次數）。', { remaining: left ?? undefined });
     }
 });
 // ------------------------------------
