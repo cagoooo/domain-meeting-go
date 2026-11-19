@@ -44,9 +44,9 @@ exports.dailyExhaustedMessage = dailyExhaustedMessage;
  *
  * 政策（2026-11-17 阿凱老師定案）：花 Gemini 額度的功能一律
  *   ① 必須 Google 帳號登入（拒絕匿名）
- *   ② 每個帳號每天 5 次（本站 1 次 = 產生 1 份會議摘要）
+ *   ② 每個帳號每天 3 次（本站 1 次 = 產生 1 份會議摘要；2026-11-19 由 5 次下修為 3 次）
  *   ③ 每次使用發 Google Chat 通知
- * 照片描述另設每帳號每日上限當保險絲（一份報告最多 4 張照片）。
+ * 照片描述另設每帳號每日上限當保險絲（一份報告最多 4 張照片 × 3 份 = 12 張）。
  *
  * 計數文件放在既有的 dmg_rate_limits 集合（同一個 expireAt TTL 自動清除）。
  * AI 呼叫失敗時呼叫 refundDailyQuota 把次數退回。
@@ -56,8 +56,8 @@ const firestore_1 = require("firebase-admin/firestore");
 const logger = __importStar(require("firebase-functions/logger"));
 const COLLECTION = 'dmg_rate_limits';
 exports.DAILY_LIMITS = {
-    summary: 5,
-    photo: 20,
+    summary: 3,
+    photo: 12,
 };
 exports.LOGIN_REQUIRED_MESSAGE = '請先用 Google 帳號登入才能使用 AI 功能。';
 /** onCall 版：框架已驗過 ID Token（無效 token 在這之前就被擋），這裡再擋「沒帶」與「匿名」 */

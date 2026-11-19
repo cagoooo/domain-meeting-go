@@ -56,7 +56,7 @@ import {
 import { saveAs } from 'file-saver';
 
 const MAX_PHOTOS = 4;
-const DAILY_SUMMARY_LIMIT = 5; // 與後端 functions/src/auth-quota.ts DAILY_LIMITS.summary 一致
+const DAILY_SUMMARY_LIMIT = 3; // 與後端 functions/src/auth-quota.ts DAILY_LIMITS.summary 一致
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -284,7 +284,7 @@ export default function Home() {
   const loginPanelRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // ── Google 登入（AI 功能必須登入；每個帳號每天 5 份會議摘要，台北時間午夜重置）──
+  // ── Google 登入（AI 功能必須登入；每個帳號每天 3 份會議摘要，台北時間午夜重置）──
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -1016,7 +1016,7 @@ export default function Home() {
 
         <Form {...form}>
           <main className="dmg-main">
-            {/* Google 登入：AI 功能必須登入，每個帳號每天 5 份會議摘要 */}
+            {/* Google 登入：AI 功能必須登入，每個帳號每天 3 份會議摘要 */}
             <section ref={loginPanelRef} className={cn('dmg-login', user && 'is-in')} aria-live="polite">
               <div className="dmg-login__icon"><ShieldCheck size={22} /></div>
               <div className="dmg-login__body">

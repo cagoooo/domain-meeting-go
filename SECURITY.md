@@ -66,7 +66,7 @@ http://localhost/*
       → issueAppCheckToken：siteverify 通過才簽發 App Check token（1 小時）
       → 所有 onCall：enforceAppCheck + CORS 白名單 + maxInstances 5 + 輸入驗證
       → 每小時上限：依 App Check token（每人）與 IP（寬鬆）計次，Firestore `dmg_rate_limits`
-      → v0.7.0 起 AI 函式必須 Google 登入（拒絕匿名），每個帳號每天 5 份會議摘要／20 張照片描述
+      → v0.7.0 起 AI 函式必須 Google 登入（拒絕匿名），每個帳號每天 3 份會議摘要／12 張照片描述（v0.7.1 由 5 份／20 張下修）
         （台北時間午夜重置，`dmg_rate_limits/daily_<種類>_<uid>_<日期>`，AI 失敗退回）
 ```
 
