@@ -11,7 +11,7 @@
  * 版本號變更時，install → activate 會清掉舊 cache。
  */
 
-const SW_VERSION = 'v0.7.0';
+const SW_VERSION = 'v0.7.1';
 // 同網域（cagoooo.github.io）其他工具也共用 Cache Storage，快取名稱要加本工具專屬前綴，清除時也只清自己的
 const CACHE_PREFIX = 'domain-meeting-go-';
 const HTML_CACHE = `${CACHE_PREFIX}html-${SW_VERSION}`;
